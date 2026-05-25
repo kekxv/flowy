@@ -297,7 +297,7 @@ function EventSelector({ eventTypes, selected, onToggle, t }: {
   eventTypes: Array<{ key: string; label: string }>;
   selected: string[];
   onToggle: (key: string) => void;
-  t: (key: string, fallback?: string) => string;
+  t: any;
 }) {
   const groups: Record<string, { label: string; keys: string[] }> = {
     issue: { label: "Issue", keys: eventTypes.filter(e => e.key.startsWith("issue.")).map(e => e.key) },

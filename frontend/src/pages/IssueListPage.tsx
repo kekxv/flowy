@@ -30,25 +30,7 @@ export default function IssueListPage() {
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
   const [myRoles, setMyRoles] = useState<string[]>([]);
   const [toast, setToast] = useState("");
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [quickTitle, setQuickTitle] = useState("");
-  const [quickType, setQuickType] = useState("bug");
-  const [quickPri, setQuickPri] = useState("medium");
-  const [quickSub, setQuickSub] = useState(false);
-
-  const openQuick = () => { setQuickOpen(true); setQuickTitle(q); };
-
-  const doQuickCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickTitle.trim()) return;
-    setQuickSub(true);
-    try {
-      const r = await api.post("/issues", { title: quickTitle, issue_type: quickType, priority: quickPri });
-      setQuickOpen(false); setQuickTitle(""); fetch();
-      navigate(`/issues/${r.data.id}`);
-    } catch (err: any) { showToast(t("common.error","Failed")); }
-    setQuickSub(false);
-  };
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   useEffect(()=>{api.get("/labels").then(r=>setLabels(r.data));},[]);
   // Poll active timers
@@ -60,7 +42,6 @@ export default function IssueListPage() {
     listIssues(p).then(r=>{setIssues(r.data);setTotal(r.meta.total);setLoading(false);}); };
   useEffect(fetch,[page,status,priority,debouncedQ,labelId]);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
   const doPopup = async (id:string, field:string, value:string) => {
     try {
       await api.put(`/issues/${id}`,{[field]:value}); setPopup(null); fetch();

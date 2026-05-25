@@ -91,6 +91,7 @@ export async function linkExternalIssue(
     external_url: string;
     title?: string;
     status?: string;
+    link_type?: string;
   }
 ): Promise<ExternalLink> {
   const res = await api.post(

@@ -70,7 +70,6 @@ export default function IssueDetailPage() {
   const isLead = (issue?.assignees||[]).some((a:any)=>a.role==="project_lead" && a.id===curUser?.id);
   const isFeatureOwner = issue?.issue_type === "feature" && (issue?.assignees||[]).some((a:any)=>a.id===curUser?.id);
   const isReporter = issue?.reporter?.id === curUser?.id;
-  const canEdit = isAdmin || isLead || isFeatureOwner || isReporter;
   const canFullEdit = isAdmin || isLead || isFeatureOwner;
   const mls=issue?.milestone_ids||[];
 

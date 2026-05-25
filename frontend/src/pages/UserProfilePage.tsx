@@ -205,7 +205,7 @@ export default function UserProfilePage() {
 
 const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 
-function ProjectRolesSection({ t }: { t: (k: string, f?: string) => string }) {
+function ProjectRolesSection({ t }: { t: any }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(true);
