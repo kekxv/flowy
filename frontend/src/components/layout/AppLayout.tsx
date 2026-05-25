@@ -11,9 +11,9 @@ function useNavItems() {
     { to: "/dashboard", label: t("dashboard.title"), icon: LayoutDashboard },
     { to: "/issues", label: t("issues.title"), icon: ListTodo },
     { to: "/milestones", label: t("milestone.title"), icon: Flag },
-    { to: "/labels", label: t("common.labels"), icon: Tags },
   ];
   if (user?.role === "admin") {
+    items.push({ to: "/labels", label: t("common.labels"), icon: Tags });
     items.push({ to: "/admin", label: t("admin.title"), icon: Shield });
   }
   return items;

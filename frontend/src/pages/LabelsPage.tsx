@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Edit3, Trash2 } from "lucide-react";
+import { Plus, Edit3, Trash2, Lock } from "lucide-react";
 import { listLabels, createLabel, updateLabel, deleteLabel, type LabelData } from "../api/issues";
+import { useAuthStore } from "../store/authStore";
 
 export default function LabelsPage() {
   const { t } = useTranslation();
+  const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === "admin";
   const [labels, setLabels] = useState<LabelData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -24,6 +27,13 @@ export default function LabelsPage() {
   const remove = async (id:string) => { if(!confirm(t("common.confirm")+"?"))return; await deleteLabel(id); fetch(); };
 
   if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (!isAdmin) return (
+    <div className="flex flex-col items-center justify-center pt-24 text-[var(--text-muted)]">
+      <Lock size={40} className="mb-3 opacity-30"/>
+      <p className="text-sm font-medium">Access denied</p>
+      <p className="text-xs mt-1">Admin only</p>
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 page-enter">
@@ -32,7 +42,7 @@ export default function LabelsPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t("common.labels")}</h1>
           <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{labels.length} labels</p>
         </div>
-        <button onClick={()=>{reset();setShowForm(true);}} className="btn btn-primary"><Plus size={15}/>{t("common.create")}</button>
+        {isAdmin && <button onClick={()=>{reset();setShowForm(true);}} className="btn btn-primary"><Plus size={15}/>{t("common.create")}</button>}
       </div>
 
       {showForm&&(
@@ -76,10 +86,10 @@ export default function LabelsPage() {
                   <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium border" style={{backgroundColor:l.color+"10",color:l.color,borderColor:l.color+"30"}}>Label preview</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {isAdmin && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={()=>edit(l)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--primary)] transition-colors"><Edit3 size={14}/></button>
                 <button onClick={()=>remove(l.id)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
-              </div>
+              </div>}
             </div>
           ))}
         </div>

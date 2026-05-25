@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models.issue import Label
 from app.models.user import User
 from app.schemas.issue import LabelCreate, LabelResponse, LabelUpdate
@@ -24,7 +24,7 @@ async def list_labels(
 async def create_label(
     data: LabelCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ):
     label = await issue_service.create_label(db, data.name, data.color, data.description)
     return LabelResponse.model_validate(label)
@@ -35,7 +35,7 @@ async def update_label(
     label_id: str,
     data: LabelUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ):
     label = await db.get(Label, label_id)
     if not label:
@@ -50,7 +50,7 @@ async def update_label(
 async def delete_label(
     label_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ):
     label = await db.get(Label, label_id)
     if not label:
