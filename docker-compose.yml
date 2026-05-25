@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/kekxv/flowy:latest
     ports:
       - "${PORT:-80}:80"
     volumes:

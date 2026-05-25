@@ -18,31 +18,25 @@ RUN npm run build
 
 # === Stage 4: Final runtime ===
 FROM python:3.11-slim
-
-# Install nginx (cached unless this layer changes)
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-# Copy backend venv (cached unless pyproject.toml/uv.lock change)
+# Copy backend venv
 COPY --from=backend-deps /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy nginx config (cached unless nginx.conf changes)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy frontend dist (cached unless frontend code changes)
+# Copy frontend dist
 COPY --from=frontend-build /app/dist /app/static
 
 # Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Copy backend code (this layer changes most often - keep LAST)
+# Copy backend code (last layer - changes most often)
 COPY backend/ .
 
 RUN mkdir -p /data
 ENV DATABASE_URL=sqlite+aiosqlite:////data/flowy.db
+ENV STATIC_DIR=/app/static
 
 EXPOSE 80
 CMD ["/entrypoint.sh"]

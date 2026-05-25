@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, inspect, select, text
 
 # Ensure all models are loaded for SQLAlchemy mapper configuration
@@ -74,6 +75,12 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+
+    # Serve frontend static files
+    import os
+    static_dir = os.environ.get("STATIC_DIR", "static")
+    if os.path.isdir(static_dir):
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
