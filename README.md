@@ -47,9 +47,11 @@ Open `http://localhost:5173` — the first registered user becomes admin.
 ### Docker
 
 ```bash
-cp .env.example .env     # edit secrets
+cp .env.example .env
 docker compose up -d
 ```
+
+Single image bundling backend (FastAPI + Uvicorn) and frontend (Nginx static) on port 80.
 
 ## Project Structure
 

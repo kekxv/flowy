@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -23,8 +27,6 @@ jobs:
         run: uv sync --frozen
       - name: Check backend imports
         run: uv run python -c "from app.main import app; print('OK')"
-      - name: Run tests
-        run: uv run pytest --tb=short 2>/dev/null || echo "No tests configured"
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,9 +49,32 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build backend image
-        run: docker build -f Dockerfile.backend -t flowy-backend .
-      - name: Build frontend image
-        run: docker build -f Dockerfile.frontend -t flowy-frontend .
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=ref,event=branch
+            type=raw,value=latest
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

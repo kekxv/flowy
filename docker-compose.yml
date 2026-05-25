@@ -1,26 +1,16 @@
 services:
-  backend:
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${PORT:-80}:80"
     volumes:
       - flowy_data:/data
     environment:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - JWT_SECRET=${JWT_SECRET:-change-me-to-random-secret}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "${PORT:-80}:80"
-    depends_on:
-      - backend
     restart: unless-stopped
 
 volumes:
