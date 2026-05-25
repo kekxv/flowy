@@ -26,8 +26,7 @@ WORKDIR /app
 
 # Copy backend venv (cached unless pyproject.toml/uv.lock change)
 COPY --from=backend-deps /app/.venv /app/.venv
-COPY --from=backend-deps /root/.local /root/.local
-ENV PATH="/app/.venv/bin:/root/.local/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy nginx config (cached unless nginx.conf changes)
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -1,9 +1,8 @@
 #!/bin/bash
 set -e
 
-# Start backend
+# Start backend (uvicorn is in /app/.venv/bin)
 uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-BACKEND_PID=$!
 
 # Start nginx (foreground)
 echo "Starting Flowy..."
