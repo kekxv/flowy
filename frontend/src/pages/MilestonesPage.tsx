@@ -134,7 +134,7 @@ export default function MilestonesPage() {
                       style={{width:`${m.progress}%`}}/>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
-                    <span>{m.closed_issues}/{m.total_issues} closed</span>
+                    <span>{m.closed_issues}/{m.total_issues} {t("dashboard.done","done")}</span>
                     {m.due_date && (
                       <span className={`flex items-center gap-1 ${overdue?"text-red-500 font-medium":soon?"text-amber-500":""}`}>
                         <Clock size={10}/>

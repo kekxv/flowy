@@ -8,11 +8,11 @@ import { useAuthStore } from "../store/authStore";
 const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 
 interface DashboardData {
-  my_issues: Array<{ id: string; title: string; status: string; priority: string; roles: string[]; created_at: string }>;
-  pending_issues: Array<{ id: string; title: string; status: string; priority: string; created_at: string }>;
+  my_issues: Array<{ id: string; title: string; status: string; priority: string; issue_type?: string; roles: string[]; created_at: string }>;
+  pending_issues: Array<{ id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string }>;
   active_timers: Array<{ entry_id: string; issue_id: string; issue_title: string; started_at: string; duration_ms: number }>;
   stats: { total_issues: number; open_issues: number; closed_issues: number; my_reported: number };
-  milestones: Array<{ id: string; name: string; due_date: string | null; total: number; closed: number; progress: number }>;
+  milestones: Array<{ id: string; name: string; status: string; due_date: string | null; total: number; closed: number; progress: number }>;
 }
 
 const timeAgo = (iso: string) => { const d=Date.now()-new Date(iso).getTime(); const m=Math.floor(d/60000); if(m<1)return"now";if(m<60)return`${m}m`;const h=Math.floor(m/60);if(h<24)return`${h}h`;return`${Math.floor(h/24)}d`; };
@@ -114,7 +114,10 @@ export default function DashboardPage() {
                 {data.my_issues.map((issue, idx) => (
                   <Link key={issue.id} to={`/issues/${issue.id}`} className={`flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)] ${idx%2?"bg-[var(--bg)]/40":""}`}>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-medium">{issue.title}</div>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue.issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600")}`}>{t(`issues.type.${issue.issue_type||"bug"}`)}</span>
+                        <span className="truncate text-[12px] font-medium">{issue.title}</span>
+                      </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
                         <span className="font-mono text-[var(--text-muted)]/60">#{issue.id.slice(0,8)}</span>
                         <span>{timeAgo(issue.created_at)}</span>
@@ -148,7 +151,10 @@ export default function DashboardPage() {
                   <div key={issue.id} className="flex items-center justify-between gap-2 px-4 py-2 transition-colors hover:bg-[var(--bg-hover)] group">
                     <Link to={`/issues/${issue.id}`} className="min-w-0 flex-1 flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[12px] font-medium">{issue.title}</div>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue.issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600")}`}>{t(`issues.type.${issue.issue_type||"bug"}`)}</span>
+                          <span className="truncate text-[12px] font-medium">{issue.title}</span>
+                        </div>
                         <div className="mt-0.5 flex items-center gap-x-2 text-[10px] text-[var(--text-muted)]">
                           <span className="font-mono">#{issue.id.slice(0,8)}</span>
                           <span>{timeAgo(issue.created_at)}</span>
@@ -206,14 +212,17 @@ export default function DashboardPage() {
                 {data.milestones.map(m => (
                   <Link key={m.id} to={`/milestones/${m.id}`} className="block px-4 py-3.5 transition-colors hover:bg-[var(--bg-hover)]">
                     <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium hover:text-[var(--primary)] transition-colors">{m.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${m.status==="published"?"bg-blue-50 text-blue-700":"bg-emerald-50 text-emerald-700"}`}>{t(`milestone.status.${m.status}`,m.status)}</span>
+                        <span className="text-[12px] font-medium hover:text-[var(--primary)] transition-colors">{m.name}</span>
+                      </div>
                       <span className="font-mono text-[11px] font-semibold text-violet-600">{m.progress}%</span>
                     </div>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-muted)]">
                       <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-500 transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
-                      <span>{m.closed}/{m.total} closed</span>
+                      <span>{m.closed}/{m.total} {t("dashboard.done","done")}</span>
                       {m.due_date && <span><Clock size={9} className="mr-0.5 inline"/>{m.due_date}</span>}
                     </div>
                   </Link>

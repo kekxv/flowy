@@ -6,7 +6,7 @@ import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listIssues, type IssueData } from "../api/issues";
 
-const STAT = ["open","in_progress","resolved","closed","cancelled"] as const;
+const STAT = ["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"] as const;
 const PRIS = ["critical","high","medium","low","trivial"] as const;
 const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 const timeAgo = (iso: string) => { const d=Date.now()-new Date(iso).getTime(); const m=Math.floor(d/60000); if (m<1) return "just"; if (m<60) return `${m}m`; const h=Math.floor(m/60); if (h<24) return `${h}h`; return `${Math.floor(h/24)}d`; };
@@ -30,6 +30,25 @@ export default function IssueListPage() {
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
   const [myRoles, setMyRoles] = useState<string[]>([]);
   const [toast, setToast] = useState("");
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickType, setQuickType] = useState("bug");
+  const [quickPri, setQuickPri] = useState("medium");
+  const [quickSub, setQuickSub] = useState(false);
+
+  const openQuick = () => { setQuickOpen(true); setQuickTitle(q); };
+
+  const doQuickCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTitle.trim()) return;
+    setQuickSub(true);
+    try {
+      const r = await api.post("/issues", { title: quickTitle, issue_type: quickType, priority: quickPri });
+      setQuickOpen(false); setQuickTitle(""); fetch();
+      navigate(`/issues/${r.data.id}`);
+    } catch (err: any) { showToast(t("common.error","Failed")); }
+    setQuickSub(false);
+  };
 
   useEffect(()=>{api.get("/labels").then(r=>setLabels(r.data));},[]);
   // Poll active timers
@@ -130,6 +149,7 @@ export default function IssueListPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 truncate text-[13px] font-medium group-hover:text-[var(--primary)] transition-colors">
                   {activeTimerIds.has(issue.id) && <span className="flex h-1.5 w-1.5 shrink-0"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75"/><span className="relative h-1.5 w-1.5 rounded-full bg-red-500"/></span>}
+                  <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600"}`}>{t(`issues.type.${(issue as any).issue_type||"bug"}`)}</span>
                   <span className="truncate">{issue.title}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-muted)]">

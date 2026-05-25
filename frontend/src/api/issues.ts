@@ -45,9 +45,11 @@ export async function getIssue(id: string): Promise<IssueData> {
 export async function createIssue(data: {
   title: string;
   description?: string;
+  issue_type?: string;
   priority?: string;
-  assignee_ids?: string[];
+  assignees?: Array<{user_id: string; role: string}>;
   label_ids?: string[];
+  milestone_ids?: string[];
 }): Promise<IssueData> {
   const res = await api.post("/issues", data);
   return res.data;

@@ -180,6 +180,6 @@ async def milestone_issues(
     )
     issues = list(result.scalars().all())
     return [
-        {"id": i.id, "title": i.title, "status": i.status, "priority": i.priority, "created_at": i.created_at}
+        {"id": i.id, "title": i.title, "status": i.status, "priority": i.priority, "issue_type": i.issue_type, "created_at": i.created_at}
         for i in issues
     ]

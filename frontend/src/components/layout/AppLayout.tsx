@@ -26,12 +26,12 @@ function Sidebar({ close }: { close?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-white">
-      <div className="flex h-14 items-center gap-2.5 border-b border-[var(--border-light)] px-4">
+      <NavLink to="/dashboard" onClick={close} className="flex h-14 items-center gap-2.5 border-b border-[var(--border-light)] px-4 hover:bg-[var(--bg-hover)] transition-colors">
         <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--primary)] text-sm font-bold text-white shadow-[0_2px_8px_rgba(79,110,247,.3)]">
           F
         </div>
         <span className="font-semibold tracking-tight text-[var(--text)]">Flowy</span>
-      </div>
+      </NavLink>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
         {navItems.map((item) => (
@@ -67,7 +67,7 @@ function Sidebar({ close }: { close?: () => void }) {
       </div>
 
       {user && (
-        <div className="flex items-center gap-2.5 border-t border-[var(--border-light)] p-3">
+        <NavLink to="/profile" onClick={close} className="flex items-center gap-2.5 border-t border-[var(--border-light)] p-3 hover:bg-[var(--bg-hover)] transition-colors">
           <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--primary)]/10 text-xs font-semibold text-[var(--primary)]">
             {(user.display_name || user.username).slice(0, 2).toUpperCase()}
           </div>
@@ -75,10 +75,10 @@ function Sidebar({ close }: { close?: () => void }) {
             <div className="truncate text-[13px] font-medium text-[var(--text)]">{user.display_name || user.username}</div>
             <div className="text-[11px] text-[var(--text-muted)]">{user.role}</div>
           </div>
-          <button onClick={logout} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500 transition-all duration-150" title={t("common.sign_out")}>
+          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); logout(); }} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500 transition-all duration-150" title={t("common.sign_out")}>
             <LogOut size={14} />
           </button>
-        </div>
+        </NavLink>
       )}
     </div>
   );
@@ -100,8 +100,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <button onClick={() => setOpen(true)} className="rounded-[10px] p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all">
           <Menu size={20} />
         </button>
-        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--primary)] text-sm font-bold text-white shadow-[0_2px_8px_rgba(79,110,247,.3)]">F</div>
-        <span className="font-semibold tracking-tight text-[var(--text)]">Flowy</span>
+        <NavLink to="/dashboard" className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--primary)] text-sm font-bold text-white shadow-[0_2px_8px_rgba(79,110,247,.3)]">F</div>
+          <span className="font-semibold tracking-tight text-[var(--text)]">Flowy</span>
+        </NavLink>
       </div>
 
       {/* Mobile drawer */}
@@ -110,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 animate-[fadeInUp_.2s_ease-out]">
             <div className="flex h-14 items-center justify-between border-b border-[var(--border-light)] bg-[#fafbfc] px-4">
-              <span className="font-semibold tracking-tight">Flowy</span>
+              <NavLink to="/dashboard" onClick={() => setOpen(false)} className="font-semibold tracking-tight">Flowy</NavLink>
               <button onClick={() => setOpen(false)} className="rounded-[10px] p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={18} /></button>
             </div>
             <Sidebar close={() => setOpen(false)} />

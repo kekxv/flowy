@@ -38,6 +38,7 @@ class Issue(Base):
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    issue_type: Mapped[str] = mapped_column(String(16), default="bug")  # bug / feature
     status: Mapped[str] = mapped_column(String(32), default="open")
     priority: Mapped[str] = mapped_column(String(16), default="medium")
     reporter_id: Mapped[str] = mapped_column(
@@ -70,7 +71,7 @@ class Issue(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('open','in_progress','resolved','closed','cancelled')",
+            "status IN ('open','in_progress','resolved','closed','cancelled','proposed','accepted','rejected')",
             name="ck_issue_status",
         ),
         CheckConstraint(

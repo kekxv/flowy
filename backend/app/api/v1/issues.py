@@ -75,7 +75,7 @@ async def list_issues(
     for i in issues:
         d = {
             "id": i.id, "title": i.title, "description": i.description,
-            "status": i.status, "priority": i.priority,
+            "issue_type": i.issue_type, "status": i.status, "priority": i.priority,
             "reporter": {
                 "id": i.reporter.id, "username": i.reporter.username,
                 "display_name": i.reporter.display_name, "avatar_url": i.reporter.avatar_url,
@@ -141,9 +141,10 @@ async def update_issue(
     is_reporter = issue.reporter_id == user.id
     assignee_roles = {a.role for a in (issue.assignees or []) if a.id == user.id}
     is_lead = "project_lead" in assignee_roles
+    is_feature_owner = issue.issue_type == "feature" and len(assignee_roles) > 0
 
-    # Admin and project_lead can do anything
-    if not is_admin and not is_lead:
+    # Admin, project_lead, and feature owner can do anything
+    if not is_admin and not is_lead and not is_feature_owner:
         # Allow assignee/milestone-only changes for everyone (claim/release/link milestone)
         if (data.assignees is not None or data.milestone_ids is not None) and _is_assignee_only(data):
             safe = IssueUpdate(assignees=data.assignees, milestone_ids=data.milestone_ids)
@@ -164,7 +165,7 @@ async def update_issue(
 def _issue_detail(issue, assignees: list):
     return {
         "id": issue.id, "title": issue.title, "description": issue.description,
-        "status": issue.status, "priority": issue.priority,
+        "issue_type": issue.issue_type, "status": issue.status, "priority": issue.priority,
         "reporter": {
             "id": issue.reporter.id, "username": issue.reporter.username,
             "display_name": issue.reporter.display_name, "avatar_url": issue.reporter.avatar_url,
@@ -348,6 +349,7 @@ async def _check_issue_permission(issue_id: str, user: User, db: AsyncSession):
     """Check if user can modify the issue. Raises 403 if not."""
     if user.role == "admin":
         return
+    # Check if project_lead
     result = await db.execute(
         select(issue_assignees.c.role).where(
             issue_assignees.c.issue_id == issue_id,
@@ -355,8 +357,21 @@ async def _check_issue_permission(issue_id: str, user: User, db: AsyncSession):
             issue_assignees.c.role == "project_lead",
         )
     )
-    if result.first() is None:
-        raise HTTPException(status_code=403, detail="Only admin or project_lead can perform this action")
+    if result.first() is not None:
+        return
+    # Check if feature owner (any assignee on a feature)
+    from app.models.issue import Issue
+    issue = await db.get(Issue, issue_id)
+    if issue and issue.issue_type == "feature":
+        roles = await db.execute(
+            select(issue_assignees.c.role).where(
+                issue_assignees.c.issue_id == issue_id,
+                issue_assignees.c.user_id == user.id,
+            )
+        )
+        if roles.first() is not None:
+            return
+    raise HTTPException(status_code=403, detail="Only admin, project_lead, or feature owner can perform this action")
 
 
 @router.post("/{issue_id}/timer/start")

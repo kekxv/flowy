@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 
-interface IssueItem { id: string; title: string; status: string; priority: string; created_at: string; }
+interface IssueItem { id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string; }
 interface MilestoneData { id: string; name: string; description: string; due_date: string|null; status: string; total_issues: number; closed_issues: number; progress: number; created_at: string; updated_at: string; owner_id?: string; }
 
 const daysLeft = (date: string|null) => { if (!date) return null; return Math.ceil((new Date(date).getTime()-Date.now())/86400000); };
@@ -142,21 +142,27 @@ export default function MilestoneDetailPage() {
           <div className="py-12 text-center text-sm text-[var(--text-muted)]">{t("issues.no_issues")}</div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
-            {issues.map((issue, idx) => (
+            {issues.map((issue, idx) => {
+              const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400", proposed:"border-l-purple-400", accepted:"border-l-emerald-400", rejected:"border-l-red-400" })[s]||"";
+              return (
               <Link key={issue.id} to={`/issues/${issue.id}`}
-                className={`flex items-center justify-between px-5 py-3 transition-colors hover:bg-[var(--bg-hover)] ${idx%2?"bg-[var(--bg)]/40":""}`}>
+                className={`flex items-center gap-3 border-l-[3px] px-5 py-3 transition-colors hover:bg-[var(--bg-hover)] ${statusL(issue.status)} ${idx%2?"bg-[var(--bg)]/40":""}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium hover:text-[var(--primary)]">{issue.title}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600"}`}>{t(`issues.type.${(issue as any).issue_type||"bug"}`)}</span>
+                    <span className="truncate text-[13px] font-medium hover:text-[var(--primary)]">{issue.title}</span>
+                  </div>
                   <div className="mt-0.5 flex items-center gap-x-2 text-[10px] text-[var(--text-muted)]">
+                    <span className="font-mono">#{issue.id.slice(0,8)}</span>
                     <span>{new Date(issue.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className={`priority-${issue.priority} rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
                   <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
                 </div>
               </Link>
-            ))}
+            )})}
           </div>
         )}
       </div>

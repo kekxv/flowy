@@ -7,7 +7,7 @@ import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listExternalLinks, linkExternalIssue, unlinkExternalIssue, refreshExternalLink, createExternalIssue, listConnections, listConnectionRepos, searchExternalIssues, type ExternalLink as ExtLink, type ConnectionData, type ExternalRepo, type ExternalIssueResult } from "../api/connections";
 
-const STAT=["open","in_progress","resolved","closed","cancelled"], PRIS=["critical","high","medium","low","trivial"];
+const STAT=["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"], PRIS=["critical","high","medium","low","trivial"];
 const ROLES=["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 
 export default function IssueDetailPage() {
@@ -68,9 +68,10 @@ export default function IssueDetailPage() {
   const curUser = useAuthStore(s=>s.user);
   const isAdmin = curUser?.role === "admin";
   const isLead = (issue?.assignees||[]).some((a:any)=>a.role==="project_lead" && a.id===curUser?.id);
+  const isFeatureOwner = issue?.issue_type === "feature" && (issue?.assignees||[]).some((a:any)=>a.id===curUser?.id);
   const isReporter = issue?.reporter?.id === curUser?.id;
-  const canEdit = isAdmin || isLead || isReporter;
-  const canFullEdit = isAdmin || isLead;
+  const canEdit = isAdmin || isLead || isFeatureOwner || isReporter;
+  const canFullEdit = isAdmin || isLead || isFeatureOwner;
   const mls=issue?.milestone_ids||[];
 
   // External link handlers
@@ -82,6 +83,12 @@ export default function IssueDetailPage() {
   const [linkMode,setLinkMode]=useState<"browse"|"create">("browse");
   const [createTitle,setCreateTitle]=useState("");
   const [createBody,setCreateBody]=useState("");
+
+  const switchToCreate = () => {
+    setCreateTitle(issue?.title || "");
+    setCreateBody(issue?.description || "");
+    setLinkMode("create");
+  };
   const doCreateAndLink=async()=>{if(!id||!linkRepo||!createTitle.trim())return;
     try{const r=await createExternalIssue(linkConnId,{repo:linkRepo,title:createTitle,body:createBody});await linkExternalIssue(id,{connection_id:linkConnId,external_repo:linkRepo,external_id:r.external_id,external_url:r.external_url,title:r.title,status:r.status});flx();setModal(null);setCreateTitle("");setCreateBody("");setLinkMode("browse");}catch{}};
   const doLink=async(extId:string,extUrl:string,title?:string,status?:string,linkType?:string)=>{if(!id||!linkRepo)return;
@@ -126,7 +133,12 @@ export default function IssueDetailPage() {
         <div className="border-b border-[var(--border-light)] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
-              <h1 className="text-lg font-bold tracking-tight">{issue.title}</h1>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${issue.issue_type==="feature"?"bg-violet-50 text-violet-700":"bg-amber-50 text-amber-700"}`}>
+                  {t(`issues.type.${issue.issue_type||"bug"}`)}
+                </span>
+                <h1 className="text-lg font-bold tracking-tight">{issue.title}</h1>
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-[12px] text-[var(--text-muted)]">
                 <span className="font-mono">#{issue.id.slice(0,8)}</span>
                 <span>{issue.reporter?.display_name||issue.reporter?.username}</span>
@@ -434,7 +446,7 @@ export default function IssueDetailPage() {
                 </div>
               )}
               <div className="border-t border-[var(--border-light)] pt-2.5">
-                <button onClick={()=>setLinkMode("create")}
+                <button onClick={switchToCreate}
                   className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors">
                   <Plus size={13}/> {t("issues.create_external","Create New Issue")}
                 </button>

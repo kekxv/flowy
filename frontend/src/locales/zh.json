@@ -55,17 +55,32 @@
     "sign_up_title": "创建新账号"
   },
   "issues": {
-    "title": "问题",
-    "new_issue": "新建问题",
-    "all_issues": "所有问题",
-    "edit_issue": "编辑问题",
-    "no_issues": "暂无问题",
+    "title": "问题和需求",
+    "new_issue": "新建",
+    "new_bug": "新建问题",
+    "new_feature": "新建需求",
+    "all_issues": "全部",
+    "edit_issue": "编辑",
+    "no_issues": "暂无",
+    "transfer": "转让负责人",
+    "feature_owner": "需求负责人",
+    "feature_require_owner": "需求必须指定一个负责人",
+    "title_placeholder": "简要描述",
+    "type_label": "类型",
+    "quick_create": "快速创建",
+    "type": {
+      "bug": "问题",
+      "feature": "需求"
+    },
     "status": {
       "open": "待处理",
       "in_progress": "进行中",
       "resolved": "已解决",
       "closed": "已关闭",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "proposed": "待审核",
+      "accepted": "已接受",
+      "rejected": "已驳回"
     },
     "priority": {
       "critical": "紧急",
@@ -102,6 +117,7 @@
     "all_clear": "全部完成",
     "welcome": "项目概览",
     "closed": "已关闭",
+    "done": "已完成",
     "started": "开始于"
   },
   "milestone": {

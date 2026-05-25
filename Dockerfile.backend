@@ -1,14 +1,24 @@
-FROM python:3.11-slim
+# ---- Dependencies layer ----
+FROM python:3.11-slim AS deps
+WORKDIR /app
+RUN pip install uv
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --no-dev --frozen
 
+# ---- Runtime layer ----
+FROM python:3.11-slim
 WORKDIR /app
 
-COPY backend/pyproject.toml backend/.env ./
-RUN pip install uv && uv sync --no-dev
+# Copy uv and venv from deps
+COPY --from=deps /root/.local /root/.local
+COPY --from=deps /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:/root/.local/bin:$PATH"
 
+# Copy application code (changes most often - last layer)
 COPY backend/ .
 
 RUN mkdir -p /data
 ENV DATABASE_URL=sqlite+aiosqlite:////data/flowy.db
 
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

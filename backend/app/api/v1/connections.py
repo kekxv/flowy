@@ -412,8 +412,21 @@ async def _check_issue_perm(issue_id: str, user: User, db: AsyncSession):
             issue_assignees.c.role == "project_lead",
         )
     )
-    if r.first() is None:
-        raise HTTPException(status_code=403, detail="Only admin or project_lead can manage external links")
+    if r.first() is not None:
+        return
+    # Check if feature owner
+    from app.models.issue import Issue
+    issue = await db.get(Issue, issue_id)
+    if issue and issue.issue_type == "feature":
+        roles = await db.execute(
+            select(issue_assignees.c.role).where(
+                issue_assignees.c.issue_id == issue_id,
+                issue_assignees.c.user_id == user.id,
+            )
+        )
+        if roles.first() is not None:
+            return
+    raise HTTPException(status_code=403, detail="Only admin, project_lead, or feature owner can manage external links")
 
 
 # External issue links

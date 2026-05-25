@@ -44,8 +44,8 @@ async def get_dashboard(
         roles = [r[0] for r in res.all()]
         my_issues.append({
             "id": i.id, "title": i.title, "status": i.status,
-            "priority": i.priority, "created_at": i.created_at,
-            "roles": roles,
+            "priority": i.priority, "issue_type": i.issue_type,
+            "created_at": i.created_at, "roles": roles,
         })
 
     # Pending issues (open/in_progress, no assignee)
@@ -63,7 +63,8 @@ async def get_dashboard(
     for i in pending.unique().scalars().all():
         pending_issues.append({
             "id": i.id, "title": i.title, "status": i.status,
-            "priority": i.priority, "created_at": i.created_at,
+            "priority": i.priority, "issue_type": i.issue_type,
+            "created_at": i.created_at,
         })
 
     # Active timers
@@ -97,7 +98,7 @@ async def get_dashboard(
 
     # Active milestones
     ml_result = await db.execute(
-        select(Milestone).where(Milestone.status == "open").order_by(Milestone.created_at.desc()).limit(5)
+        select(Milestone).where(Milestone.status.in_(["open", "published"])).order_by(Milestone.created_at.desc()).limit(5)
     )
     milestones_data = []
     for m in ml_result.scalars().all():
@@ -112,8 +113,8 @@ async def get_dashboard(
             )
         )).scalar() or 0
         milestones_data.append({
-            "id": m.id, "name": m.name, "due_date": m.due_date,
-            "total": t, "closed": c,
+            "id": m.id, "name": m.name, "status": m.status,
+            "due_date": m.due_date, "total": t, "closed": c,
             "progress": round((c / t) * 100) if t > 0 else 0,
         })
 

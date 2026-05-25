@@ -98,6 +98,7 @@ class AssigneeInput(BaseModel):
 class IssueCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     description: str = Field(default="")
+    issue_type: str = Field(default="bug", pattern=r"^(bug|feature)$")
     priority: str = Field(default="medium", pattern=r"^(critical|high|medium|low|trivial)$")
     assignees: list[AssigneeInput] = Field(default_factory=list)
     label_ids: list[str] = Field(default_factory=list)
@@ -107,7 +108,8 @@ class IssueCreate(BaseModel):
 class IssueUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     description: str | None = None
-    status: str | None = Field(default=None, pattern=r"^(open|in_progress|resolved|closed|cancelled)$")
+    issue_type: str | None = Field(default=None, pattern=r"^(bug|feature)$")
+    status: str | None = Field(default=None, pattern=r"^(open|in_progress|resolved|closed|cancelled|proposed|accepted|rejected)$")
     priority: str | None = Field(default=None, pattern=r"^(critical|high|medium|low|trivial)$")
     assignees: list[AssigneeInput] | None = None
     label_ids: list[str] | None = None

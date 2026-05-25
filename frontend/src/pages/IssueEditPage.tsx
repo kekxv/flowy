@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getIssue, updateIssue } from "../api/issues";
 
-const STAT = ["open","in_progress","resolved","closed","cancelled"];
+const STAT = ["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"];
 const PRIS = ["critical","high","medium","low","trivial"];
 
 export default function IssueEditPage() {

@@ -84,6 +84,7 @@ async def create_issue(
         id=str(uuid4()),
         title=data.title,
         description=data.description,
+        issue_type=data.issue_type,
         priority=data.priority,
         reporter_id=reporter_id,
     )
@@ -144,6 +145,8 @@ async def update_issue(
     added_ms: list = []
     removed_ms: list = []
 
+    if data.issue_type is not None:
+        issue.issue_type = data.issue_type
     if data.title is not None:
         issue.title = data.title
     if data.description is not None:
