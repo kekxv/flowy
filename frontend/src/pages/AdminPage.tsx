@@ -100,7 +100,7 @@ export default function AdminPage() {
           {/* Callback hint */}
           <div className="rounded-lg bg-[var(--primary-light)] px-3 py-2.5 text-[11px] text-[var(--primary)]">
             <strong>{t("admin.oauth_callback","Callback / Redirect URI")}:</strong>
-            <code className="ml-2 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[10px] select-all">{oauthConfig["_oauth_callback_url"] || (window.location.origin + "/profile")}</code>
+            <code className="ml-2 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[10px] select-all">{(oauthConfig["frontend_url"] || window.location.origin) + "/api/v1/external/connections/oauth/callback"}</code>
           </div>
 
           {/* GitHub */}
