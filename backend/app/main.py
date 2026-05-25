@@ -76,11 +76,19 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
 
-    # Serve frontend static files
+    # Serve frontend static files (SPA fallback)
     import os
+    from fastapi.responses import FileResponse
     static_dir = os.environ.get("STATIC_DIR", "static")
     if os.path.isdir(static_dir):
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        # Mount static assets first
+        app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+        # SPA fallback: serve index.html for any other path
+        @app.get("/{path:path}")
+        async def spa(path: str):
+            if path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            return FileResponse(os.path.join(static_dir, "index.html"))
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):

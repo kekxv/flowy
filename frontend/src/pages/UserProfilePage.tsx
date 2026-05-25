@@ -49,7 +49,9 @@ export default function UserProfilePage() {
   // Handle OAuth callback from Gitea/GitHub (code & state in URL params)
   useEffect(() => {
     if (oauthHandled.current) return;
-    const params = new URLSearchParams(window.location.search);
+    // With HashRouter, query params may be after the hash
+    const search = window.location.search || (window.location.hash.includes("?") ? "?" + window.location.hash.split("?")[1] : "");
+    const params = new URLSearchParams(search);
     const code = params.get("code");
     const state = params.get("state");
     if (code && state) {

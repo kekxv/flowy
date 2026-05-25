@@ -27,7 +27,7 @@ api.interceptors.response.use(
         return api(error.config);
       } catch {
         localStorage.clear();
-        window.location.href = "/login";
+        window.location.href = "/#/login";
       }
     }
     return Promise.reject(error);
