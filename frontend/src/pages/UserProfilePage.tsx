@@ -57,19 +57,19 @@ export default function UserProfilePage() {
       const saved = sessionStorage.getItem("oauth_state");
       if (state !== saved) {
         setError("OAuth state mismatch");
-        window.history.replaceState({}, "", "/profile");
+        window.history.replaceState({}, "", "/#/profile");
         return;
       }
       api.post("/external/connections/oauth/callback", { code, state })
         .then(() => {
           sessionStorage.removeItem("oauth_state");
-          window.history.replaceState({}, "", "/profile");
+          window.history.replaceState({}, "", "/#/profile");
           setSuccess(t("settings.connect_ok","Account connected successfully!"));
           fetch();
         })
         .catch(err => {
           setError(err?.response?.data?.detail || "OAuth callback failed");
-          window.history.replaceState({}, "", "/profile");
+          window.history.replaceState({}, "", "/#/profile");
         });
     }
   }, []);
