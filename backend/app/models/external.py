@@ -133,6 +133,7 @@ class OAuthState(Base):
     instance_url: Mapped[str] = mapped_column(String(256), default="")
     user_id: Mapped[str] = mapped_column(String(36), nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
+    frontend_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[str] = mapped_column(
         String(32), default=lambda: datetime.now().isoformat()
     )

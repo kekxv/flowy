@@ -15,7 +15,7 @@ async def get_settings(req: Request, db: AsyncSession = Depends(get_db), _user: 
     result = await db.execute(select(AppSetting))
     data = {s.key: s.value for s in result.scalars().all()}
     origin = req.headers.get("origin", str(req.base_url).rstrip("/"))
-    data["_oauth_callback_url"] = origin + "/profile"
+    data["_oauth_callback_url"] = origin + "/api/v1/external/connections/oauth/callback"
     return data
 
 

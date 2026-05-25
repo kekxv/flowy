@@ -77,18 +77,20 @@ async def oauth_init(data: dict, req: Request, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=400, detail=f"OAuth not configured for {provider}")
 
     state = secrets.token_urlsafe(32)
-    # Redirect to frontend /profile, which will call POST /oauth/callback with code+state
-    frontend_callback = f"{frontend_url or 'http://localhost:5173'}/profile"
+    # Build backend callback URL
+    frontend = await db.get(AppSetting, "frontend_url")
+    fe_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+    backend_callback = f"{fe_url}/api/v1/external/connections/oauth/callback"
 
     if provider == "github":
-        auth_url = f"{cfg['auth_url']}?client_id={cfg['client_id']}&redirect_uri={frontend_callback}&state={state}&scope={cfg['scope']}"
+        auth_url = f"{cfg['auth_url']}?client_id={cfg['client_id']}&redirect_uri={backend_callback}&state={state}&scope={cfg['scope']}"
     else:  # gitea
         base = (inst or "https://gitea.com").rstrip("/")
         url_tpl = cfg["auth_url"].replace("{instance}", base)
-        auth_url = f"{url_tpl}?client_id={cfg['client_id']}&redirect_uri={frontend_callback}&state={state}&response_type=code"
+        auth_url = f"{url_tpl}?client_id={cfg['client_id']}&redirect_uri={backend_callback}&state={state}&response_type=code"
 
     # Persist state to DB (survives server reload)
-    db.add(OAuthState(state=state, provider=provider, instance_url=inst, user_id=user.id, redirect_uri=frontend_callback))
+    db.add(OAuthState(state=state, provider=provider, instance_url=inst, user_id=user.id, redirect_uri=backend_callback, frontend_url=fe_url))
     await db.commit()
     return {"auth_url": auth_url, "state": state}
 
@@ -241,9 +243,11 @@ async def oauth_callback_get(
         )
         await db.delete(stored)
         await db.commit()
-        return RedirectResponse(url=f"{stored.redirect_uri.rsplit('/', 1)[0]}?oauth=ok")
+        fe = (stored.frontend_url or "http://localhost:5173").rstrip("/")
+        return RedirectResponse(url=f"{fe}/#/profile?oauth=ok")
     except HTTPException as e:
-        return RedirectResponse(url=f"{stored.redirect_uri.rsplit('/', 1)[0]}?oauth=error&msg={e.detail}")
+        fe = (stored.frontend_url or "http://localhost:5173").rstrip("/")
+        return RedirectResponse(url=f"{fe}/#/profile?oauth=error&msg={e.detail}")
 
 
 @router.post("/oauth/callback", status_code=status.HTTP_201_CREATED)

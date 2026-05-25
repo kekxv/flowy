@@ -38,41 +38,26 @@ export default function UserProfilePage() {
     try {
       const res = await api.post("/external/connections/oauth/init", {
         provider: p, instance_url: oauthConfig[`${p}_instance_url`] || undefined,
-        frontend_url: window.location.origin,
       });
       sessionStorage.setItem("oauth_state", res.data.state);
-      // Brief delay so the loading spinner renders before navigation
       setTimeout(() => { window.location.href = res.data.auth_url; }, 200);
     } catch(err:any) { setError(err?.response?.data?.detail||err?.message||"OAuth failed"); setOauthConnecting(false); }
   };
 
-  // Handle OAuth callback from Gitea/GitHub (code & state in URL params)
+  // Handle OAuth callback redirect from backend
   useEffect(() => {
     if (oauthHandled.current) return;
-    // With HashRouter, query params may be after the hash
-    const search = window.location.search || (window.location.hash.includes("?") ? "?" + window.location.hash.split("?")[1] : "");
-    const params = new URLSearchParams(search);
-    const code = params.get("code");
-    const state = params.get("state");
-    if (code && state) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("oauth") === "ok") {
       oauthHandled.current = true;
-      const saved = sessionStorage.getItem("oauth_state");
-      if (state !== saved) {
-        setError("OAuth state mismatch");
-        window.history.replaceState({}, "", "/#/profile");
-        return;
-      }
-      api.post("/external/connections/oauth/callback", { code, state })
-        .then(() => {
-          sessionStorage.removeItem("oauth_state");
-          window.history.replaceState({}, "", "/#/profile");
-          setSuccess(t("settings.connect_ok","Account connected successfully!"));
-          fetch();
-        })
-        .catch(err => {
-          setError(err?.response?.data?.detail || "OAuth callback failed");
-          window.history.replaceState({}, "", "/#/profile");
-        });
+      sessionStorage.removeItem("oauth_state");
+      window.history.replaceState({}, "", "/#/profile");
+      setSuccess(t("settings.connect_ok","Account connected successfully!"));
+      fetch();
+    } else if (params.get("oauth") === "error") {
+      oauthHandled.current = true;
+      setError(params.get("msg") || "OAuth failed");
+      window.history.replaceState({}, "", "/#/profile");
     }
   }, []);
 
