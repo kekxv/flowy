@@ -4,8 +4,7 @@ import { useTranslation } from "react-i18next";
 import { X, Plus, ChevronDown } from "lucide-react";
 import { createIssue } from "../api/issues";
 import api from "../api/client";
-
-const ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
+import { ALL_ROLES } from "../constants";
 
 export default function IssueCreatePage() {
   const navigate = useNavigate(); const { t } = useTranslation();
@@ -100,7 +99,7 @@ export default function IssueCreatePage() {
                 <div className="absolute left-0 top-full z-10 mt-1 w-48 card rounded-xl py-1.5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.12s_ease-out]">
                   <div className="px-2 pb-1 mb-1 border-b border-[var(--border-light)]">
                     <div className="flex flex-wrap gap-1">
-                      {ROLES.map(r => (
+                      {ALL_ROLES.map(r => (
                         <button key={r} type="button" onClick={() => setSelRole(r)}
                           className={`role-badge role-${r} rounded px-1.5 py-0.5 text-[10px] ${selRole===r ? "ring-2 ring-[var(--primary)]" : ""}`}>{t(`roles.${r}`)}</button>
                       ))}

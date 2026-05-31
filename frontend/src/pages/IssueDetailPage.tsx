@@ -6,9 +6,8 @@ import ReactMarkdown from "react-markdown";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listExternalLinks, linkExternalIssue, unlinkExternalIssue, refreshExternalLink, createExternalIssue, listConnections, listConnectionRepos, searchExternalIssues, type ExternalLink as ExtLink, type ConnectionData, type ExternalRepo, type ExternalIssueResult } from "../api/connections";
-
-const STAT=["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"], PRIS=["critical","high","medium","low","trivial"];
-const ROLES=["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
+import { ALL_ROLES, STAT, PRIS } from "../constants";
+import Loader from "../components/Loader";
 
 export default function IssueDetailPage() {
   const {id}=useParams<{id:string}>(); const {t}=useTranslation();
@@ -41,7 +40,6 @@ export default function IssueDetailPage() {
   const [claimOpen, setClaimOpen] = useState(false);
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
   const [myRoles, setMyRoles] = useState<string[]>([]);
-  const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
   const flx=async()=>{if(!id)return;try{const r=await listExternalLinks(id);setExtLinks(r);}catch{}};
   useEffect(()=>{flx();},[id]);
 
@@ -74,7 +72,7 @@ export default function IssueDetailPage() {
 
   // External link handlers
   const openLinkModal=async()=>{setLinkMode("browse");setLinkConnId("");setLinkRepo("");setLinkQuery("");setLinkSearchResults([]);setCreateTitle("");setCreateBody("");setLinkRepos([]);
-    try{const c=await listConnections();setConns(c);if(c.length>0){loadRepos(c[0].id);}}catch{};setModal("link");};
+    try{const c=await listConnections();setConns(c);if(c.length>0){const first=c[0];if(first)loadRepos(first.id);}}catch{};setModal("link");};
   const loadRepos=async(cid:string)=>{setLinkConnId(cid);setLinkRepo("");setLinkQuery("");setLinkSearchResults([]);setLinkRepos([]);try{const r=await listConnectionRepos(cid);setLinkRepos(r);}catch{}};
   const selectRepo=async(repo:string)=>{setLinkRepo(repo);setLinkSearchResults([]);setLinkMode("browse");if(!repo)return;setLinkSearching(true);try{const r=await searchExternalIssues(linkConnId,repo,linkQuery);setLinkSearchResults(r);}catch{}finally{setLinkSearching(false);}};
   const searchIssues=async()=>{if(!linkRepo)return;setLinkSearching(true);try{const r=await searchExternalIssues(linkConnId,linkRepo,linkQuery);setLinkSearchResults(r);}catch{}finally{setLinkSearching(false);}};
@@ -95,7 +93,7 @@ export default function IssueDetailPage() {
   const doRefresh=async(lid:string)=>{try{await refreshExternalLink(id!,lid);flx();}catch{}};
   // Claim
   const openClaim = async () => { setClaimOpen(true); setClaimRoles([]);
-    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles(ALL_ROLES); }
+    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles([...ALL_ROLES]); }
   };
   const toggleClaimRole = (r: string) => setClaimRoles(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r]);
   const doClaim = async () => {
@@ -110,7 +108,7 @@ export default function IssueDetailPage() {
     } catch (err: any) { showErr(err, "Claim failed"); }
   };
 
-  if(loading)return <div className="flex justify-center pt-24"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if(loading)return <Loader />;
   if(!issue)return <div className="text-center pt-24 text-[var(--text-muted)]">Not found.</div>;
 
   return (
@@ -298,7 +296,7 @@ export default function IssueDetailPage() {
         {modal==="label"&&<div className="max-h-60 space-y-1 overflow-y-auto">{labels.map(l=>{const a=(issue.labels||[]).some((il:any)=>il.id===l.id);return <button key={l.id} onClick={()=>tl(l.id)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${a?"bg-[var(--primary-light)] text-[var(--primary)]":"hover:bg-[var(--bg-hover)]"}`}><span className="h-3 w-3 rounded-full" style={{backgroundColor:l.color}}/>{l.name}{a&&<Check size={14} className="ml-auto"/>}</button>})}</div>}
         {modal==="role"&&(
           <div className="max-h-80 space-y-1.5 overflow-y-auto">
-            {ROLES.map(r=>{
+            {ALL_ROLES.map(r=>{
               const assigned = (issue.assignees||[]).filter((a:any)=>a.role===r);
               return (
                 <div key={r} className="rounded-xl border border-[var(--border-light)] overflow-hidden">

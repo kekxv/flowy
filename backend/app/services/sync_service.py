@@ -11,10 +11,10 @@ from app.core.dispatcher import dispatch
 from app.database import async_session
 from app.models.external import ExternalConnection, ExternalIssue
 from app.models.issue import Issue
-from app.models.settings import AppSetting
 from app.models.tracking import IssueAssigneeLog
 from app.services.external import get_client
 from app.services.notifications.base import NotificationEvent
+from app.utils.settings import get_frontend_url
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +103,7 @@ class SyncService:
                             try:
                                 flowy_issue = await db.get(Issue, link.issue_id)
                                 issue_title = flowy_issue.title if flowy_issue else link.issue_id
-                                frontend = await db.get(AppSetting, "frontend_url")
-                                frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+                                frontend_url = await get_frontend_url(db)
                                 await dispatch(db, NotificationEvent(
                                     event_type="external_link.updated",
                                     title=f"External {ri.link_type}: {ri.title}",
@@ -115,6 +114,7 @@ class SyncService:
                                     resource_id=link.id,
                                     extra={"flowy_issue_title": issue_title, "external_title": ri.title, "old_status": old_status, "new_status": ri.status},
                                 ))
+                                await db.commit()  # Persist notification logs
                             except Exception as e:
                                 logger.warning(f"Notification dispatch failed: {e}")
                 except Exception as e:

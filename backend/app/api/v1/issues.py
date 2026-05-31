@@ -1,15 +1,15 @@
 import uuid
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.core.dispatcher import dispatch
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.settings import AppSetting
+from app.utils.settings import get_frontend_url
 from app.services.notifications.base import NotificationEvent
 from app.models.issue import Comment, Issue, issue_assignees
 from app.models.tracking import IssueAssigneeLog, TimeEntry
@@ -28,6 +28,8 @@ from app.schemas.issue import (
 )
 from app.services import issue_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/issues", tags=["issues"])
 
 
@@ -39,16 +41,27 @@ async def _build_assignees(db: AsyncSession, issue_id: str) -> list[AssigneeResp
         )
     )
     rows = result.all()
-    assignees = []
-    for user_id, role in rows:
-        user = await db.get(User, user_id)
-        if user:
-            assignees.append(AssigneeResponse(
-                id=user.id, username=user.username, email=user.email,
-                display_name=user.display_name, role=role or "member",
-                avatar_url=user.avatar_url,
-            ))
-    return assignees
+    if not rows:
+        return []
+
+    # Batch fetch all users at once to avoid N+1
+    user_ids = [r.user_id for r in rows if r.user_id]
+    users_map: dict[str, User] = {}
+    if user_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users_map = {u.id: u for u in users_result.scalars().all()}
+
+    return [
+        AssigneeResponse(
+            id=users_map[user_id].id if user_id in users_map else user_id,
+            username=users_map[user_id].username if user_id in users_map else "",
+            email=users_map[user_id].email if user_id in users_map else "",
+            display_name=users_map[user_id].display_name if user_id in users_map else "",
+            role=role or "member",
+            avatar_url=users_map[user_id].avatar_url if user_id in users_map else None,
+        )
+        for user_id, role in rows
+    ]
 
 
 @router.get("")
@@ -248,8 +261,7 @@ async def add_comment(
     await db.refresh(comment)
     # Dispatch notification
     try:
-        frontend = await db.get(AppSetting, "frontend_url")
-        frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+        frontend_url = await get_frontend_url(db)
         await dispatch(db, NotificationEvent(
             event_type="issue.commented",
             title=f"Comment on #{issue.id[:8]}: {issue.title}",
@@ -259,8 +271,9 @@ async def add_comment(
             resource_type="comment",
             resource_id=comment.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return _comment_dict(comment)
 
 
@@ -409,8 +422,7 @@ async def start_timer(
     try:
         issue = await db.get(Issue, issue_id)
         if issue:
-            frontend = await db.get(AppSetting, "frontend_url")
-            frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+            frontend_url = await get_frontend_url(db)
             await dispatch(db, NotificationEvent(
                 event_type="timer.started",
                 title=f"Timer started: {issue.title}",
@@ -420,8 +432,9 @@ async def start_timer(
                 resource_type="timer",
                 resource_id=entry.id,
             ))
-    except Exception:
-        pass
+            await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return {"id": entry.id, "issue_id": entry.issue_id, "started_at": entry.started_at, "is_running": True}
 
 
@@ -460,8 +473,7 @@ async def stop_timer(
         issue = await db.get(Issue, issue_id)
         if issue:
             mins = int(elapsed / 60000)
-            frontend = await db.get(AppSetting, "frontend_url")
-            frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+            frontend_url = await get_frontend_url(db)
             await dispatch(db, NotificationEvent(
                 event_type="timer.stopped",
                 title=f"Timer stopped: {issue.title}",
@@ -471,8 +483,9 @@ async def stop_timer(
                 resource_type="timer",
                 resource_id=entry.id,
             ))
-    except Exception:
-        pass
+            await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return {"id": entry.id, "duration_ms": entry.duration_ms, "is_running": False}
 
 
@@ -543,10 +556,23 @@ async def assignee_logs(
         .limit(50)
     )
     logs = list(result.scalars().all())
+
+    # Batch fetch all users at once to avoid N+1
+    all_user_ids: set[str] = set()
+    for l in logs:
+        if l.user_id:
+            all_user_ids.add(l.user_id)
+        if l.changed_by:
+            all_user_ids.add(l.changed_by)
+    users_map: dict[str, User] = {}
+    if all_user_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(list(all_user_ids))))
+        users_map = {u.id: u for u in users_result.scalars().all()}
+
     data = []
     for l in logs:
-        u = await db.get(User, l.user_id) if l.user_id else None
-        cb = await db.get(User, l.changed_by) if l.changed_by else None
+        u = users_map.get(l.user_id) if l.user_id else None
+        cb = users_map.get(l.changed_by) if l.changed_by else None
         action_label = l.action
         if l.action == "status_changed":
             action_label = f"{l.role}"

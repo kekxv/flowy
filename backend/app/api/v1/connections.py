@@ -1,5 +1,6 @@
 import uuid
 import secrets
+import logging
 from datetime import datetime, timedelta
 
 import httpx
@@ -28,6 +29,9 @@ from app.services import connection_service
 from app.services.external import get_client
 from app.services.external.base import ExternalRepo
 from app.services.notifications.base import NotificationEvent
+from app.utils.settings import get_frontend_url
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/external/connections", tags=["connections"])
 
@@ -78,9 +82,8 @@ async def oauth_init(data: dict, req: Request, db: AsyncSession = Depends(get_db
 
     state = secrets.token_urlsafe(32)
     # Build backend callback URL
-    frontend = await db.get(AppSetting, "frontend_url")
-    fe_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
-    backend_callback = f"{fe_url}/api/v1/external/connections/oauth/callback"
+    frontend_url = await get_frontend_url(db)
+    backend_callback = f"{frontend_url}/api/v1/external/connections/oauth/callback"
 
     if provider == "github":
         auth_url = f"{cfg['auth_url']}?client_id={cfg['client_id']}&redirect_uri={backend_callback}&state={state}&scope={cfg['scope']}"
@@ -163,8 +166,7 @@ async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: st
     await db.refresh(conn)
     # Dispatch notification
     try:
-        frontend = await db.get(AppSetting, "frontend_url")
-        frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+        frontend_url = await get_frontend_url(db)
         await dispatch(db, NotificationEvent(
             event_type="external.connected",
             title=f"External account connected: {conn.provider}",
@@ -174,8 +176,9 @@ async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: st
             resource_type="connection",
             resource_id=conn.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return conn
 
 
@@ -218,8 +221,8 @@ async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
                                 conn.token_expires_at = (datetime.now() + timedelta(seconds=int(expires_in))).isoformat()
                             await db.commit()
                             return new_token
-        except Exception:
-            pass  # Refresh failed, fall through to return existing token
+        except Exception as e:
+            logger.warning(f"Failed to dispatch notification: {e}")
 
     return token
 async def oauth_callback_get(
@@ -298,8 +301,7 @@ async def remove_connection(
         raise HTTPException(status_code=404, detail="Connection not found")
     await connection_service.delete_connection(db, conn)
     try:
-        frontend = await db.get(AppSetting, "frontend_url")
-        frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+        frontend_url = await get_frontend_url(db)
         await dispatch(db, NotificationEvent(
             event_type="external.disconnected",
             title=f"External account removed: {conn.provider}",
@@ -309,8 +311,9 @@ async def remove_connection(
             resource_type="connection",
             resource_id=conn.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
 
 
 @router.post("/{connection_id}/test")
@@ -527,8 +530,8 @@ async def refresh_external_link(
             link.title = ri.title
             link.status = ri.status
             link.external_url = ri.url
-    except Exception:
-        pass  # Keep old data if fetch fails
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
 
     from datetime import datetime
     link.last_synced_at = datetime.now().isoformat()

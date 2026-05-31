@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getIssue, updateIssue } from "../api/issues";
-
-const STAT = ["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"];
-const PRIS = ["critical","high","medium","low","trivial"];
+import { STAT, PRIS } from "../constants";
+import Loader from "../components/Loader";
 
 export default function IssueEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,11 +16,7 @@ export default function IssueEditPage() {
 
   const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority}); navigate(`/issues/${id}`); };
 
-  if (loading) return (
-    <div className="flex justify-center pt-24">
-      <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/>
-    </div>
-  );
+  if (loading) return <Loader />;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 page-enter">

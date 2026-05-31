@@ -5,11 +5,28 @@ services:
       - "${PORT:-80}:80"
     volumes:
       - flowy_data:/data
+    env_file:
+      - .env
     environment:
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      - JWT_SECRET=${JWT_SECRET:-change-me-to-random-secret}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
     restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   flowy_data:

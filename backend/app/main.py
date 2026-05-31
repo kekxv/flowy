@@ -1,6 +1,9 @@
+import logging
 import uuid
 import asyncio
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,7 +59,7 @@ async def lifespan(_app: FastAPI):
                     db.add(Label(id=str(uuid.uuid4()), name=name, color=color, description=desc))
                 await db.commit()
         except Exception:
-            pass
+            logger.exception("Failed to seed default labels")
 
     await sync_service.start()
     yield
@@ -99,7 +102,15 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/health")
     async def health_check():
-        return {"status": "ok"}
+        try:
+            async with async_session() as db:
+                await db.execute(text("SELECT 1"))
+            return {"status": "ok"}
+        except Exception:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "degraded", "db": "unreachable"},
+            )
 
     return app
 

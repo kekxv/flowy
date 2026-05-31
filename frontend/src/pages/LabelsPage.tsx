@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Edit3, Trash2, Lock } from "lucide-react";
 import { listLabels, createLabel, updateLabel, deleteLabel, type LabelData } from "../api/issues";
 import { useAuthStore } from "../store/authStore";
+import Loader from "../components/Loader";
 
 export default function LabelsPage() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function LabelsPage() {
     editing?await updateLabel(editing.id,{name,color,description}):await createLabel({name,color,description});reset();fetch(); };
   const remove = async (id:string) => { if(!confirm(t("common.confirm")+"?"))return; await deleteLabel(id); fetch(); };
 
-  if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (loading) return <Loader />;
   if (!isAdmin) return (
     <div className="flex flex-col items-center justify-center pt-24 text-[var(--text-muted)]">
       <Lock size={40} className="mb-3 opacity-30"/>

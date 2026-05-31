@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, Calendar, Flag, CheckCircle2, AlertCircle, Edit3, Roc
 import ReactMarkdown from "react-markdown";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
+import Loader from "../components/Loader";
 
 interface IssueItem { id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string; }
 interface MilestoneData { id: string; name: string; description: string; due_date: string|null; status: string; total_issues: number; closed_issues: number; progress: number; created_at: string; updated_at: string; owner_id?: string; }
@@ -52,7 +53,7 @@ export default function MilestoneDetailPage() {
     catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error","Failed")); }
   };
 
-  if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (loading) return <Loader />;
   if (!milestone) return <div className="text-center text-[var(--text-muted)] pt-16">{t("milestone.no_milestones")}</div>;
 
   const left = daysLeft(milestone.due_date);

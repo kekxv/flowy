@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 
@@ -11,9 +12,15 @@ from app.models.notification import NotificationLog, NotificationRule
 from app.services.notifications import get_channel
 from app.services.notifications.base import NotificationEvent
 
+logger = logging.getLogger(__name__)
+
 
 async def dispatch(db: AsyncSession, event: NotificationEvent) -> None:
-    """Dispatch an event to all matching notification rules. Non-blocking per-channel."""
+    """Dispatch an event to all matching notification rules. Non-blocking per-channel.
+
+    Note: This function does NOT commit the session. The caller is responsible
+    for committing after all database operations are complete.
+    """
 
     # Find matching rules (event_type can be comma-separated for multi-event rules)
     result = await db.execute(
@@ -21,6 +28,9 @@ async def dispatch(db: AsyncSession, event: NotificationEvent) -> None:
     )
     all_rules = list(result.scalars().all())
     rules = [r for r in all_rules if event.event_type in r.event_type.split(",")]
+
+    if rules:
+        logger.debug("Dispatching event %s to %d rule(s)", event.event_type, len(rules))
 
     async def send_to_channel(rule: NotificationRule) -> None:
         try:
@@ -53,4 +63,4 @@ async def dispatch(db: AsyncSession, event: NotificationEvent) -> None:
             db.add(log)
 
     await asyncio.gather(*[send_to_channel(rule) for rule in rules])
-    await db.commit()
+    # Removed: await db.commit() — caller is responsible for committing

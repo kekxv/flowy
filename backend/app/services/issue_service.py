@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from uuid import uuid4
 
@@ -7,19 +8,14 @@ from sqlalchemy.orm import selectinload
 
 from app.models.issue import Comment, Issue, Label, issue_assignees, issue_labels_table, issue_milestones_table
 from app.models.tracking import IssueAssigneeLog, Milestone
-from app.config import settings
 from app.core.dispatcher import dispatch
-from app.models.settings import AppSetting
 from app.models.user import User
+from app.utils.settings import get_frontend_url
 from app.schemas.common import PaginationParams
 from app.schemas.issue import IssueCreate, IssueFilter, IssueUpdate
+
+logger = logging.getLogger(__name__)
 from app.services.notifications.base import NotificationEvent
-
-
-async def _get_frontend_url(db: AsyncSession) -> str:
-    """Get frontend URL from DB settings, falling back to config."""
-    row = await db.get(AppSetting, "frontend_url")
-    return (row.value if row and row.value else settings.frontend_url).rstrip("/")
 
 
 async def list_issues(
@@ -120,7 +116,7 @@ async def create_issue(
     issue = await get_issue(db, issue.id)
     # Dispatch notification
     try:
-        frontend_url = await _get_frontend_url(db)
+        frontend_url = await get_frontend_url(db)
         reporter_name = issue.reporter.display_name or issue.reporter.username if issue.reporter else ""
         await dispatch(db, NotificationEvent(
             event_type="issue.created",
@@ -131,8 +127,9 @@ async def create_issue(
             resource_type="issue",
             resource_id=issue.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return issue
 
 
@@ -251,7 +248,7 @@ async def update_issue(
     issue = await get_issue(db, issue.id)
     # Build notification with specific change details
     try:
-        frontend_url = await _get_frontend_url(db)
+        frontend_url = await get_frontend_url(db)
         changes = []
         if data.status is not None:
             changes.append(f"状态 → {data.status}")
@@ -285,8 +282,9 @@ async def update_issue(
             resource_type="issue",
             resource_id=issue.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
     return issue
 
 

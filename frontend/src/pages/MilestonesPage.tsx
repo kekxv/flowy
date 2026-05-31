@@ -5,6 +5,7 @@ import { Plus, Clock, Flag, CheckCircle2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
+import Loader from "../components/Loader";
 
 interface Milestone {
   id: string; name: string; description: string; due_date: string | null;
@@ -50,7 +51,7 @@ export default function MilestonesPage() {
 
   const filtered = milestones.filter(m => filter === "all" || m.status === filter);
 
-  if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (loading) return <Loader />;
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 page-enter">

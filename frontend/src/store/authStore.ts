@@ -56,7 +56,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.clear();
+    // Only remove auth-related keys, not all localStorage data
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
@@ -70,7 +72,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await getMe();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch {
-      localStorage.clear();
+      // Only remove auth-related keys, not all localStorage data
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },

@@ -4,6 +4,8 @@ import { Globe, Code2, Key, Trash2, CheckCircle2, XCircle, ExternalLink, Refresh
 import { listConnections, connectViaPat, deleteConnection, testConnection, type ConnectionData } from "../api/connections";
 import { useAuthStore } from "../store/authStore";
 import api from "../api/client";
+import { ALL_ROLES } from "../constants";
+import Loader from "../components/Loader";
 
 export default function UserProfilePage() {
   const { t } = useTranslation();
@@ -67,7 +69,7 @@ export default function UserProfilePage() {
   const remove = async (id:string) => { if(!confirm(t("common.confirm")+"?"))return; await deleteConnection(id); fetch(); };
   const test = async (id:string) => { const ok=await testConnection(id); alert(ok?t("settings.test_ok","OK"):t("settings.test_fail","Failed")); };
 
-  if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (loading) return <Loader />;
 
   const showProviderConnect = (p:string) => conns.every(c=>c.provider!==p);
 
@@ -189,8 +191,6 @@ export default function UserProfilePage() {
     </div>
   );
 }
-
-const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 
 function ProjectRolesSection({ t }: { t: any }) {
   const [roles, setRoles] = useState<string[]>([]);

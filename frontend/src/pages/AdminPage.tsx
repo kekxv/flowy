@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, UserCog, Crown, Globe, Code2, Settings2, Lock, Briefcase, X } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
+import { ALL_ROLES } from "../constants";
+import Loader from "../components/Loader";
 
 interface UserItem { id: string; username: string; email: string; display_name: string; role: string; is_active: boolean; created_at: string; }
 interface Stats { users: number; issues: number; open_issues: number; closed_issues: number; connections: number; }
@@ -29,7 +31,6 @@ export default function AdminPage() {
 
   const [roleEditUser, setRoleEditUser] = useState<string|null>(null);
   const [roleEditRoles, setRoleEditRoles] = useState<string[]>([]);
-  const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
 
   const toggleRole = async (u:UserItem) => { await api.put(`/users/${u.id}`,{role:u.role==="admin"?"member":"admin"}); fetch(); };
   const toggleActive = async (u:UserItem) => { await api.put(`/users/${u.id}`,{is_active:!u.is_active}); fetch(); };
@@ -44,7 +45,7 @@ export default function AdminPage() {
     setRoleEditUser(null);
   };
 
-  if (loading) return <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>;
+  if (loading) return <Loader />;
   if (user?.role !== "admin") return (
     <div className="flex flex-col items-center justify-center pt-24 text-[var(--text-muted)]">
       <Lock size={40} className="mb-3 opacity-30"/>

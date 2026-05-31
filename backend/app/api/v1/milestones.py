@@ -1,18 +1,21 @@
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.core.dispatcher import dispatch
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.issue import Issue, issue_milestones_table
-from app.models.settings import AppSetting
+from app.utils.settings import get_frontend_url
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.services.notifications.base import NotificationEvent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/milestones", tags=["milestones"])
 
@@ -80,8 +83,7 @@ async def create_milestone(
 
     # Dispatch notification
     try:
-        frontend = await db.get(AppSetting, "frontend_url")
-        frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+        frontend_url = await get_frontend_url(db)
         await dispatch(db, NotificationEvent(
             event_type="milestone.created",
             title=f"Milestone created: {milestone.name}",
@@ -91,8 +93,9 @@ async def create_milestone(
             resource_type="milestone",
             resource_id=milestone.id,
         ))
-    except Exception:
-        pass
+        await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
 
     return {
         "id": milestone.id,
@@ -136,8 +139,7 @@ async def update_milestone(
             event_map = {"published": "milestone.published", "closed": "milestone.closed", "open": "milestone.reopened"}
             event_type = event_map.get(new_status, "milestone.updated")
             status_labels = {"published": "已发布", "closed": "已关闭", "open": "已重新打开"}
-            frontend = await db.get(AppSetting, "frontend_url")
-            frontend_url = (frontend.value if frontend and frontend.value else settings.frontend_url).rstrip("/")
+            frontend_url = await get_frontend_url(db)
             await dispatch(db, NotificationEvent(
                 event_type=event_type,
                 title=f"Milestone: {m.name}",
@@ -147,8 +149,9 @@ async def update_milestone(
                 resource_type="milestone",
                 resource_id=m.id,
             ))
-    except Exception:
-        pass
+            await db.commit()  # Persist notification logs
+    except Exception as e:
+        logger.warning(f"Failed to dispatch notification: {e}")
 
     return {"id": m.id, "name": m.name, "description": m.description, "due_date": m.due_date, "status": m.status, "owner_id": m.owner_id}
 

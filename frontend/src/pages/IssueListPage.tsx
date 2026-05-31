@@ -5,11 +5,9 @@ import { Search, Plus, ChevronRight, X, UserPlus } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listIssues, type IssueData } from "../api/issues";
-
-const STAT = ["open","in_progress","resolved","closed","cancelled","proposed","accepted","rejected"] as const;
-const PRIS = ["critical","high","medium","low","trivial"] as const;
-const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
-const timeAgo = (iso: string) => { const d=Date.now()-new Date(iso).getTime(); const m=Math.floor(d/60000); if (m<1) return "just"; if (m<60) return `${m}m`; const h=Math.floor(m/60); if (h<24) return `${h}h`; return `${Math.floor(h/24)}d`; };
+import { ALL_ROLES, STAT, PRIS } from "../constants";
+import Loader from "../components/Loader";
+import { timeAgo } from "../utils/time";
 const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400" })[s]||"";
 
 export default function IssueListPage() {
@@ -52,7 +50,7 @@ export default function IssueListPage() {
   };
   const openClaim = async (issueId: string) => {
     setClaimId(issueId); setClaimRoles([]);
-    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles(ALL_ROLES); }
+    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles([...ALL_ROLES]); }
   };
   const toggleClaimRole = (r: string) => setClaimRoles(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r]);
   const doClaim = async () => {
@@ -121,7 +119,7 @@ export default function IssueListPage() {
         )}
       </div>
 
-      {loading ? <div className="flex justify-center pt-16"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent"/></div>
+      {loading ? <Loader />
       : issues.length===0 ? <div className="card flex flex-col items-center justify-center py-16 rounded-[var(--radius-lg)]"><div className="mb-3 text-4xl">🔍</div><p className="text-[13px] text-[var(--text-muted)]">{t("issues.no_issues")}</p></div>
       : <div className="card overflow-hidden rounded-[var(--radius-lg)]">
           {issues.map((issue,idx)=>(

@@ -4,8 +4,9 @@ import { useTranslation } from "react-i18next";
 import { BarChart3, AlertCircle, CheckCircle2, Flag, Layers, ChevronRight, TrendingUp, Timer, Clock, Inbox, UserPlus, X } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
-
-const ALL_ROLES = ["project_lead","backend_dev","frontend_dev","tester","ui_designer","devops","clerk","member"];
+import { ALL_ROLES } from "../constants";
+import { timeAgo } from "../utils/time";
+import Loader from "../components/Loader";
 
 interface DashboardData {
   my_issues: Array<{ id: string; title: string; status: string; priority: string; issue_type?: string; roles: string[]; created_at: string }>;
@@ -15,7 +16,6 @@ interface DashboardData {
   milestones: Array<{ id: string; name: string; status: string; due_date: string | null; total: number; closed: number; progress: number }>;
 }
 
-const timeAgo = (iso: string) => { const d=Date.now()-new Date(iso).getTime(); const m=Math.floor(d/60000); if(m<1)return"now";if(m<60)return`${m}m`;const h=Math.floor(m/60);if(h<24)return`${h}h`;return`${Math.floor(h/24)}d`; };
 const fmtMs = (ms: number) => { const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return h>0?`${h}h ${m}m`:`${m}m`; };
 
 export default function DashboardPage() {
@@ -28,16 +28,12 @@ export default function DashboardPage() {
 
   useEffect(() => { api.get("/dashboard").then(r => setData(r.data)); }, []);
 
-  if (!data) return (
-    <div className="flex justify-center pt-24">
-      <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--primary)] border-t-transparent" />
-    </div>
-  );
+  if (!data) return <Loader />;
 
   const openClaim = async (issueId: string) => {
     setClaimId(issueId); setClaimRoles([]);
     // Fetch user's project roles
-    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles(ALL_ROLES); }
+    try { const r = await api.get("/auth/me/project-roles"); setMyRoles(r.data); } catch { setMyRoles([...ALL_ROLES]); }
   };
   const toggleClaimRole = (r: string) => setClaimRoles(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r]);
   const claimIssue = async () => {

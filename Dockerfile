@@ -1,7 +1,7 @@
 # === Stage 1: Backend dependencies ===
 FROM python:3.11-slim AS backend-deps
 WORKDIR /app
-RUN pip install uv
+RUN pip install uv --no-cache-dir
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --frozen
 
@@ -29,14 +29,23 @@ COPY --from=frontend-build /app/dist /app/static
 
 # Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Copy backend code (last layer - changes most often)
 COPY backend/ .
 
-RUN mkdir -p /data
+# Create non-root user and set permissions
+RUN useradd --system --group --shell /bin/false appuser \
+    && mkdir -p /data \
+    && chown -R appuser:appuser /app /data
+
 ENV DATABASE_URL=sqlite+aiosqlite:////data/flowy.db
 ENV STATIC_DIR=/app/static
 
+USER appuser
+
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:80/api/v1/health')" || exit 1
+
 CMD ["/entrypoint.sh"]
