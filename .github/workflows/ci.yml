@@ -40,6 +40,10 @@ jobs:
         run: uv run python -c "from app.main import app; print('OK')"
       - name: Run ruff linter
         run: uv run ruff check
+      - name: Generate test encryption key
+        run: |
+          ENCRYPTION_KEY=$(uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+          echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> $GITHUB_ENV
       - name: Run tests
         run: uv run pytest
 
