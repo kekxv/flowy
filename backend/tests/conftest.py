@@ -1,7 +1,16 @@
 import asyncio
+import os
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+
+def pytest_configure(config):
+    """Generate a per-session encryption key for tests so no default key is baked in."""
+    if not os.environ.get("ENCRYPTION_KEY"):
+        from cryptography.fernet import Fernet
+
+        os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 
 from app.database import Base
 from app.models.issue import Label
