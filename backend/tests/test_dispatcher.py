@@ -1,8 +1,8 @@
 """Tests for app/core/dispatcher.py."""
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dispatcher import dispatch
 from app.models.notification import NotificationChannel, NotificationLog, NotificationRule
@@ -21,27 +21,41 @@ def _make_event(event_type="test.event") -> NotificationEvent:
     )
 
 
-async def _create_channel_and_rule(db_session: AsyncSession, channel_id="ch-1", rule_id="rule-1",
-                                    event_type="test.event", is_active=True):
+async def _create_channel_and_rule(
+    db_session: AsyncSession,
+    channel_id="ch-1",
+    rule_id="rule-1",
+    event_type="test.event",
+    is_active=True,
+):
     """Create a user, channel, and rule for testing."""
-    from app.models.user import User
     import bcrypt
+
+    from app.models.user import User
+
     user = User(
-        id=f"user-{channel_id}", username=f"chuser_{channel_id}",
+        id=f"user-{channel_id}",
+        username=f"chuser_{channel_id}",
         email=f"ch{channel_id}@test.com",
-        password_hash=bcrypt.hashpw("pass123".encode(), bcrypt.gensalt()).decode(),
+        password_hash=bcrypt.hashpw(b"pass123", bcrypt.gensalt()).decode(),
     )
     db_session.add(user)
     await db_session.flush()
 
     channel = NotificationChannel(
-        id=channel_id, name="Test Channel", channel_type="webhook",
-        is_active=is_active, config='{"url": "http://example.com/hook"}',
+        id=channel_id,
+        name="Test Channel",
+        channel_type="webhook",
+        is_active=is_active,
+        config='{"url": "http://example.com/hook"}',
         created_by=user.id,
     )
     rule = NotificationRule(
-        id=rule_id, name="Test Rule", channel_id=channel_id,
-        event_type=event_type, is_active=is_active,
+        id=rule_id,
+        name="Test Rule",
+        channel_id=channel_id,
+        event_type=event_type,
+        is_active=is_active,
         created_by=user.id,
     )
     db_session.add(channel)
@@ -78,9 +92,7 @@ class TestDispatch:
         await db_session.commit()
 
         result = await db_session.execute(
-            select(NotificationLog).where(
-                NotificationLog.event_type == "test.event"
-            )
+            select(NotificationLog).where(NotificationLog.event_type == "test.event")
         )
         logs = list(result.scalars().all())
         assert len(logs) == 1
@@ -108,8 +120,10 @@ class TestDispatch:
     async def test_dispatch_multi_event_type(self, db_session: AsyncSession):
         """Rule with comma-separated event types matches individual events."""
         await _create_channel_and_rule(
-            db_session, channel_id="ch-multi", rule_id="rule-multi",
-            event_type="event.a,event.b,event.c"
+            db_session,
+            channel_id="ch-multi",
+            rule_id="rule-multi",
+            event_type="event.a,event.b,event.c",
         )
 
         event = _make_event(event_type="event.b")

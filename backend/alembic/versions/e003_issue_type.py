@@ -4,12 +4,13 @@ Revision ID: e003
 Revises: e002
 Create Date: 2026-05-26 00:00:00.000000
 """
-from typing import Sequence, Union
-from alembic import op
+
 import sqlalchemy as sa
 
-revision: str = 'e003'
-down_revision: Union[str, None] = 'e002'
+from alembic import op
+
+revision: str = "e003"
+down_revision: str | None = "e002"
 branch_labels = None
 depends_on = None
 

@@ -62,9 +62,7 @@ class GiteaClient(ExternalProviderClient):
         data = await self._request("GET", f"/repos/{repo}/issues", params=params)
         return [self._parse_issue(i) for i in data]
 
-    async def search_issues(
-        self, repo: str, query: str
-    ) -> list[ExternalIssueData]:
+    async def search_issues(self, repo: str, query: str) -> list[ExternalIssueData]:
         data = await self._request(
             "GET", f"/repos/{repo}/issues", params={"q": query, "state": "all", "limit": "30"}
         )
@@ -97,9 +95,7 @@ class GiteaClient(ExternalProviderClient):
             payload["state"] = state
         if labels is not None:
             payload["labels"] = [l for l in labels]
-        data = await self._request(
-            "PATCH", f"/repos/{repo}/issues/{issue_number}", json=payload
-        )
+        data = await self._request("PATCH", f"/repos/{repo}/issues/{issue_number}", json=payload)
         return self._parse_issue(data)
 
     async def add_comment(self, repo: str, issue_number: int, body: str) -> dict:
@@ -111,13 +107,13 @@ class GiteaClient(ExternalProviderClient):
 
     def _parse_issue(self, data: dict) -> ExternalIssueData:
         labels = [l["name"] for l in (data.get("labels") or [])]
-        assignees = [
-            a["login"] for a in (data.get("assignees") or []) if a
-        ]
+        assignees = [a["login"] for a in (data.get("assignees") or []) if a]
         return ExternalIssueData(
             external_id=str(data["number"]),
             title=data["title"],
-            status=data.get("merged_at") and "merged" or (data.get("pull_request") and data["state"] or data["state"]),
+            status=data.get("merged_at")
+            and "merged"
+            or (data.get("pull_request") and data["state"] or data["state"]),
             description=data.get("body", "") or "",
             url=data["html_url"],
             labels=labels,

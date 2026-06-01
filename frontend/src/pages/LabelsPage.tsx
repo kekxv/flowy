@@ -15,7 +15,7 @@ export default function LabelsPage() {
   const [editing, setEditing] = useState<LabelData|null>(null);
   const [name, setName] = useState("");
   const randomColor = () => "#"+Math.floor(Math.random()*16777215).toString(16).padStart(6,"0");
-  const [color, setColor] = useState(randomColor());
+  const [color, setColor] = useState("#6366f1");
   const [description, setDescription] = useState("");
 
   const fetch = async () => { const d=await listLabels(); setLabels(d); setLoading(false); };

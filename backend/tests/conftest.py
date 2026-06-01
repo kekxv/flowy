@@ -1,13 +1,12 @@
 import asyncio
-from typing import AsyncGenerator
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.user import User
+from app.database import Base
 from app.models.issue import Label
 from app.models.tracking import Milestone
-from app.database import Base
+from app.models.user import User
 
 
 @pytest.fixture(scope="session")
@@ -38,6 +37,7 @@ async def db_session():
 def _make_user(**kwargs) -> dict:
     """Default user kwargs for creation."""
     import bcrypt
+
     defaults = {
         "username": "testuser",
         "email": "test@example.com",
@@ -47,7 +47,7 @@ def _make_user(**kwargs) -> dict:
     }
     defaults.update(kwargs)
     if "password_hash" not in defaults:
-        defaults["password_hash"] = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
+        defaults["password_hash"] = bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode()
     return defaults
 
 
@@ -63,7 +63,9 @@ async def test_user(db_session: AsyncSession) -> User:
 @pytest.fixture
 async def test_admin(db_session: AsyncSession) -> User:
     """Create an admin test user."""
-    user = User(id="admin-001", **_make_user(username="admin", email="admin@example.com", role="admin"))
+    user = User(
+        id="admin-001", **_make_user(username="admin", email="admin@example.com", role="admin")
+    )
     db_session.add(user)
     await db_session.flush()
     return user
@@ -82,8 +84,12 @@ async def test_label(db_session) -> Label:
 async def test_milestone(db_session, test_user) -> Milestone:
     """Create a test milestone."""
     milestone = Milestone(
-        id="ms-001", name="v1.0", description="First release",
-        status="open", due_date=None, created_by=test_user.id,
+        id="ms-001",
+        name="v1.0",
+        description="First release",
+        status="open",
+        due_date=None,
+        created_by=test_user.id,
     )
     db_session.add(milestone)
     await db_session.flush()
@@ -94,9 +100,14 @@ async def test_milestone(db_session, test_user) -> Milestone:
 async def test_issue(db_session, test_user):
     """Create a test issue reported by test_user."""
     from app.models.issue import Issue
+
     issue = Issue(
-        id="issue-001", title="Test Bug", description="A test bug",
-        issue_type="bug", status="open", priority="medium",
+        id="issue-001",
+        title="Test Bug",
+        description="A test bug",
+        issue_type="bug",
+        status="open",
+        priority="medium",
         reporter_id=test_user.id,
     )
     db_session.add(issue)

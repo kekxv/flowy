@@ -26,27 +26,26 @@ issue_milestones_table = Table(
     "issue_milestones",
     Base.metadata,
     Column("issue_id", String(36), ForeignKey("issues.id", ondelete="CASCADE"), primary_key=True),
-    Column("milestone_id", String(36), ForeignKey("milestones.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "milestone_id",
+        String(36),
+        ForeignKey("milestones.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
 class Issue(Base):
     __tablename__ = "issues"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
     issue_type: Mapped[str] = mapped_column(String(16), default="bug")  # bug / feature
     status: Mapped[str] = mapped_column(String(32), default="open")
     priority: Mapped[str] = mapped_column(String(16), default="medium")
-    reporter_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id"), nullable=False
-    )
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    reporter_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     updated_at: Mapped[str] = mapped_column(
         String(32),
         default=lambda: datetime.now().isoformat(),
@@ -84,29 +83,21 @@ class Issue(Base):
 class Label(Base):
     __tablename__ = "labels"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     color: Mapped[str] = mapped_column(String(7), default="#808080")
     description: Mapped[str] = mapped_column(String(256), default="")
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
 
 
 class Comment(Base):
     __tablename__ = "issue_comments"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     issue_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("issues.id", ondelete="CASCADE"), nullable=False
     )
-    author_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id"), nullable=False
-    )
+    author_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("issue_comments.id", ondelete="CASCADE"), nullable=True
@@ -115,9 +106,7 @@ class Comment(Base):
     status_changed_by: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True
     )
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     updated_at: Mapped[str] = mapped_column(
         String(32),
         default=lambda: datetime.now().isoformat(),
@@ -127,5 +116,7 @@ class Comment(Base):
     issue: Mapped["Issue"] = relationship("Issue", back_populates="comments")
     author: Mapped["User"] = relationship("User", lazy="joined", foreign_keys=[author_id])
     status_changer: Mapped["User"] = relationship(
-        "User", lazy="joined", foreign_keys=[status_changed_by],
+        "User",
+        lazy="joined",
+        foreign_keys=[status_changed_by],
     )

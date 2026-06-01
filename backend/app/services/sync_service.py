@@ -104,16 +104,24 @@ class SyncService:
                                 flowy_issue = await db.get(Issue, link.issue_id)
                                 issue_title = flowy_issue.title if flowy_issue else link.issue_id
                                 frontend_url = await get_frontend_url(db)
-                                await dispatch(db, NotificationEvent(
-                                    event_type="external_link.updated",
-                                    title=f"External {ri.link_type}: {ri.title}",
-                                    summary=f"Flowy #{link.issue_id[:8]} | {link.external_repo}#{link.external_id}: {old_status} → {ri.status}",
-                                    detail_url=f"{frontend_url}/issues/{link.issue_id}",
-                                    actor_name="Sync",
-                                    resource_type=f"external_{ri.link_type}",
-                                    resource_id=link.id,
-                                    extra={"flowy_issue_title": issue_title, "external_title": ri.title, "old_status": old_status, "new_status": ri.status},
-                                ))
+                                await dispatch(
+                                    db,
+                                    NotificationEvent(
+                                        event_type="external_link.updated",
+                                        title=f"External {ri.link_type}: {ri.title}",
+                                        summary=f"Flowy #{link.issue_id[:8]} | {link.external_repo}#{link.external_id}: {old_status} → {ri.status}",
+                                        detail_url=f"{frontend_url}/issues/{link.issue_id}",
+                                        actor_name="Sync",
+                                        resource_type=f"external_{ri.link_type}",
+                                        resource_id=link.id,
+                                        extra={
+                                            "flowy_issue_title": issue_title,
+                                            "external_title": ri.title,
+                                            "old_status": old_status,
+                                            "new_status": ri.status,
+                                        },
+                                    ),
+                                )
                                 await db.commit()  # Persist notification logs
                             except Exception as e:
                                 logger.warning(f"Notification dispatch failed: {e}")

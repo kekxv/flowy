@@ -109,7 +109,10 @@ class IssueUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     description: str | None = None
     issue_type: str | None = Field(default=None, pattern=r"^(bug|feature)$")
-    status: str | None = Field(default=None, pattern=r"^(open|in_progress|resolved|closed|cancelled|proposed|accepted|rejected)$")
+    status: str | None = Field(
+        default=None,
+        pattern=r"^(open|in_progress|resolved|closed|cancelled|proposed|accepted|rejected)$",
+    )
     priority: str | None = Field(default=None, pattern=r"^(critical|high|medium|low|trivial)$")
     assignees: list[AssigneeInput] | None = None
     label_ids: list[str] | None = None

@@ -10,9 +10,7 @@ from app.database import Base
 class ExternalConnection(Base):
     __tablename__ = "external_connections"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -26,9 +24,7 @@ class ExternalConnection(Base):
     remote_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     last_synced_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     updated_at: Mapped[str] = mapped_column(
         String(32),
         default=lambda: datetime.now().isoformat(),
@@ -37,17 +33,13 @@ class ExternalConnection(Base):
 
     user: Mapped["User"] = relationship("User", lazy="joined")
 
-    __table_args__ = (
-        CheckConstraint("provider IN ('github','gitea')", name="ck_conn_provider"),
-    )
+    __table_args__ = (CheckConstraint("provider IN ('github','gitea')", name="ck_conn_provider"),)
 
 
 class ExternalIssue(Base):
     __tablename__ = "external_issues"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     issue_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("issues.id", ondelete="CASCADE"), nullable=False
     )
@@ -65,9 +57,7 @@ class ExternalIssue(Base):
     merged_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     last_synced_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
     sync_direction: Mapped[str] = mapped_column(String(16), default="bidirectional")
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     updated_at: Mapped[str] = mapped_column(
         String(32),
         default=lambda: datetime.now().isoformat(),
@@ -75,9 +65,7 @@ class ExternalIssue(Base):
     )
 
     issue: Mapped["Issue"] = relationship("Issue", lazy="joined")
-    connection: Mapped["ExternalConnection"] = relationship(
-        "ExternalConnection", lazy="joined"
-    )
+    connection: Mapped["ExternalConnection"] = relationship("ExternalConnection", lazy="joined")
 
     __table_args__ = (
         CheckConstraint(
@@ -90,9 +78,7 @@ class ExternalIssue(Base):
 class SyncLog(Base):
     __tablename__ = "sync_logs"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     connection_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("external_connections.id", ondelete="CASCADE"),
@@ -104,14 +90,10 @@ class SyncLog(Base):
     issues_created: Mapped[int] = mapped_column(default=0)
     issues_updated: Mapped[int] = mapped_column(default=0)
     errors: Mapped[str | None] = mapped_column(Text, nullable=True)
-    started_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    started_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     completed_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
-    connection: Mapped["ExternalConnection"] = relationship(
-        "ExternalConnection", lazy="joined"
-    )
+    connection: Mapped["ExternalConnection"] = relationship("ExternalConnection", lazy="joined")
 
     __table_args__ = (
         CheckConstraint(
@@ -134,25 +116,17 @@ class OAuthState(Base):
     user_id: Mapped[str] = mapped_column(String(36), nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String(512), nullable=False)
     frontend_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
 
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
-    user_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("users.id"), nullable=True
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(64), nullable=False)
     resource_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[str] = mapped_column(
-        String(32), default=lambda: datetime.now().isoformat()
-    )
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())

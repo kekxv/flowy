@@ -32,7 +32,9 @@ class WeChatWorkChannel(NotificationChannel):
             return False
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(url, json={"msgtype": "text", "text": {"content": "Flowy 通知测试"}})
+                resp = await client.post(
+                    url, json={"msgtype": "text", "text": {"content": "Flowy 通知测试"}}
+                )
                 return resp.status_code < 500
         except Exception:
             return False
@@ -61,7 +63,9 @@ class WeChatWorkChannel(NotificationChannel):
         }
         type_label = type_labels.get(event.event_type, event.event_type)
 
-        ts = event.timestamp[:19].replace("T", " ") if len(event.timestamp) > 19 else event.timestamp
+        ts = (
+            event.timestamp[:19].replace("T", " ") if len(event.timestamp) > 19 else event.timestamp
+        )
 
         extra_lines = ""
         flowy_title = event.extra.get("flowy_issue_title")

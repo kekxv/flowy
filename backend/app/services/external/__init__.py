@@ -1,6 +1,6 @@
 from app.services.external.base import ExternalProviderClient
-from app.services.external.github import GitHubClient
 from app.services.external.gitea import GiteaClient
+from app.services.external.github import GitHubClient
 
 PROVIDERS: dict[str, type[ExternalProviderClient]] = {
     "github": GitHubClient,

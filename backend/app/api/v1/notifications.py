@@ -13,7 +13,7 @@ from app.models.notification import (
     NotificationRule,
 )
 from app.models.user import User
-from app.services.notifications import get_channel, CHANNEL_REGISTRY
+from app.services.notifications import CHANNEL_REGISTRY, get_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -33,11 +33,16 @@ EVENT_TYPES = [
     {"key": "sync.completed", "label": "Sync Completed", "label_zh": "同步完成"},
     {"key": "sync.failed", "label": "Sync Failed", "label_zh": "同步失败"},
     {"key": "external.connected", "label": "External Connection Added", "label_zh": "外部连接添加"},
-    {"key": "external.disconnected", "label": "External Connection Removed", "label_zh": "外部连接移除"},
+    {
+        "key": "external.disconnected",
+        "label": "External Connection Removed",
+        "label_zh": "外部连接移除",
+    },
 ]
 
 
 # Channels
+
 
 @router.get("/channels")
 async def list_channels(
@@ -156,6 +161,7 @@ async def delete_channel(
 
 # Rules
 
+
 @router.get("/rules")
 async def list_rules(
     db: AsyncSession = Depends(get_db),
@@ -267,6 +273,7 @@ async def delete_rule(
 
 # Logs
 
+
 @router.get("/logs")
 async def list_logs(
     channel_id: str | None = Query(default=None),
@@ -311,6 +318,7 @@ async def list_logs(
 
 
 # Channel types info (for frontend config_schema rendering)
+
 
 @router.get("/channel-types")
 async def list_channel_types():

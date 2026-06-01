@@ -1,11 +1,8 @@
 """Tests for app/core/crypto.py."""
 
-import os
-
 import pytest
 
 from app.core.crypto import decrypt_token, encrypt_token
-from app.config import settings
 
 
 class TestEncryptDecrypt:
@@ -46,10 +43,12 @@ class TestEncryptDecrypt:
         monkeypatch.setenv("ENCRYPTION_KEY", "")
         # Need to reload settings to pick up the new env var
         from app.config import Settings
+
         new_settings = Settings()
         assert new_settings.encryption_key == ""
 
         # The Fernet constructor will fail with invalid key
         from cryptography.fernet import Fernet
+
         with pytest.raises(Exception):
-            Fernet("".encode())
+            Fernet(b"")

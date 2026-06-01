@@ -1,12 +1,10 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import async_session
 from app.models.notification import NotificationChannel as NotificationChannelModel
 from app.models.notification import NotificationLog, NotificationRule
 from app.services.notifications import get_channel

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from jose import jwt
@@ -19,7 +19,7 @@ def create_access_token(user_id: str, role: str) -> str:
         "sub": user_id,
         "role": role,
         "type": "access",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
+        "exp": datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
@@ -28,6 +28,6 @@ def create_refresh_token(user_id: str) -> str:
     payload = {
         "sub": user_id,
         "type": "refresh",
-        "exp": datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+        "exp": datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)

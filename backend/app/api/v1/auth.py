@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from sqlalchemy import delete
-
 from app.dependencies import get_current_user
 from app.models.tracking import UserProjectRole
 from app.models.user import User
@@ -113,9 +111,7 @@ async def get_my_project_roles(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(UserProjectRole).where(UserProjectRole.user_id == user.id)
-    )
+    result = await db.execute(select(UserProjectRole).where(UserProjectRole.user_id == user.id))
     roles = [r.role for r in result.scalars().all()]
     return roles or ["member"]
 
@@ -128,9 +124,7 @@ async def set_my_project_roles(
 ):
     roles = data.get("roles", [])
     # Delete existing
-    await db.execute(
-        delete(UserProjectRole).where(UserProjectRole.user_id == user.id)
-    )
+    await db.execute(delete(UserProjectRole).where(UserProjectRole.user_id == user.id))
     # Insert new
     for r in roles:
         db.add(UserProjectRole(user_id=user.id, role=r))

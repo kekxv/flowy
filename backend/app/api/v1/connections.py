@@ -1,6 +1,6 @@
-import uuid
-import secrets
 import logging
+import secrets
+import uuid
 from datetime import datetime, timedelta
 
 import httpx
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.crypto import decrypt_token, encrypt_token
+from app.core.dispatcher import dispatch
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.external import ExternalConnection, ExternalIssue, OAuthState
@@ -24,10 +25,8 @@ from app.schemas.external import (
     LinkExternalIssueRequest,
     PATConnectionRequest,
 )
-from app.core.dispatcher import dispatch
 from app.services import connection_service
 from app.services.external import get_client
-from app.services.external.base import ExternalRepo
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
 
@@ -62,7 +61,12 @@ async def list_connections(
 
 
 @router.post("/oauth/init")
-async def oauth_init(data: dict, req: Request, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def oauth_init(
+    data: dict,
+    req: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """Generate OAuth authorization URL."""
     provider = data.get("provider", "github")
     instance_url = data.get("instance_url", "").rstrip("/")
@@ -93,12 +97,23 @@ async def oauth_init(data: dict, req: Request, db: AsyncSession = Depends(get_db
         auth_url = f"{url_tpl}?client_id={cfg['client_id']}&redirect_uri={backend_callback}&state={state}&response_type=code"
 
     # Persist state to DB (survives server reload)
-    db.add(OAuthState(state=state, provider=provider, instance_url=inst, user_id=user.id, redirect_uri=backend_callback, frontend_url=fe_url))
+    db.add(
+        OAuthState(
+            state=state,
+            provider=provider,
+            instance_url=inst,
+            user_id=user.id,
+            redirect_uri=backend_callback,
+            frontend_url=frontend_url,
+        )
+    )
     await db.commit()
     return {"auth_url": auth_url, "state": state}
 
 
-async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: str, code: str, redirect_uri: str, db: AsyncSession):
+async def _exchange_and_save_oauth(
+    provider: str, instance_url: str, user_id: str, code: str, redirect_uri: str, db: AsyncSession
+):
     """Exchange OAuth code for token and save connection."""
     cfg = OAUTH_CONFIGS.get(provider)
     if not cfg:
@@ -108,26 +123,43 @@ async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: st
     sr = await db.execute(select(AppSetting))
     for s in sr.scalars().all():
         db_settings[s.key] = s.value
-    cfg = {**cfg, "client_id": db_settings.get(f"{provider}_client_id") or cfg["client_id"],
-           "client_secret": db_settings.get(f"{provider}_client_secret") or cfg["client_secret"]}
+    cfg = {
+        **cfg,
+        "client_id": db_settings.get(f"{provider}_client_id") or cfg["client_id"],
+        "client_secret": db_settings.get(f"{provider}_client_secret") or cfg["client_secret"],
+    }
 
     # Exchange code for token
     if provider == "github":
         token_url = cfg["token_url"]
-        payload = {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"], "code": code, "redirect_uri": redirect_uri}
+        payload = {
+            "client_id": cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "code": code,
+            "redirect_uri": redirect_uri,
+        }
         headers = {"Accept": "application/json"}
         verify = True
     else:
         base = (instance_url or "https://gitea.com").rstrip("/")
         token_url = cfg["token_url"].replace("{instance}", base)
-        payload = {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"], "code": code, "redirect_uri": redirect_uri, "grant_type": "authorization_code"}
+        payload = {
+            "client_id": cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }
         headers = {"Accept": "application/json"}
         verify = not instance_url
 
     async with httpx.AsyncClient(timeout=15, verify=verify) as client:
         resp = await client.post(token_url, data=payload, headers=headers)
         if resp.status_code >= 400:
-            raise HTTPException(status_code=400, detail=f"Token exchange failed [{resp.status_code}] for {token_url}: {resp.text or '(empty body)'}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Token exchange failed [{resp.status_code}] for {token_url}: {resp.text or '(empty body)'}",
+            )
         token_data = resp.json()
 
     access_token = token_data.get("access_token")
@@ -155,11 +187,17 @@ async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: st
         await db.delete(old)
 
     conn = ExternalConnection(
-        id=str(uuid.uuid4()), user_id=user_id, provider=provider,
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        provider=provider,
         oauth_token=encrypt_token(access_token),
-        refresh_token=encrypt_token(token_data.get("refresh_token")) if token_data.get("refresh_token") else None,
+        refresh_token=encrypt_token(token_data.get("refresh_token"))
+        if token_data.get("refresh_token")
+        else None,
         token_expires_at=expires_at,
-        instance_url=instance_url, remote_username=username, remote_user_id=username,
+        instance_url=instance_url,
+        remote_username=username,
+        remote_user_id=username,
     )
     db.add(conn)
     await db.commit()
@@ -167,15 +205,18 @@ async def _exchange_and_save_oauth(provider: str, instance_url: str, user_id: st
     # Dispatch notification
     try:
         frontend_url = await get_frontend_url(db)
-        await dispatch(db, NotificationEvent(
-            event_type="external.connected",
-            title=f"External account connected: {conn.provider}",
-            summary=f"Connected as {conn.remote_username}",
-            detail_url=f"{frontend_url}/profile",
-            actor_name=conn.remote_username,
-            resource_type="connection",
-            resource_id=conn.id,
-        ))
+        await dispatch(
+            db,
+            NotificationEvent(
+                event_type="external.connected",
+                title=f"External account connected: {conn.provider}",
+                summary=f"Connected as {conn.remote_username}",
+                detail_url=f"{frontend_url}/profile",
+                actor_name=conn.remote_username,
+                resource_type="connection",
+                resource_id=conn.id,
+            ),
+        )
         await db.commit()  # Persist notification logs
     except Exception as e:
         logger.warning(f"Failed to dispatch notification: {e}")
@@ -195,7 +236,9 @@ async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
                 cfg = OAUTH_CONFIGS.get(conn.provider, {})
                 base = (conn.instance_url or "https://gitea.com").rstrip("/")
                 if conn.provider == "gitea":
-                    token_url = cfg.get("token_url", "{instance}/login/oauth/access_token").replace("{instance}", base)
+                    token_url = cfg.get("token_url", "{instance}/login/oauth/access_token").replace(
+                        "{instance}", base
+                    )
                 else:
                     token_url = cfg.get("token_url", "https://github.com/login/oauth/access_token")
 
@@ -205,26 +248,43 @@ async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
                 for s in sr.scalars().all():
                     db_settings[s.key] = s.value
                 cid = db_settings.get(f"{conn.provider}_client_id") or cfg.get("client_id", "")
-                csec = db_settings.get(f"{conn.provider}_client_secret") or cfg.get("client_secret", "")
+                csec = db_settings.get(f"{conn.provider}_client_secret") or cfg.get(
+                    "client_secret", ""
+                )
 
-                payload = {"client_id": cid, "client_secret": csec, "refresh_token": refresh, "grant_type": "refresh_token"}
+                payload = {
+                    "client_id": cid,
+                    "client_secret": csec,
+                    "refresh_token": refresh,
+                    "grant_type": "refresh_token",
+                }
                 async with httpx.AsyncClient(timeout=15, verify=not conn.instance_url) as client:
-                    resp = await client.post(token_url, data=payload, headers={"Accept": "application/json"})
+                    resp = await client.post(
+                        token_url, data=payload, headers={"Accept": "application/json"}
+                    )
                     if resp.status_code < 400:
                         data = resp.json()
                         new_token = data.get("access_token")
                         if new_token:
                             conn.oauth_token = encrypt_token(new_token)
-                            conn.refresh_token = encrypt_token(data.get("refresh_token")) if data.get("refresh_token") else conn.refresh_token
+                            conn.refresh_token = (
+                                encrypt_token(data.get("refresh_token"))
+                                if data.get("refresh_token")
+                                else conn.refresh_token
+                            )
                             expires_in = data.get("expires_in", 0)
                             if expires_in:
-                                conn.token_expires_at = (datetime.now() + timedelta(seconds=int(expires_in))).isoformat()
+                                conn.token_expires_at = (
+                                    datetime.now() + timedelta(seconds=int(expires_in))
+                                ).isoformat()
                             await db.commit()
                             return new_token
         except Exception as e:
             logger.warning(f"Failed to dispatch notification: {e}")
 
     return token
+
+
 async def oauth_callback_get(
     code: str = Query(...),
     state: str = Query(...),
@@ -302,15 +362,18 @@ async def remove_connection(
     await connection_service.delete_connection(db, conn)
     try:
         frontend_url = await get_frontend_url(db)
-        await dispatch(db, NotificationEvent(
-            event_type="external.disconnected",
-            title=f"External account removed: {conn.provider}",
-            summary=f"Disconnected {conn.remote_username}",
-            detail_url=f"{frontend_url}/profile",
-            actor_name=user.display_name or user.username,
-            resource_type="connection",
-            resource_id=conn.id,
-        ))
+        await dispatch(
+            db,
+            NotificationEvent(
+                event_type="external.disconnected",
+                title=f"External account removed: {conn.provider}",
+                summary=f"Disconnected {conn.remote_username}",
+                detail_url=f"{frontend_url}/profile",
+                actor_name=user.display_name or user.username,
+                resource_type="connection",
+                resource_id=conn.id,
+            ),
+        )
         await db.commit()  # Persist notification logs
     except Exception as e:
         logger.warning(f"Failed to dispatch notification: {e}")
@@ -344,7 +407,13 @@ async def list_repos(
     client = get_client(conn.provider, token, conn.instance_url)
     repos = await client.list_repos()
     return [
-        ExternalRepoResponse(full_name=r.full_name, name=r.name, description=r.description, private=r.private, url=r.url)
+        ExternalRepoResponse(
+            full_name=r.full_name,
+            name=r.name,
+            description=r.description,
+            private=r.private,
+            url=r.url,
+        )
         for r in repos
     ]
 
@@ -423,6 +492,7 @@ async def _check_issue_perm(issue_id: str, user: User, db: AsyncSession):
         return
     # Check if feature owner
     from app.models.issue import Issue
+
     issue = await db.get(Issue, issue_id)
     if issue and issue.issue_type == "feature":
         roles = await db.execute(
@@ -433,7 +503,10 @@ async def _check_issue_perm(issue_id: str, user: User, db: AsyncSession):
         )
         if roles.first() is not None:
             return
-    raise HTTPException(status_code=403, detail="Only admin, project_lead, or feature owner can manage external links")
+    raise HTTPException(
+        status_code=403,
+        detail="Only admin, project_lead, or feature owner can manage external links",
+    )
 
 
 # External issue links
@@ -443,9 +516,7 @@ async def list_external_links(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(ExternalIssue).where(ExternalIssue.issue_id == issue_id)
-    )
+    result = await db.execute(select(ExternalIssue).where(ExternalIssue.issue_id == issue_id))
     links = list(result.scalars().all())
     return [
         {
@@ -534,15 +605,21 @@ async def refresh_external_link(
         logger.warning(f"Failed to dispatch notification: {e}")
 
     from datetime import datetime
+
     link.last_synced_at = datetime.now().isoformat()
     await db.commit()
     return {
-        "id": link.id, "title": link.title, "status": link.status,
-        "external_url": link.external_url, "last_synced_at": link.last_synced_at,
+        "id": link.id,
+        "title": link.title,
+        "status": link.status,
+        "external_url": link.external_url,
+        "last_synced_at": link.last_synced_at,
     }
 
 
-@router.delete("/issues/{issue_id}/external-links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/issues/{issue_id}/external-links/{link_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def unlink_external_issue(
     issue_id: str,
     link_id: str,

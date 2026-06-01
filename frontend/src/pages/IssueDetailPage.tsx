@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Edit3, Plus, X, Check, Play, Square, ChevronDown, ExternalLink, Link2, Globe, Code2, Search, Unlink, RefreshCw, AlertCircle, GitPullRequest, CheckCircle2, UserPlus } from "lucide-react";
@@ -505,10 +505,10 @@ function Modal({children,onClose,title,wide}:{children:React.ReactNode;onClose:(
       {children}</div></div>;}
 
 function TimerW({issueId}:{issueId:string}){
-  const[running,setRunning]=useState(false);const[e,setE]=useState(0);const[intv]=useState<{c:any}>({c:null});
+  const[running,setRunning]=useState(false);const[e,setE]=useState(0);const intv=useRef<ReturnType<typeof setInterval>|null>(null);
   const ft=async()=>{try{const r=await api.get(`/issues/${issueId}/timer/status`);setRunning(r.data.is_running);if(r.data.is_running)setE(r.data.duration_ms);}catch{}};
-  useEffect(()=>{ft();return()=>clearInterval(intv.c);},[issueId]);
-  useEffect(()=>{if(running){intv.c=setInterval(()=>setE((e:number)=>e+1000),1000);}else clearInterval(intv.c);return()=>clearInterval(intv.c);},[running]);
+  useEffect(()=>{ft();return()=>{if(intv.current)clearInterval(intv.current);};},[issueId]);
+  useEffect(()=>{if(running){intv.current=setInterval(()=>setE((e:number)=>e+1000),1000);}else{if(intv.current)clearInterval(intv.current);}return()=>{if(intv.current)clearInterval(intv.current);};},[running]);
   const tt=async()=>{running?await api.post(`/issues/${issueId}/timer/stop`):await api.post(`/issues/${issueId}/timer/start`);setRunning(!running);};
   const h=Math.floor(e/3600000),m=Math.floor((e%3600000)/60000),s=Math.floor((e%60000)/1000);
   return <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-white px-3 py-1.5">

@@ -1,8 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from sqlalchemy import delete
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
@@ -20,7 +18,16 @@ async def list_users(
 ):
     result = await db.execute(select(User).order_by(User.created_at))
     return [
-        {"id": u.id, "username": u.username, "email": u.email, "display_name": u.display_name, "role": u.role, "is_active": u.is_active, "avatar_url": u.avatar_url, "created_at": u.created_at}
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "display_name": u.display_name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "avatar_url": u.avatar_url,
+            "created_at": u.created_at,
+        }
         for u in result.scalars().all()
     ]
 
@@ -62,9 +69,7 @@ async def get_user_project_roles(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    result = await db.execute(
-        select(UserProjectRole).where(UserProjectRole.user_id == user_id)
-    )
+    result = await db.execute(select(UserProjectRole).where(UserProjectRole.user_id == user_id))
     return [r.role for r in result.scalars().all()]
 
 

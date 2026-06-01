@@ -1,5 +1,5 @@
-import uuid
 import logging
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,24 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dispatcher import dispatch
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.utils.settings import get_frontend_url
-from app.services.notifications.base import NotificationEvent
 from app.models.issue import Comment, Issue, issue_assignees
 from app.models.tracking import IssueAssigneeLog, TimeEntry
 from app.models.user import User
 from app.schemas.common import PaginationParams, paginated_response
 from app.schemas.issue import (
     AssigneeResponse,
-    CommentCreate,
-    CommentResponse,
-    CommentUpdate,
     IssueCreate,
-    IssueDetailResponse,
     IssueFilter,
-    IssueResponse,
     IssueUpdate,
 )
 from app.services import issue_service
+from app.services.notifications.base import NotificationEvent
+from app.utils.settings import get_frontend_url
 
 logger = logging.getLogger(__name__)
 
@@ -80,22 +75,38 @@ async def list_issues(
 ):
     pagination = PaginationParams(page=page, per_page=per_page, sort=sort)
     filters = IssueFilter(
-        status=status, priority=priority, assignee_id=assignee_id,
-        reporter_id=reporter_id, label_id=label_id, q=q,
+        status=status,
+        priority=priority,
+        assignee_id=assignee_id,
+        reporter_id=reporter_id,
+        label_id=label_id,
+        q=q,
     )
     issues, total = await issue_service.list_issues(db, pagination, filters)
     data = []
     for i in issues:
         d = {
-            "id": i.id, "title": i.title, "description": i.description,
-            "issue_type": i.issue_type, "status": i.status, "priority": i.priority,
+            "id": i.id,
+            "title": i.title,
+            "description": i.description,
+            "issue_type": i.issue_type,
+            "status": i.status,
+            "priority": i.priority,
             "reporter": {
-                "id": i.reporter.id, "username": i.reporter.username,
-                "display_name": i.reporter.display_name, "avatar_url": i.reporter.avatar_url,
-            } if i.reporter else None,
-            "labels": [{"id": l.id, "name": l.name, "color": l.color, "description": l.description} for l in (i.labels or [])],
+                "id": i.reporter.id,
+                "username": i.reporter.username,
+                "display_name": i.reporter.display_name,
+                "avatar_url": i.reporter.avatar_url,
+            }
+            if i.reporter
+            else None,
+            "labels": [
+                {"id": l.id, "name": l.name, "color": l.color, "description": l.description}
+                for l in (i.labels or [])
+            ],
             "milestone_ids": [m.id for m in (i.milestones or [])],
-            "created_at": i.created_at, "updated_at": i.updated_at,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
             "closed_at": i.closed_at,
             "assignees": [a.model_dump() for a in await _build_assignees(db, i.id)],
         }
@@ -143,7 +154,6 @@ async def update_issue(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    from app.models.tracking import UserProjectRole
 
     issue = await issue_service.get_issue(db, issue_id)
     if not issue:
@@ -159,7 +169,9 @@ async def update_issue(
     # Admin, project_lead, and feature owner can do anything
     if not is_admin and not is_lead and not is_feature_owner:
         # Allow assignee/milestone-only changes for everyone (claim/release/link milestone)
-        if (data.assignees is not None or data.milestone_ids is not None) and _is_assignee_only(data):
+        if (data.assignees is not None or data.milestone_ids is not None) and _is_assignee_only(
+            data
+        ):
             safe = IssueUpdate(assignees=data.assignees, milestone_ids=data.milestone_ids)
             issue = await issue_service.update_issue(db, issue, safe, changed_by=user.id)
             return _issue_detail(issue, await _build_assignees(db, issue.id))
@@ -169,7 +181,9 @@ async def update_issue(
             issue = await issue_service.update_issue(db, issue, safe_data, changed_by=user.id)
             return _issue_detail(issue, await _build_assignees(db, issue.id))
         # Others cannot modify
-        raise HTTPException(status_code=403, detail="You do not have permission to modify this issue")
+        raise HTTPException(
+            status_code=403, detail="You do not have permission to modify this issue"
+        )
 
     issue = await issue_service.update_issue(db, issue, data, changed_by=user.id)
     return _issue_detail(issue, await _build_assignees(db, issue.id))
@@ -177,19 +191,37 @@ async def update_issue(
 
 def _issue_detail(issue, assignees: list):
     return {
-        "id": issue.id, "title": issue.title, "description": issue.description,
-        "issue_type": issue.issue_type, "status": issue.status, "priority": issue.priority,
+        "id": issue.id,
+        "title": issue.title,
+        "description": issue.description,
+        "issue_type": issue.issue_type,
+        "status": issue.status,
+        "priority": issue.priority,
         "reporter": {
-            "id": issue.reporter.id, "username": issue.reporter.username,
-            "display_name": issue.reporter.display_name, "avatar_url": issue.reporter.avatar_url,
-        } if issue.reporter else None,
-        "assignees": [a.model_dump() if hasattr(a, 'model_dump') else a for a in assignees],
-        "labels": [{"id": l.id, "name": l.name, "color": l.color, "description": l.description, "created_at": l.created_at} for l in (issue.labels or [])],
+            "id": issue.reporter.id,
+            "username": issue.reporter.username,
+            "display_name": issue.reporter.display_name,
+            "avatar_url": issue.reporter.avatar_url,
+        }
+        if issue.reporter
+        else None,
+        "assignees": [a.model_dump() if hasattr(a, "model_dump") else a for a in assignees],
+        "labels": [
+            {
+                "id": l.id,
+                "name": l.name,
+                "color": l.color,
+                "description": l.description,
+                "created_at": l.created_at,
+            }
+            for l in (issue.labels or [])
+        ],
         "milestone_ids": [m.id for m in (issue.milestones or [])],
-        "created_at": issue.created_at, "updated_at": issue.updated_at,
+        "created_at": issue.created_at,
+        "updated_at": issue.updated_at,
         "closed_at": issue.closed_at,
         "comments": [
-            _comment_dict(c) for c in (issue.comments or []) if not getattr(c, 'parent_id', None)
+            _comment_dict(c) for c in (issue.comments or []) if not getattr(c, "parent_id", None)
         ],
         "external_links": [],
     }
@@ -197,17 +229,26 @@ def _issue_detail(issue, assignees: list):
 
 # Comments
 
+
 def _comment_dict(c) -> dict:
     """Serialize a comment with replies and status info."""
-    replies = getattr(c, 'replies', [])
+    replies = getattr(c, "replies", [])
     return {
-        "id": c.id, "issue_id": c.issue_id,
-        "parent_id": getattr(c, 'parent_id', None),
-        "author": {"id": c.author.id, "username": c.author.username, "display_name": c.author.display_name} if c.author else None,
+        "id": c.id,
+        "issue_id": c.issue_id,
+        "parent_id": getattr(c, "parent_id", None),
+        "author": {
+            "id": c.author.id,
+            "username": c.author.username,
+            "display_name": c.author.display_name,
+        }
+        if c.author
+        else None,
         "body": c.body,
-        "status": getattr(c, 'status', 'valid'),
+        "status": getattr(c, "status", "valid"),
         "status_changed_by": c.status_changed_by,
-        "created_at": c.created_at, "updated_at": c.updated_at,
+        "created_at": c.created_at,
+        "updated_at": c.updated_at,
         "replies": [_comment_dict(r) for r in replies] if replies else [],
     }
 
@@ -221,6 +262,7 @@ async def list_comments(
     issue = await issue_service.get_issue(db, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+
     async def load_replies(comment):
         result = await db.execute(
             select(Comment).where(Comment.parent_id == comment.id).order_by(Comment.created_at)
@@ -231,8 +273,8 @@ async def list_comments(
         return children
 
     comments = []
-    for c in (issue.comments or []):
-        if not getattr(c, 'parent_id', None):
+    for c in issue.comments or []:
+        if not getattr(c, "parent_id", None):
             c.replies = await load_replies(c)
             comments.append(_comment_dict(c))
     return comments
@@ -246,6 +288,7 @@ async def add_comment(
     user: User = Depends(get_current_user),
 ):
     from app.models.issue import Comment
+
     if not data.get("body"):
         raise HTTPException(status_code=422, detail="body is required")
     issue = await issue_service.get_issue(db, issue_id)
@@ -253,8 +296,11 @@ async def add_comment(
         raise HTTPException(status_code=404, detail="Issue not found")
     parent_id = data.get("parent_id")
     comment = Comment(
-        id=str(uuid.uuid4()), issue_id=issue_id, author_id=user.id,
-        body=data["body"], parent_id=parent_id,
+        id=str(uuid.uuid4()),
+        issue_id=issue_id,
+        author_id=user.id,
+        body=data["body"],
+        parent_id=parent_id,
     )
     db.add(comment)
     await db.commit()
@@ -262,15 +308,18 @@ async def add_comment(
     # Dispatch notification
     try:
         frontend_url = await get_frontend_url(db)
-        await dispatch(db, NotificationEvent(
-            event_type="issue.commented",
-            title=f"Comment on #{issue.id[:8]}: {issue.title}",
-            summary=data["body"][:200],
-            detail_url=f"{frontend_url}/issues/{issue_id}",
-            actor_name=user.display_name or user.username,
-            resource_type="comment",
-            resource_id=comment.id,
-        ))
+        await dispatch(
+            db,
+            NotificationEvent(
+                event_type="issue.commented",
+                title=f"Comment on #{issue.id[:8]}: {issue.title}",
+                summary=data["body"][:200],
+                detail_url=f"{frontend_url}/issues/{issue_id}",
+                actor_name=user.display_name or user.username,
+                resource_type="comment",
+                resource_id=comment.id,
+            ),
+        )
         await db.commit()  # Persist notification logs
     except Exception as e:
         logger.warning(f"Failed to dispatch notification: {e}")
@@ -286,6 +335,7 @@ async def edit_comment(
     user: User = Depends(get_current_user),
 ):
     from app.models.issue import Comment
+
     result = await db.execute(select(Comment).where(Comment.id == comment_id))
     comment = result.scalar_one_or_none()
     if not comment or comment.issue_id != issue_id:
@@ -309,6 +359,7 @@ async def set_comment_status(
 ):
     """Set comment status. Only project_lead on this issue can change status."""
     from app.models.issue import Comment
+
     # Check user is project_lead on this issue
     role_result = await db.execute(
         select(issue_assignees.c.role).where(
@@ -329,7 +380,9 @@ async def set_comment_status(
     valid_statuses = ["valid", "invalid", "outdated", "duplicate", "resolved"]
     new_status = data.get("status", "valid")
     if new_status not in valid_statuses:
-        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        raise HTTPException(
+            status_code=422, detail=f"Invalid status. Must be one of: {valid_statuses}"
+        )
 
     comment.status = new_status
     comment.status_changed_by = user.id
@@ -346,6 +399,7 @@ async def delete_comment(
     user: User = Depends(get_current_user),
 ):
     from app.models.issue import Comment
+
     result = await db.execute(select(Comment).where(Comment.id == comment_id))
     comment = result.scalar_one_or_none()
     if not comment or comment.issue_id != issue_id:
@@ -357,6 +411,7 @@ async def delete_comment(
 
 
 # Timer endpoints
+
 
 async def _check_issue_permission(issue_id: str, user: User, db: AsyncSession):
     """Check if user can modify the issue. Raises 403 if not."""
@@ -374,6 +429,7 @@ async def _check_issue_permission(issue_id: str, user: User, db: AsyncSession):
         return
     # Check if feature owner (any assignee on a feature)
     from app.models.issue import Issue
+
     issue = await db.get(Issue, issue_id)
     if issue and issue.issue_type == "feature":
         roles = await db.execute(
@@ -384,7 +440,9 @@ async def _check_issue_permission(issue_id: str, user: User, db: AsyncSession):
         )
         if roles.first() is not None:
             return
-    raise HTTPException(status_code=403, detail="Only admin, project_lead, or feature owner can perform this action")
+    raise HTTPException(
+        status_code=403, detail="Only admin, project_lead, or feature owner can perform this action"
+    )
 
 
 @router.post("/{issue_id}/timer/start")
@@ -397,7 +455,8 @@ async def start_timer(
     # Check no other timer is running for this user
     existing = await db.execute(
         select(TimeEntry).where(
-            TimeEntry.user_id == user.id, TimeEntry.is_running == True  # noqa: E712
+            TimeEntry.user_id == user.id,
+            TimeEntry.is_running == True,  # noqa: E712
         )
     )
     for running in existing.scalars().all():
@@ -412,10 +471,16 @@ async def start_timer(
         is_running=True,
     )
     db.add(entry)
-    db.add(IssueAssigneeLog(
-        id=str(uuid.uuid4()), issue_id=issue_id, user_id=user.id, role="",
-        action="timer_started", changed_by=user.id,
-    ))
+    db.add(
+        IssueAssigneeLog(
+            id=str(uuid.uuid4()),
+            issue_id=issue_id,
+            user_id=user.id,
+            role="",
+            action="timer_started",
+            changed_by=user.id,
+        )
+    )
     await db.commit()
     await db.refresh(entry)
     # Dispatch notification
@@ -423,19 +488,27 @@ async def start_timer(
         issue = await db.get(Issue, issue_id)
         if issue:
             frontend_url = await get_frontend_url(db)
-            await dispatch(db, NotificationEvent(
-                event_type="timer.started",
-                title=f"Timer started: {issue.title}",
-                summary=f"{user.display_name or user.username} started tracking time",
-                detail_url=f"{frontend_url}/issues/{issue_id}",
-                actor_name=user.display_name or user.username,
-                resource_type="timer",
-                resource_id=entry.id,
-            ))
+            await dispatch(
+                db,
+                NotificationEvent(
+                    event_type="timer.started",
+                    title=f"Timer started: {issue.title}",
+                    summary=f"{user.display_name or user.username} started tracking time",
+                    detail_url=f"{frontend_url}/issues/{issue_id}",
+                    actor_name=user.display_name or user.username,
+                    resource_type="timer",
+                    resource_id=entry.id,
+                ),
+            )
             await db.commit()  # Persist notification logs
     except Exception as e:
         logger.warning(f"Failed to dispatch notification: {e}")
-    return {"id": entry.id, "issue_id": entry.issue_id, "started_at": entry.started_at, "is_running": True}
+    return {
+        "id": entry.id,
+        "issue_id": entry.issue_id,
+        "started_at": entry.started_at,
+        "is_running": True,
+    }
 
 
 @router.post("/{issue_id}/timer/stop")
@@ -461,11 +534,16 @@ async def stop_timer(
     entry.is_running = False
     entry.stopped_at = now.isoformat()
     entry.duration_ms += int(elapsed)
-    db.add(IssueAssigneeLog(
-        id=str(uuid.uuid4()), issue_id=issue_id, user_id=user.id,
-        role=f"{int(elapsed/60000)}m",
-        action="timer_stopped", changed_by=user.id,
-    ))
+    db.add(
+        IssueAssigneeLog(
+            id=str(uuid.uuid4()),
+            issue_id=issue_id,
+            user_id=user.id,
+            role=f"{int(elapsed / 60000)}m",
+            action="timer_stopped",
+            changed_by=user.id,
+        )
+    )
     await db.commit()
     await db.refresh(entry)
     # Dispatch notification
@@ -474,15 +552,18 @@ async def stop_timer(
         if issue:
             mins = int(elapsed / 60000)
             frontend_url = await get_frontend_url(db)
-            await dispatch(db, NotificationEvent(
-                event_type="timer.stopped",
-                title=f"Timer stopped: {issue.title}",
-                summary=f"{user.display_name or user.username} tracked {mins}min",
-                detail_url=f"{frontend_url}/issues/{issue_id}",
-                actor_name=user.display_name or user.username,
-                resource_type="timer",
-                resource_id=entry.id,
-            ))
+            await dispatch(
+                db,
+                NotificationEvent(
+                    event_type="timer.stopped",
+                    title=f"Timer stopped: {issue.title}",
+                    summary=f"{user.display_name or user.username} tracked {mins}min",
+                    detail_url=f"{frontend_url}/issues/{issue_id}",
+                    actor_name=user.display_name or user.username,
+                    resource_type="timer",
+                    resource_id=entry.id,
+                ),
+            )
             await db.commit()  # Persist notification logs
     except Exception as e:
         logger.warning(f"Failed to dispatch notification: {e}")
@@ -543,6 +624,7 @@ async def list_time_entries(
 
 # Assignee log endpoint
 
+
 @router.get("/{issue_id}/assignee-logs")
 async def assignee_logs(
     issue_id: str,
@@ -574,9 +656,7 @@ async def assignee_logs(
         u = users_map.get(l.user_id) if l.user_id else None
         cb = users_map.get(l.changed_by) if l.changed_by else None
         action_label = l.action
-        if l.action == "status_changed":
-            action_label = f"{l.role}"
-        elif l.action == "priority_changed":
+        if l.action == "status_changed" or l.action == "priority_changed":
             action_label = f"{l.role}"
         elif l.action == "label_added":
             action_label = f"+{l.role}"
@@ -594,14 +674,16 @@ async def assignee_logs(
             action_label = l.role  # use role directly, shown with user_name
         elif l.action == "removed":
             action_label = l.role
-        data.append({
-            "id": l.id,
-            "user_id": l.user_id,
-            "user_name": u.display_name or u.username if u else "Unknown",
-            "role": l.role,
-            "action": action_label,
-            "raw_action": l.action,
-            "changed_by_name": cb.display_name or cb.username if cb else "Unknown",
-            "created_at": l.created_at,
-        })
+        data.append(
+            {
+                "id": l.id,
+                "user_id": l.user_id,
+                "user_name": u.display_name or u.username if u else "Unknown",
+                "role": l.role,
+                "action": action_label,
+                "raw_action": l.action,
+                "changed_by_name": cb.display_name or cb.username if cb else "Unknown",
+                "created_at": l.created_at,
+            }
+        )
     return data

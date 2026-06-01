@@ -3,9 +3,9 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.settings import AppSetting
 from app.utils.settings import get_frontend_url
-from app.config import settings
 
 
 class TestGetFrontendUrl:

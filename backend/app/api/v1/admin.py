@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
-from app.models.external import AuditLog, ExternalConnection, SyncLog
+from app.models.external import AuditLog, ExternalConnection
 from app.models.issue import Issue
 from app.models.user import User
 
@@ -18,9 +18,7 @@ async def get_stats(
 ):
     user_count = await db.execute(select(func.count(User.id)))
     issue_count = await db.execute(select(func.count(Issue.id)))
-    open_count = await db.execute(
-        select(func.count(Issue.id)).where(Issue.status == "open")
-    )
+    open_count = await db.execute(select(func.count(Issue.id)).where(Issue.status == "open"))
     closed_count = await db.execute(
         select(func.count(Issue.id)).where(Issue.status.in_(["closed", "resolved"]))
     )

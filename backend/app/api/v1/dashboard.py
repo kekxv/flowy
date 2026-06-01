@@ -42,11 +42,17 @@ async def get_dashboard(
             )
         )
         roles = [r[0] for r in res.all()]
-        my_issues.append({
-            "id": i.id, "title": i.title, "status": i.status,
-            "priority": i.priority, "issue_type": i.issue_type,
-            "created_at": i.created_at, "roles": roles,
-        })
+        my_issues.append(
+            {
+                "id": i.id,
+                "title": i.title,
+                "status": i.status,
+                "priority": i.priority,
+                "issue_type": i.issue_type,
+                "created_at": i.created_at,
+                "roles": roles,
+            }
+        )
 
     # Pending issues (open/in_progress, no assignee)
     pending = await db.execute(
@@ -61,62 +67,89 @@ async def get_dashboard(
     )
     pending_issues = []
     for i in pending.unique().scalars().all():
-        pending_issues.append({
-            "id": i.id, "title": i.title, "status": i.status,
-            "priority": i.priority, "issue_type": i.issue_type,
-            "created_at": i.created_at,
-        })
+        pending_issues.append(
+            {
+                "id": i.id,
+                "title": i.title,
+                "status": i.status,
+                "priority": i.priority,
+                "issue_type": i.issue_type,
+                "created_at": i.created_at,
+            }
+        )
 
     # Active timers
     timer_result = await db.execute(
         select(TimeEntry).where(
-            TimeEntry.user_id == user.id, TimeEntry.is_running == True  # noqa: E712
+            TimeEntry.user_id == user.id,
+            TimeEntry.is_running == True,  # noqa: E712
         )
     )
     active_timers = []
     for t in timer_result.scalars().all():
         issue = await db.get(Issue, t.issue_id)
-        active_timers.append({
-            "entry_id": t.id, "issue_id": t.issue_id,
-            "issue_title": issue.title if issue else "Unknown",
-            "started_at": t.started_at, "duration_ms": t.duration_ms,
-        })
+        active_timers.append(
+            {
+                "entry_id": t.id,
+                "issue_id": t.issue_id,
+                "issue_title": issue.title if issue else "Unknown",
+                "started_at": t.started_at,
+                "duration_ms": t.duration_ms,
+            }
+        )
 
     # Stats
     total_issues = (await db.execute(select(func.count(Issue.id)))).scalar() or 0
-    open_issues = (await db.execute(
-        select(func.count(Issue.id)).where(Issue.status.in_(["open", "in_progress"]))
-    )).scalar() or 0
-    closed_issues = (await db.execute(
-        select(func.count(Issue.id)).where(Issue.status.in_(["closed", "resolved"]))
-    )).scalar() or 0
+    open_issues = (
+        await db.execute(
+            select(func.count(Issue.id)).where(Issue.status.in_(["open", "in_progress"]))
+        )
+    ).scalar() or 0
+    closed_issues = (
+        await db.execute(
+            select(func.count(Issue.id)).where(Issue.status.in_(["closed", "resolved"]))
+        )
+    ).scalar() or 0
 
     # My reported count (deduplicated)
-    my_reported = (await db.execute(
-        select(func.count(Issue.id)).where(Issue.reporter_id == user.id)
-    )).scalar() or 0
+    my_reported = (
+        await db.execute(select(func.count(Issue.id)).where(Issue.reporter_id == user.id))
+    ).scalar() or 0
 
     # Active milestones
     ml_result = await db.execute(
-        select(Milestone).where(Milestone.status.in_(["open", "published"])).order_by(Milestone.created_at.desc()).limit(5)
+        select(Milestone)
+        .where(Milestone.status.in_(["open", "published"]))
+        .order_by(Milestone.created_at.desc())
+        .limit(5)
     )
     milestones_data = []
     for m in ml_result.scalars().all():
-        t = (await db.execute(
-            select(func.count()).where(issue_milestones_table.c.milestone_id == m.id)
-        )).scalar() or 0
-        c = (await db.execute(
-            select(func.count()).where(
-                issue_milestones_table.c.milestone_id == m.id,
-                Issue.id == issue_milestones_table.c.issue_id,
-                Issue.status.in_(["closed", "resolved"]),
+        t = (
+            await db.execute(
+                select(func.count()).where(issue_milestones_table.c.milestone_id == m.id)
             )
-        )).scalar() or 0
-        milestones_data.append({
-            "id": m.id, "name": m.name, "status": m.status,
-            "due_date": m.due_date, "total": t, "closed": c,
-            "progress": round((c / t) * 100) if t > 0 else 0,
-        })
+        ).scalar() or 0
+        c = (
+            await db.execute(
+                select(func.count()).where(
+                    issue_milestones_table.c.milestone_id == m.id,
+                    Issue.id == issue_milestones_table.c.issue_id,
+                    Issue.status.in_(["closed", "resolved"]),
+                )
+            )
+        ).scalar() or 0
+        milestones_data.append(
+            {
+                "id": m.id,
+                "name": m.name,
+                "status": m.status,
+                "due_date": m.due_date,
+                "total": t,
+                "closed": c,
+                "progress": round((c / t) * 100) if t > 0 else 0,
+            }
+        )
 
     return {
         "my_issues": my_issues,

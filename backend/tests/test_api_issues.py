@@ -1,27 +1,28 @@
 """Tests for issue API endpoints."""
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.services.auth import hash_password
-from app.models.user import User
-from app.models.issue import Issue
 
 
 def _build_transport(db_session):
     """Override get_db dependency."""
     from app.database import get_db
+
     app.dependency_overrides[get_db] = lambda: (yield db_session)
     return ASGITransport(app=app, raise_app_exceptions=True)
 
 
 async def _login(client, username="testuser", password="password123"):
     """Helper to login and return auth headers."""
-    resp = await client.post("/api/v1/auth/login", json={
-        "username_or_email": username,
-        "password": password,
-    })
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "username_or_email": username,
+            "password": password,
+        },
+    )
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -33,12 +34,16 @@ class TestIssueAPI:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
-            resp = await client.post("/api/v1/issues", json={
-                "title": "API Test Issue",
-                "description": "Created via API test",
-                "issue_type": "bug",
-                "priority": "high",
-            }, headers=headers)
+            resp = await client.post(
+                "/api/v1/issues",
+                json={
+                    "title": "API Test Issue",
+                    "description": "Created via API test",
+                    "issue_type": "bug",
+                    "priority": "high",
+                },
+                headers=headers,
+            )
         assert resp.status_code == 201
         data = resp.json()
         assert data["title"] == "API Test Issue"
@@ -66,7 +71,9 @@ class TestIssueAPI:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
             # Create
-            create_resp = await client.post("/api/v1/issues", json={"title": "Detail Test"}, headers=headers)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Detail Test"}, headers=headers
+            )
             issue_id = create_resp.json()["id"]
             # Get detail
             resp = await client.get(f"/api/v1/issues/{issue_id}", headers=headers)
@@ -98,12 +105,18 @@ class TestIssueAPI:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
             # Create
-            create_resp = await client.post("/api/v1/issues", json={"title": "Update Test"}, headers=headers)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Update Test"}, headers=headers
+            )
             issue_id = create_resp.json()["id"]
             # Reporter can only change status to resolved or cancelled
-            resp = await client.put(f"/api/v1/issues/{issue_id}", json={
-                "status": "resolved",
-            }, headers=headers)
+            resp = await client.put(
+                f"/api/v1/issues/{issue_id}",
+                json={
+                    "status": "resolved",
+                },
+                headers=headers,
+            )
         assert resp.status_code == 200
         assert resp.json()["status"] == "resolved"
 
@@ -113,11 +126,17 @@ class TestIssueAPI:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client, username="admin", password="password123")
-            create_resp = await client.post("/api/v1/issues", json={"title": "Priority Test"}, headers=headers)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Priority Test"}, headers=headers
+            )
             issue_id = create_resp.json()["id"]
-            resp = await client.put(f"/api/v1/issues/{issue_id}", json={
-                "priority": "critical",
-            }, headers=headers)
+            resp = await client.put(
+                f"/api/v1/issues/{issue_id}",
+                json={
+                    "priority": "critical",
+                },
+                headers=headers,
+            )
         assert resp.status_code == 200
         assert resp.json()["priority"] == "critical"
 
@@ -127,11 +146,17 @@ class TestIssueAPI:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
-            create_resp = await client.post("/api/v1/issues", json={"title": "Comment Test"}, headers=headers)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Comment Test"}, headers=headers
+            )
             issue_id = create_resp.json()["id"]
-            resp = await client.post(f"/api/v1/issues/{issue_id}/comments", json={
-                "body": "This is a test comment",
-            }, headers=headers)
+            resp = await client.post(
+                f"/api/v1/issues/{issue_id}/comments",
+                json={
+                    "body": "This is a test comment",
+                },
+                headers=headers,
+            )
         assert resp.status_code == 201
         data = resp.json()
         assert data["body"] == "This is a test comment"
@@ -142,7 +167,9 @@ class TestIssueAPI:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
-            create_resp = await client.post("/api/v1/issues", json={"title": "Log Test"}, headers=headers)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Log Test"}, headers=headers
+            )
             issue_id = create_resp.json()["id"]
             resp = await client.get(f"/api/v1/issues/{issue_id}/assignee-logs", headers=headers)
         assert resp.status_code == 200
@@ -174,7 +201,9 @@ class TestIssueAPI:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             headers = await _login(client)
-            await client.post("/api/v1/issues", json={"title": "UniqueSearchTerm123"}, headers=headers)
+            await client.post(
+                "/api/v1/issues", json={"title": "UniqueSearchTerm123"}, headers=headers
+            )
             resp = await client.get("/api/v1/issues?q=UniqueSearchTerm123", headers=headers)
         assert resp.status_code == 200
         data = resp.json()

@@ -59,9 +59,7 @@ class ExternalProviderClient(ABC):
         ...
 
     @abstractmethod
-    async def search_issues(
-        self, repo: str, query: str
-    ) -> list[ExternalIssueData]:
+    async def search_issues(self, repo: str, query: str) -> list[ExternalIssueData]:
         """Search issues by query string."""
         ...
 
@@ -86,8 +84,6 @@ class ExternalProviderClient(ABC):
         ...
 
     @abstractmethod
-    async def add_comment(
-        self, repo: str, issue_number: int, body: str
-    ) -> dict:
+    async def add_comment(self, repo: str, issue_number: int, body: str) -> dict:
         """Add a comment to an external issue."""
         ...

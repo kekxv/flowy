@@ -3,10 +3,9 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.issue import Label, Comment
 from app.models.tracking import IssueAssigneeLog
 from app.schemas.common import PaginationParams
-from app.schemas.issue import IssueCreate, IssueFilter, IssueUpdate, AssigneeInput
+from app.schemas.issue import AssigneeInput, IssueCreate, IssueFilter, IssueUpdate
 from app.services import issue_service
 
 
@@ -88,10 +87,14 @@ class TestListIssues:
     @pytest.mark.asyncio
     async def test_filter_by_status(self, db_session: AsyncSession, test_user):
         """Filter issues by status."""
-        issue1 = await issue_service.create_issue(db_session, IssueCreate(title="Open Issue"), test_user.id)
-        issue2 = await issue_service.create_issue(db_session, IssueCreate(title="Closed Issue"), test_user.id)
+        await issue_service.create_issue(db_session, IssueCreate(title="Open Issue"), test_user.id)
+        issue2 = await issue_service.create_issue(
+            db_session, IssueCreate(title="Closed Issue"), test_user.id
+        )
         # Update second issue to closed status
-        await issue_service.update_issue(db_session, issue2, IssueUpdate(status="closed"), changed_by=test_user.id)
+        await issue_service.update_issue(
+            db_session, issue2, IssueUpdate(status="closed"), changed_by=test_user.id
+        )
 
         pagination = PaginationParams(page=1, per_page=20)
         filters = IssueFilter(status="open")
@@ -203,19 +206,22 @@ class TestUpdateIssue:
         assert updated.title == "New Title"
 
     @pytest.mark.asyncio
-    async def test_assignee_logging(self, db_session: AsyncSession, test_issue, test_user, test_admin):
+    async def test_assignee_logging(
+        self, db_session: AsyncSession, test_issue, test_user, test_admin
+    ):
         """Adding assignees creates IssueAssigneeLog records."""
-        data = IssueUpdate(assignees=[
-            AssigneeInput(user_id=test_user.id, role="project_lead"),
-            AssigneeInput(user_id=test_admin.id, role="backend"),
-        ])
-        await issue_service.update_issue(
-            db_session, test_issue, data, changed_by=test_user.id
+        data = IssueUpdate(
+            assignees=[
+                AssigneeInput(user_id=test_user.id, role="project_lead"),
+                AssigneeInput(user_id=test_admin.id, role="backend"),
+            ]
         )
+        await issue_service.update_issue(db_session, test_issue, data, changed_by=test_user.id)
 
         # Verify logs were created
         result = await db_session.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(IssueAssigneeLog)
+            __import__("sqlalchemy", fromlist=["select"])
+            .select(IssueAssigneeLog)
             .where(IssueAssigneeLog.issue_id == test_issue.id)
         )
         logs = list(result.scalars().all())

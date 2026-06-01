@@ -67,9 +67,7 @@ class GitHubClient(ExternalProviderClient):
         data = await self._request("GET", f"/repos/{repo}/issues", params=params)
         return [self._parse_issue(i) for i in data]
 
-    async def search_issues(
-        self, repo: str, query: str
-    ) -> list[ExternalIssueData]:
+    async def search_issues(self, repo: str, query: str) -> list[ExternalIssueData]:
         q = f"repo:{repo} {query}"
         data = await self._request("GET", "/search/issues", params={"q": q, "per_page": "30"})
         return [self._parse_issue(i) for i in data.get("items", [])]
@@ -101,9 +99,7 @@ class GitHubClient(ExternalProviderClient):
             payload["state"] = state
         if labels is not None:
             payload["labels"] = labels
-        data = await self._request(
-            "PATCH", f"/repos/{repo}/issues/{issue_number}", json=payload
-        )
+        data = await self._request("PATCH", f"/repos/{repo}/issues/{issue_number}", json=payload)
         return self._parse_issue(data)
 
     async def add_comment(self, repo: str, issue_number: int, body: str) -> dict:
@@ -115,9 +111,7 @@ class GitHubClient(ExternalProviderClient):
 
     def _parse_issue(self, data: dict) -> ExternalIssueData:
         labels = [l["name"] for l in (data.get("labels") or [])]
-        assignees = [
-            a["login"] for a in (data.get("assignees") or []) if a
-        ]
+        assignees = [a["login"] for a in (data.get("assignees") or []) if a]
         return ExternalIssueData(
             external_id=str(data["number"]),
             title=data["title"],

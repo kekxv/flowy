@@ -40,9 +40,7 @@ async def update_label(
     label = await db.get(Label, label_id)
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
-    label = await issue_service.update_label(
-        db, label, data.name, data.color, data.description
-    )
+    label = await issue_service.update_label(db, label, data.name, data.color, data.description)
     return LabelResponse.model_validate(label)
 
 

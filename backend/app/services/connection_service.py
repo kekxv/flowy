@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.crypto import encrypt_token, decrypt_token
+from app.core.crypto import decrypt_token, encrypt_token
 from app.models.external import ExternalConnection
 from app.services.external import get_client
 
@@ -46,9 +45,7 @@ async def test_connection(db: AsyncSession, connection_id: str) -> bool:
     return await client.test_connection()
 
 
-async def get_user_connections(
-    db: AsyncSession, user_id: str
-) -> list[ExternalConnection]:
+async def get_user_connections(db: AsyncSession, user_id: str) -> list[ExternalConnection]:
     result = await db.execute(
         select(ExternalConnection).where(ExternalConnection.user_id == user_id)
     )

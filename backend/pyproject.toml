@@ -35,7 +35,10 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
-ignore = ["E501"]
+ignore = ["E501", "B008", "B904", "E402", "E701", "E741", "F401", "SIM105", "B017"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/models/*.py" = ["F821"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

@@ -4,14 +4,14 @@ Revision ID: m001
 Revises: 4692ab361441
 Create Date: 2026-05-23
 """
-from typing import Sequence, Union
-from alembic import op
-import sqlalchemy as sa
 
-revision: str = 'm001'
-down_revision: Union[str, None] = '4692ab361441'
+from alembic import op
+
+revision: str = "m001"
+down_revision: str | None = "4692ab361441"
 branch_labels = None
 depends_on = None
+
 
 def upgrade():
     # SQLite can't alter PK, rebuild table
@@ -29,6 +29,7 @@ def upgrade():
     op.execute("INSERT OR IGNORE INTO issue_assignees_new SELECT * FROM issue_assignees")
     op.execute("DROP TABLE issue_assignees")
     op.execute("ALTER TABLE issue_assignees_new RENAME TO issue_assignees")
+
 
 def downgrade():
     op.execute("""

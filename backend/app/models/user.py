@@ -25,6 +25,4 @@ class User(Base):
         onupdate=lambda: datetime.now().isoformat(),
     )
 
-    __table_args__ = (
-        CheckConstraint("role IN ('admin', 'member')", name="ck_user_role"),
-    )
+    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="ck_user_role"),)

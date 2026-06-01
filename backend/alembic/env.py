@@ -1,14 +1,23 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import create_engine
 
+from alembic import context
 from app.database import Base
 from app.models.external import AuditLog, ExternalConnection, ExternalIssue, SyncLog  # noqa: F401
 from app.models.issue import Comment, Issue, Label  # noqa: F401
-from app.models.notification import NotificationChannel, NotificationLog, NotificationRule  # noqa: F401
+from app.models.notification import (  # noqa: F401
+    NotificationChannel,
+    NotificationLog,
+    NotificationRule,
+)
 from app.models.settings import AppSetting  # noqa: F401
-from app.models.tracking import IssueAssigneeLog, Milestone, TimeEntry, UserProjectRole  # noqa: F401
+from app.models.tracking import (  # noqa: F401
+    IssueAssigneeLog,
+    Milestone,
+    TimeEntry,
+    UserProjectRole,
+)
 from app.models.user import User  # noqa: F401
 
 config = context.config

@@ -1,11 +1,9 @@
 """Tests for auth API endpoints."""
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
-from app.main import app
 from app.models.user import User
-from app.services.auth import hash_password
 
 
 def _build_transport(db_session):
@@ -15,9 +13,9 @@ def _build_transport(db_session):
     async def override_get_db():
         yield db_session
 
-    _app.dependency_overrides[
-        __import__("app.database", fromlist=["get_db"]).get_db
-    ] = override_get_db
+    _app.dependency_overrides[__import__("app.database", fromlist=["get_db"]).get_db] = (
+        override_get_db
+    )
     transport = ASGITransport(app=_app, raise_app_exceptions=True)
     return transport
 
@@ -28,11 +26,14 @@ class TestRegister:
         """Register creates a user and returns user data."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/register", json={
-                "username": "newuser",
-                "email": "new@example.com",
-                "password": "password123",
-            })
+            resp = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "newuser",
+                    "email": "new@example.com",
+                    "password": "password123",
+                },
+            )
         assert resp.status_code == 201
         data = resp.json()
         assert data["username"] == "newuser"
@@ -44,13 +45,23 @@ class TestRegister:
         """Register with duplicate username fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp1 = await client.post("/api/v1/auth/register", json={
-                "username": "dupuser", "email": "dup1@example.com", "password": "pass123",
-            })
+            resp1 = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "dupuser",
+                    "email": "dup1@example.com",
+                    "password": "pass123",
+                },
+            )
             assert resp1.status_code == 201
-            resp2 = await client.post("/api/v1/auth/register", json={
-                "username": "dupuser", "email": "dup2@example.com", "password": "pass123",
-            })
+            resp2 = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "dupuser",
+                    "email": "dup2@example.com",
+                    "password": "pass123",
+                },
+            )
             assert resp2.status_code == 409
 
     @pytest.mark.asyncio
@@ -58,13 +69,23 @@ class TestRegister:
         """Register with duplicate email fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp1 = await client.post("/api/v1/auth/register", json={
-                "username": "user1", "email": "same@example.com", "password": "pass123",
-            })
+            resp1 = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "user1",
+                    "email": "same@example.com",
+                    "password": "pass123",
+                },
+            )
             assert resp1.status_code == 201
-            resp2 = await client.post("/api/v1/auth/register", json={
-                "username": "user2", "email": "same@example.com", "password": "pass123",
-            })
+            resp2 = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "user2",
+                    "email": "same@example.com",
+                    "password": "pass123",
+                },
+            )
             assert resp2.status_code == 409
 
     @pytest.mark.asyncio
@@ -72,9 +93,14 @@ class TestRegister:
         """First registered user gets admin role."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/register", json={
-                "username": "admin1", "email": "admin1@example.com", "password": "pass123",
-            })
+            resp = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "admin1",
+                    "email": "admin1@example.com",
+                    "password": "pass123",
+                },
+            )
         assert resp.status_code == 201
         assert resp.json()["role"] == "admin"
 
@@ -83,12 +109,19 @@ class TestRegister:
         """Password is not stored as plaintext."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            await client.post("/api/v1/auth/register", json={
-                "username": "hashtest", "email": "hash@example.com", "password": "secret123",
-            })
+            await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "hashtest",
+                    "email": "hash@example.com",
+                    "password": "secret123",
+                },
+            )
 
         result = await db_session.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(User).where(User.username == "hashtest")
+            __import__("sqlalchemy", fromlist=["select"])
+            .select(User)
+            .where(User.username == "hashtest")
         )
         user = result.scalar_one()
         assert user.password_hash != "secret123"
@@ -101,10 +134,13 @@ class TestLogin:
         """Login with correct credentials returns tokens."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "testuser",
-                "password": "password123",
-            })
+            resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "testuser",
+                    "password": "password123",
+                },
+            )
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
@@ -116,10 +152,13 @@ class TestLogin:
         """Login with wrong password fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "testuser",
-                "password": "wrongpassword",
-            })
+            resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "testuser",
+                    "password": "wrongpassword",
+                },
+            )
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
@@ -127,10 +166,13 @@ class TestLogin:
         """Login for non-existent user fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "nouser",
-                "password": "password123",
-            })
+            resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "nouser",
+                    "password": "password123",
+                },
+            )
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
@@ -138,10 +180,13 @@ class TestLogin:
         """Login with email instead of username works."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "test@example.com",
-                "password": "password123",
-            })
+            resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "test@example.com",
+                    "password": "password123",
+                },
+            )
         assert resp.status_code == 200
 
 
@@ -161,10 +206,13 @@ class TestGetMe:
 
         # Login first
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            login_resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "testuser",
-                "password": "password123",
-            })
+            login_resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "testuser",
+                    "password": "password123",
+                },
+            )
             token = login_resp.json()["access_token"]
 
             resp = await client.get(
@@ -194,16 +242,22 @@ class TestRefreshToken:
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # Login
-            login_resp = await client.post("/api/v1/auth/login", json={
-                "username_or_email": "testuser",
-                "password": "password123",
-            })
+            login_resp = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username_or_email": "testuser",
+                    "password": "password123",
+                },
+            )
             refresh_token = login_resp.json()["refresh_token"]
 
             # Refresh
-            refresh_resp = await client.post("/api/v1/auth/refresh", json={
-                "refresh_token": refresh_token,
-            })
+            refresh_resp = await client.post(
+                "/api/v1/auth/refresh",
+                json={
+                    "refresh_token": refresh_token,
+                },
+            )
             assert refresh_resp.status_code == 200
             data = refresh_resp.json()
             assert "access_token" in data
@@ -215,7 +269,10 @@ class TestRefreshToken:
         """Refresh with invalid token fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/auth/refresh", json={
-                "refresh_token": "invalid.token.here",
-            })
+            resp = await client.post(
+                "/api/v1/auth/refresh",
+                json={
+                    "refresh_token": "invalid.token.here",
+                },
+            )
         assert resp.status_code == 401

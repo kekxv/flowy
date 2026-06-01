@@ -1,6 +1,6 @@
-from app.models.user import User
-from app.models.issue import Issue, Label, Comment
-from app.models.external import ExternalConnection, ExternalIssue, OAuthState, SyncLog, AuditLog
-from app.models.tracking import TimeEntry, Milestone, UserProjectRole, IssueAssigneeLog
-from app.models.notification import NotificationChannel, NotificationRule, NotificationLog
+from app.models.external import AuditLog, ExternalConnection, ExternalIssue, OAuthState, SyncLog
+from app.models.issue import Comment, Issue, Label
+from app.models.notification import NotificationChannel, NotificationLog, NotificationRule
 from app.models.settings import AppSetting
+from app.models.tracking import IssueAssigneeLog, Milestone, TimeEntry, UserProjectRole
+from app.models.user import User
