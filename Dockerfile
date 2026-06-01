@@ -6,7 +6,7 @@ COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --frozen
 
 # === Stage 2: Frontend dependencies ===
-FROM node:22-alpine AS frontend-deps
+FROM node:26-alpine AS frontend-deps
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
