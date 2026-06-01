@@ -34,7 +34,7 @@ COPY entrypoint.sh /entrypoint.sh
 COPY backend/ .
 
 # Create non-root user and set permissions
-RUN useradd --system --group --shell /bin/false appuser \
+RUN useradd --system --shell /bin/false appuser \
     && mkdir -p /data \
     && chown -R appuser:appuser /app /data
 
