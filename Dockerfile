@@ -1,5 +1,5 @@
 # === Stage 1: Backend dependencies ===
-FROM python:3.11-slim AS backend-deps
+FROM python:3.14-slim AS backend-deps
 WORKDIR /app
 RUN pip install uv --no-cache-dir
 COPY backend/pyproject.toml backend/uv.lock ./
@@ -17,7 +17,7 @@ COPY frontend/ .
 RUN npm run build
 
 # === Stage 4: Final runtime ===
-FROM python:3.11-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Copy backend venv
