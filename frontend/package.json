@@ -47,7 +47,7 @@
     "happy-dom": "^20.9.0",
     "jsdom": "^29.1.1",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.59.2",
+    "typescript-eslint": "^8.60.1",
     "vite": "^8.0.12",
     "vitest": "^4.1.7"
   }
