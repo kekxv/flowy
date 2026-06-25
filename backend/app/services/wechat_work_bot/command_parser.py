@@ -1,10 +1,13 @@
 """Command parsing and intent matching for WeChat Work bot."""
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.services.wechat_work_bot.message_parser import MessageContext
+
+logger = logging.getLogger("uvicorn")
 
 
 @dataclass
@@ -249,6 +252,27 @@ class CommandParser:
                 )
                 data = resp.json()
 
+                # Log response details
+                choice = data.get("choices", [{}])[0]
+                message = choice.get("message", {})
+
+                # Thinking content (if any)
+                thinking = message.get("reasoning_content") or message.get("thinking")
+                if thinking:
+                    logger.debug(f"LLM thinking: {thinking[:200]}...")
+
+                # Text content
+                content = message.get("content", "")
+                if content:
+                    logger.debug(f"LLM content: {content[:300]}")
+
+                # Tool calls
+                tool_calls = message.get("tool_calls", [])
+                if tool_calls:
+                    for tc in tool_calls:
+                        func = tc.get("function", {})
+                        logger.debug(f"LLM tool call: {func.get('name')}({func.get('arguments', '')[:200]})")
+
                 # Extract tool call
                 choice = data.get("choices", [{}])[0]
                 message = choice.get("message", {})
@@ -272,7 +296,9 @@ class CommandParser:
 
         except Exception as e:
             import logging
+            import traceback
             logging.getLogger("uvicorn").error(f"LLM tool call failed: {e}")
+            logging.getLogger("uvicorn").error(traceback.format_exc())
 
         return None
 
