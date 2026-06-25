@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 import uuid
 from datetime import datetime
 
@@ -406,6 +408,14 @@ async def delete_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
     if comment.author_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail="Cannot delete this comment")
+    # Clean up attachment files from disk
+    if comment.body:
+        attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
+        filenames = set(re.findall(r'attachment:([a-f0-9]+\.\w+)', comment.body))
+        for fn in filenames:
+            fp = os.path.join(attachments_dir, fn)
+            if os.path.exists(fp):
+                os.remove(fp)
     await db.delete(comment)
     await db.commit()
 

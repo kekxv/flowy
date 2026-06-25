@@ -283,7 +283,7 @@ export default function IssueDetailPage() {
       {/* Comments */}
       <div className="card rounded-xl p-5 space-y-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("issues.comments")} ({comments.length})</h3>
-        {comments.map((c:any)=><Cm key={c.id} c={c} issueId={issue.id} roles={(issue.assignees||[]).filter((a:any)=>a.id===c.author?.id).map((a:any)=>a.role)} canEdit={canFullEdit} onReply={setReplyTo} onRefresh={fc} t={t}/>)}
+        {comments.map((c:any)=><Cm key={c.id} c={c} issueId={issue.id} roles={(issue.assignees||[]).filter((a:any)=>a.id===c.author?.id).map((a:any)=>a.role)} canEdit={canFullEdit} curUserId={curUser?.id} onReply={setReplyTo} onRefresh={fc} t={t}/>)}
         {replyTo&&<div className="ml-8 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-600">{t("comment.replying","Replying")} <button onClick={()=>setReplyTo(null)} className="ml-2 hover:text-blue-800 font-medium">✕</button></div>}
         <form onSubmit={hc} className="space-y-2">
           <textarea rows={3} value={comment} onChange={e=>setComment(e.target.value)} placeholder={t("issues.write_comment")} className="input resize-none"/>
@@ -516,8 +516,9 @@ function TimerW({issueId}:{issueId:string}){
     <button onClick={tt} className={`flex h-5 w-5 items-center justify-center rounded-full text-white transition-all hover:scale-110 ${running?"bg-red-500 hover:bg-red-600":"bg-emerald-500 hover:bg-emerald-600"}`}>{running?<Square size={9}/>:<Play size={9}/>}</button></span>;}
 
 const STAT_LBLS:Record<string,string>={invalid:"Invalid",outdated:"Outdated",duplicate:"Duplicate",resolved:"Resolved",valid:""};
-function Cm({c,issueId,roles,canEdit,onReply,onRefresh,t,depth=0}:any){
+function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any){
   const[ss,setSs]=useState(false);const hidden=c.status!=="valid";
+  const canDeleteAttachment=canEdit||c.author?.id===curUserId;
   // Extract attachment filenames from comment body
   const attachments = (c.body || "").match(/attachment:([a-f0-9]+\.\w+)/g)?.map((s: string) => s.replace('attachment:', '')) || [];
   const uniqueAttachments = [...new Set(attachments)];
@@ -548,9 +549,9 @@ function Cm({c,issueId,roles,canEdit,onReply,onRefresh,t,depth=0}:any){
           {(uniqueAttachments as string[]).map((filename: string) => {
             const url = `/api/v1/bot-attachments/${filename}`;
             return (
-              <div key={filename} className="flex items-center gap-1 rounded bg-[var(--bg)] px-2 py-1 text-[10px]">
+              <div key={filename} className="flex items-center gap-1.5 rounded bg-[var(--bg)] px-2 py-1 text-[11px]">
                 <a href={url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline"> {filename}</a>
-                {canEdit && <button onClick={() => handleDelete(filename)} className="text-red-400 hover:text-red-600 ml-1" title="Delete"></button>}
+                {canDeleteAttachment && <button onClick={() => handleDelete(filename)} className="cursor-pointer text-red-400 hover:text-red-600 ml-1 transition-colors" title="Delete"><X size={14} /></button>}
               </div>
             );
           })}
@@ -558,5 +559,5 @@ function Cm({c,issueId,roles,canEdit,onReply,onRefresh,t,depth=0}:any){
       )}
       {!hidden&&<button onClick={()=>onReply?.(c.id)} className="mt-1.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">{t("comment.reply","Reply")}</button>}
     </div>
-    {c.replies?.map((r:any)=><Cm key={r.id} c={r} issueId={issueId} roles={roles} canEdit={canEdit} onReply={onReply} onRefresh={onRefresh} t={t} depth={depth+1}/>)}
+    {c.replies?.map((r:any)=><Cm key={r.id} c={r} issueId={issueId} roles={roles} canEdit={canEdit} curUserId={curUserId} onReply={onReply} onRefresh={onRefresh} t={t} depth={depth+1}/>)}
   </div>;}
