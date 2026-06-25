@@ -1,5 +1,6 @@
 """Command handlers for WeChat Work bot."""
 
+import io
 import json
 import logging
 import uuid
@@ -8,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.issue import Comment, Issue, Label, issue_assignees
+from app.models.issue import Comment, Issue, Label, issue_assignees, issue_labels_table
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
@@ -70,7 +71,7 @@ class CommandHandlers:
 ### ✏️ 操作类
 | 指令 | 说明 |
 | --- | --- |
-| `/create` `/创建` [bug\|feature] <标题> | 创建问题 |
+| `/create` `/创建` [bug|feature] <标题> | 创建问题 |
 | `/update` `/修改` <id> <字段> <值> | 更新问题 |
 | `/close` `/关闭` <id> [原因] | 关闭问题 |
 | `/assign` `/指派` <id> <用户名> | 指派问题 |
@@ -102,7 +103,8 @@ class CommandHandlers:
 """
 
     async def handle_list(self, args: list[str], quote: dict, frame: dict = None) -> str:
-        from datetime import datetime as dt, timedelta
+        from datetime import datetime as dt
+        from datetime import timedelta
 
         show_all = args and args[0].lower() == "all"
         assigned_issue_ids = await self._get_assigned_issue_ids()
@@ -180,7 +182,8 @@ class CommandHandlers:
 
         return "\n".join(lines)
     async def handle_stats(self, args: list[str], quote: dict, frame: dict = None) -> str:
-        from datetime import datetime as dt, timedelta
+        from datetime import datetime as dt
+        from datetime import timedelta
 
         show_all = args and args[0].lower() == "all"
         assigned_issue_ids = await self._get_assigned_issue_ids()
@@ -268,10 +271,7 @@ class CommandHandlers:
                 created = dt.fromisoformat(issue.created_at[:19])
                 days = (now - created).days
                 hours = int((now - created).total_seconds() / 3600)
-                if days > 0:
-                    duration = f"{days}天"
-                else:
-                    duration = f"{hours}时"
+                duration = f"{days}天" if days > 0 else f"{hours}时"
                 title = issue.title[:20] + ".." if len(issue.title) > 20 else issue.title
                 lines.append(f"- #{issue.id[:8]} {title} — {duration}")
 
@@ -455,7 +455,6 @@ class CommandHandlers:
 
             # Build numbered list
             lines = [f"请选择要指派给 **{target_user.display_name or target_user.username}** 的问题：\n"]
-            issue_list = []
             for i, issue in enumerate(issues, 1):
                 status_emoji = {"open": "🟢", "in_progress": "🔵", "proposed": "🟡", "accepted": "🔵"}.get(issue.status, "⚪")
                 title = issue.title[:35] + "..." if len(issue.title) > 35 else issue.title
@@ -632,8 +631,9 @@ class CommandHandlers:
                         # Resize images if over 500KB
                         if media_type == "image" and len(data) > 500 * 1024:
                             try:
-                                from PIL import Image
                                 import io
+
+                                from PIL import Image
                                 img = Image.open(io.BytesIO(data))
                                 img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
                                 buf = io.BytesIO()
@@ -690,6 +690,8 @@ class CommandHandlers:
 
     async def handle_priority(self, args: list[str], quote: dict, frame: dict = None) -> str:
         """Handle /priority command: /priority <id> <critical|high|medium|low|trivial>"""
+        from datetime import datetime as dt
+
         issue_id = None
         if args and args[0].startswith("#"):
             issue_id = args[0][1:]

@@ -45,7 +45,9 @@ async def lifespan(_app: FastAPI):
 
     # Auto-apply migrations using alembic (run in thread to avoid blocking async loop)
     import asyncio
+
     from alembic.config import Config
+
     from alembic import command
 
     def _run_migrations():

@@ -1,9 +1,12 @@
 """Command parsing and intent matching for WeChat Work bot."""
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
+
+import httpx
 
 from app.services.wechat_work_bot.message_parser import MessageContext
 
@@ -189,9 +192,6 @@ class CommandParser:
             return None
 
         try:
-            import httpx
-            import json
-
             # Build tools definitions for function calling
             tools = []
             for cmd, info in COMMANDS.items():

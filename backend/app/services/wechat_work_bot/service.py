@@ -133,7 +133,7 @@ class WeChatWorkBotService:
                                 "assign", [str(idx + 1)], response, "success", None
                             )
                         except Exception as e:
-                            logger.exception(f"Failed to complete assignment")
+                            logger.exception("Failed to complete assignment")
                             if self._client:
                                 await self._client.reply_text(frame, f"❌ 指派失败: {e}")
                         finally:
