@@ -29,6 +29,7 @@ COPY --from=frontend-build /app/dist /app/static
 
 # Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Copy backend code (last layer - changes most often)
 COPY backend/ .
