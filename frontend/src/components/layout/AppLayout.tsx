@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, ListTodo, Flag, Tags, Shield, Settings, Bell, Globe, LogOut, Menu, X, ChevronRight } from "lucide-react";
+import { LayoutDashboard, ListTodo, Flag, Tags, Shield, Settings, Bell, Globe, LogOut, Menu, X, ChevronRight, Bot } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 function useNavItems() {
@@ -60,6 +60,12 @@ function Sidebar({ close }: { close?: () => void }) {
           `flex items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
             isActive ? "bg-[var(--primary)]/8 text-[var(--primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           }`}><Bell size={17} />{t("settings.notifications")}</NavLink>
+        {user?.role === "admin" && (
+          <NavLink to="/settings/wechat-work-bot" onClick={close} className={({ isActive }) =>
+            `flex items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
+              isActive ? "bg-[var(--primary)]/8 text-[var(--primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            }`}><Bot size={17} />{t("wechat_work_bot.title", "企业微信机器人")}</NavLink>
+        )}
         <button onClick={() => i18n.changeLanguage(i18n.language === "zh" ? "en" : "zh")}
           className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-150">
           <Globe size={17} />{i18n.language === "zh" ? "English" : "中文"}

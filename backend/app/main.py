@@ -1,8 +1,30 @@
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
 
-logger = logging.getLogger(__name__)
+from uvicorn.logging import DefaultFormatter
+
+# Monkey-patch json.dumps to output Unicode as-is (not escaped)
+# but respect explicit ensure_ascii if provided
+_original_dumps = json.dumps
+def _json_dumps_unicode(obj, **kwargs):
+    kwargs.setdefault('ensure_ascii', False)
+    return _original_dumps(obj, **kwargs)
+json.dumps = _json_dumps_unicode
+
+# Unified colored log format — all app loggers use "uvicorn"
+_LOG_FORMAT = "%(levelprefix)s %(asctime)s %(message)s"
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(DefaultFormatter(fmt=_LOG_FORMAT, datefmt="%H:%M:%S", use_colors=True))
+
+_uvicorn_logger = logging.getLogger("uvicorn")
+_uvicorn_logger.handlers.clear()
+_uvicorn_logger.addHandler(_log_handler)
+_uvicorn_logger.setLevel(logging.DEBUG)
+_uvicorn_logger.propagate = False
+
+logger = logging.getLogger("uvicorn")
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,39 +41,17 @@ from app.services.sync_service import sync_service
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Auto-apply migrations if fresh database
-    async with engine.begin() as conn:
-        has_tables = await conn.run_sync(lambda c: inspect(c).has_table("users"))
-        if not has_tables:
+    # Auto-apply migrations using alembic
+    from alembic.config import Config
+    from alembic import command
+
+    alembic_cfg = Config("alembic.ini")
+    try:
+        command.upgrade(alembic_cfg, "head")
+    except Exception:
+        # Fallback: create tables if alembic fails
+        async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            await conn.run_sync(
-                lambda c: c.execute(
-                    text(
-                        "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
-                    )
-                )
-            )
-            versions = [
-                "972e94b14d0d",
-                "2a561e160fc0",
-                "79b188889e30",
-                "a15a1fa9a7c3",
-                "00990fcb887b",
-                "df200ec12a76",
-                "01731fcd0b00",
-                "4692ab361441",
-                "manual_fix_assignee_pk",
-                "e001",
-                "e002",
-                "e003",
-            ]
-            for v in versions:
-                await conn.run_sync(
-                    lambda c, v=v: c.execute(
-                        text("INSERT OR IGNORE INTO alembic_version (version_num) VALUES (:v)"),
-                        {"v": v},
-                    )
-                )
 
     # Seed default labels if none exist
     from app.models.issue import Label
@@ -77,7 +77,18 @@ async def lifespan(_app: FastAPI):
             logger.exception("Failed to seed default labels")
 
     await sync_service.start()
+
+    # Auto-start WeChat Work bot if configured
+    from app.services.wechat_work_bot import bot_service
+
+    try:
+        await bot_service.load_config_and_start()
+    except Exception:
+        logger.exception("Failed to auto-start WeChat Work bot")
+
     yield
+
+    await bot_service.stop()
     await sync_service.stop()
 
 
@@ -100,10 +111,11 @@ def create_app() -> FastAPI:
     from fastapi.responses import FileResponse
 
     static_dir = os.environ.get("STATIC_DIR", "static")
-    if os.path.isdir(static_dir):
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.isdir(static_dir) and os.path.isdir(assets_dir):
         # Mount static assets first
         app.mount(
-            "/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets"
+            "/assets", StaticFiles(directory=assets_dir), name="assets"
         )
 
         # SPA fallback: serve index.html for any other path

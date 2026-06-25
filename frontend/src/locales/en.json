@@ -223,5 +223,27 @@
     "merged": "Merged",
     "pr": "PR",
     "issue": "Issue"
+  },
+  "wechat_work_bot": {
+    "title": "WeChat Work Bot",
+    "desc": "Configure the intelligent bot to manage issues and milestones via group chat",
+    "config": "Configuration",
+    "users": "User Management",
+    "logs": "Command Logs",
+    "bot_id": "Bot ID",
+    "secret": "Secret",
+    "ai_enabled": "AI Natural Language Matching",
+    "auto_reply": "Auto Reply Hints",
+    "start": "Start",
+    "stop": "Stop",
+    "running": "Running",
+    "stopped": "Stopped",
+    "add_user": "Add User",
+    "wechat_user_id": "WeChat Work User ID",
+    "flowy_user": "Linked Flowy User",
+    "role": "Role",
+    "role_admin": "Admin",
+    "role_helper": "Helper",
+    "role_viewer": "Viewer"
   }
 }

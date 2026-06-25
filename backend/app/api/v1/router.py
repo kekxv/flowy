@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin,
     auth,
+    bot_attachments,
     connections,
     dashboard,
     issues,
@@ -12,6 +13,7 @@ from app.api.v1 import (
     settings_api,
     sync,
     users,
+    wechat_work_bot,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -26,3 +28,5 @@ api_router.include_router(milestones.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(settings_api.router)
 api_router.include_router(notifications.router)
+api_router.include_router(wechat_work_bot.router)
+api_router.include_router(bot_attachments.router)

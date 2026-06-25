@@ -16,7 +16,7 @@ from app.services.external import get_client
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 class SyncService:

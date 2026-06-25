@@ -23,6 +23,7 @@ async def list_users(
             "username": u.username,
             "email": u.email,
             "display_name": u.display_name,
+            "nickname": u.nickname,
             "role": u.role,
             "is_active": u.is_active,
             "avatar_url": u.avatar_url,
@@ -58,6 +59,10 @@ async def update_user(
         user.role = data["role"]
     if "is_active" in data and isinstance(data["is_active"], bool):
         user.is_active = data["is_active"]
+    if "display_name" in data:
+        user.display_name = data["display_name"]
+    if "nickname" in data:
+        user.nickname = data["nickname"]
     await db.commit()
     await db.refresh(user)
     return UserResponse.model_validate(user)

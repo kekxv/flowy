@@ -11,6 +11,7 @@ issue_assignees = Table(
     Base.metadata,
     Column("issue_id", String(36), ForeignKey("issues.id", ondelete="CASCADE"), primary_key=True),
     Column("user_id", String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("wechat_user_id", String(128), nullable=True, default=None),
     Column("role", String(32), default="member", primary_key=True),
     Column("assigned_at", String(32), default=lambda: datetime.now().isoformat()),
 )

@@ -19,7 +19,7 @@ from app.schemas.common import PaginationParams
 from app.schemas.issue import IssueCreate, IssueFilter, IssueUpdate
 from app.utils.settings import get_frontend_url
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 from app.services.notifications.base import NotificationEvent
 
 

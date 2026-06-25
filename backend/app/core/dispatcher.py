@@ -10,7 +10,7 @@ from app.models.notification import NotificationLog, NotificationRule
 from app.services.notifications import get_channel
 from app.services.notifications.base import NotificationEvent
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 async def dispatch(db: AsyncSession, event: NotificationEvent) -> None:

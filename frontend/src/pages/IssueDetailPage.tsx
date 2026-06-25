@@ -209,7 +209,7 @@ export default function IssueDetailPage() {
           <div>
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.description")}</h3>
             <div className="rounded-lg bg-[var(--bg)] p-4 text-[13px] leading-relaxed text-[var(--text-secondary)] prose prose-sm max-w-none">
-              <ReactMarkdown>{issue.description||"—"}</ReactMarkdown></div>
+              <ReactMarkdown urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{issue.description||"—"}</ReactMarkdown></div>
           </div>
         </div>
       </div>
@@ -518,6 +518,14 @@ function TimerW({issueId}:{issueId:string}){
 const STAT_LBLS:Record<string,string>={invalid:"Invalid",outdated:"Outdated",duplicate:"Duplicate",resolved:"Resolved",valid:""};
 function Cm({c,issueId,roles,canEdit,onReply,onRefresh,t,depth=0}:any){
   const[ss,setSs]=useState(false);const hidden=c.status!=="valid";
+  // Extract attachment filenames from comment body
+  const attachments = (c.body || "").match(/attachment:([a-f0-9]+\.\w+)/g)?.map((s: string) => s.replace('attachment:', '')) || [];
+  const uniqueAttachments = [...new Set(attachments)];
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`Delete ${filename}?`)) return;
+    await api.delete(`/bot-attachments/${filename}`);
+    onRefresh?.();
+  };
   return <div className={depth>0?"ml-8 border-l-2 border-[var(--border-light)] pl-3":""}>
     <div className={`mb-3 rounded-lg border p-3 transition-all ${hidden?"border-dashed bg-[var(--bg)] opacity-80":""}`}>
       {hidden&&<div className="mb-2 inline-flex items-center gap-1.5 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">⚠ {STAT_LBLS[c.status]}</div>}
@@ -534,7 +542,20 @@ function Cm({c,issueId,roles,canEdit,onReply,onRefresh,t,depth=0}:any){
             {(hidden?["valid",c.status]:["invalid","outdated","duplicate","resolved"]).map((s:string)=><button key={s} onClick={async()=>{await api.patch(`/issues/${issueId}/comments/${c.id}/status`,{status:s});setSs(false);onRefresh?.();}}
               className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{STAT_LBLS[s]||s}</button>)}</div>}</div>}
       </div>
-      <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><ReactMarkdown>{c.body}</ReactMarkdown></div>
+      <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><ReactMarkdown urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{c.body}</ReactMarkdown></div>
+      {uniqueAttachments.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {(uniqueAttachments as string[]).map((filename: string) => {
+            const url = `/api/v1/bot-attachments/${filename}`;
+            return (
+              <div key={filename} className="flex items-center gap-1 rounded bg-[var(--bg)] px-2 py-1 text-[10px]">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline"> {filename}</a>
+                {canEdit && <button onClick={() => handleDelete(filename)} className="text-red-400 hover:text-red-600 ml-1" title="Delete"></button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {!hidden&&<button onClick={()=>onReply?.(c.id)} className="mt-1.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">{t("comment.reply","Reply")}</button>}
     </div>
     {c.replies?.map((r:any)=><Cm key={r.id} c={r} issueId={issueId} roles={roles} canEdit={canEdit} onReply={onReply} onRefresh={onRefresh} t={t} depth={depth+1}/>)}

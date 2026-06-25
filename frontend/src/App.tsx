@@ -18,6 +18,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"))
 const AdminPage = lazy(() => import("./pages/AdminPage"))
 const MilestonesPage = lazy(() => import("./pages/MilestonesPage"))
 const MilestoneDetailPage = lazy(() => import("./pages/MilestoneDetailPage"))
+const WeChatWorkBotPage = lazy(() => import("./pages/WeChatWorkBotPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -48,6 +49,7 @@ function App() {
                       <Route path="/milestones/:id" element={<MilestoneDetailPage />} />
                       <Route path="/profile" element={<UserProfilePage />} />
                       <Route path="/settings/notifications" element={<NotificationsPage />} />
+                      <Route path="/settings/wechat-work-bot" element={<WeChatWorkBotPage />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

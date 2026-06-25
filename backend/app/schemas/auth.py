@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     display_name: str
+    nickname: str
     role: str
     avatar_url: str
     is_active: bool
@@ -39,6 +40,7 @@ class UserResponse(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=128)
+    nickname: str | None = Field(default=None, max_length=128)
     avatar_url: str | None = Field(default=None, max_length=512)
 
 

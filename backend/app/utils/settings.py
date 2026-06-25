@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.settings import AppSetting
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 async def get_frontend_url(db: AsyncSession) -> str:

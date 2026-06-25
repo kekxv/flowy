@@ -6,7 +6,7 @@ import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
 import Loader from "../components/Loader";
 
-interface UserItem { id: string; username: string; email: string; display_name: string; role: string; is_active: boolean; created_at: string; }
+interface UserItem { id: string; username: string; email: string; display_name: string; nickname: string; role: string; is_active: boolean; created_at: string; }
 interface Stats { users: number; issues: number; open_issues: number; closed_issues: number; connections: number; }
 
 export default function AdminPage() {
@@ -31,6 +31,8 @@ export default function AdminPage() {
 
   const [roleEditUser, setRoleEditUser] = useState<string|null>(null);
   const [roleEditRoles, setRoleEditRoles] = useState<string[]>([]);
+  const [userEditUser, setUserEditUser] = useState<UserItem|null>(null);
+  const [userEditForm, setUserEditForm] = useState({display_name: "", nickname: ""});
 
   const toggleRole = async (u:UserItem) => { await api.put(`/users/${u.id}`,{role:u.role==="admin"?"member":"admin"}); fetch(); };
   const toggleActive = async (u:UserItem) => { await api.put(`/users/${u.id}`,{is_active:!u.is_active}); fetch(); };
@@ -43,6 +45,16 @@ export default function AdminPage() {
     if (!roleEditUser) return;
     await api.put(`/users/${roleEditUser}/project-roles`, { roles: roleEditRoles });
     setRoleEditUser(null);
+  };
+  const openUserEdit = (u: UserItem) => {
+    setUserEditUser(u);
+    setUserEditForm({display_name: u.display_name, nickname: u.nickname});
+  };
+  const saveUserEdit = async () => {
+    if (!userEditUser) return;
+    await api.put(`/users/${userEditUser.id}`, userEditForm);
+    setUserEditUser(null);
+    fetch();
   };
 
   if (loading) return <Loader />;
@@ -173,7 +185,7 @@ export default function AdminPage() {
                         {(u.display_name||u.username).slice(0,2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-[13px] font-medium">{u.display_name||u.username}</div>
+                        <div className="text-[13px] font-medium">{u.display_name||u.username}{u.nickname && <span className="ml-1.5 text-[11px] text-[var(--text-muted)]">({u.nickname})</span>}</div>
                         <div className="text-[11px] text-[var(--text-muted)] sm:hidden">{u.email}</div>
                       </div>
                     </div>
@@ -191,7 +203,8 @@ export default function AdminPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-1">
-                      <button onClick={()=>openRoleEdit(u.id)} title={t("roles.title","Project Roles")}
+                        <button onClick={()=>openUserEdit(u)} title="Edit user" className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><UserCog size={13}/></button>
+                        <button onClick={()=>openRoleEdit(u.id)} title={t("roles.title","Project Roles")}
                         className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors">
                         <Briefcase size={14}/></button>
                       <button onClick={()=>toggleRole(u)} title={t("admin.toggle_role")} disabled={u.id === user?.id}
@@ -235,6 +248,31 @@ export default function AdminPage() {
             </div>
             <div className="border-t border-[var(--border-light)] px-5 py-3">
               <button onClick={saveRoles} className="btn btn-primary btn-sm w-full">{t("common.save")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* User edit modal */}
+      {userEditUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setUserEditUser(null)}>
+          <div className="card w-80 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
+              <h3 className="text-sm font-semibold">编辑用户</h3>
+              <button onClick={() => setUserEditUser(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
+            </div>
+            <div className="px-5 py-3 space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">显示名称</label>
+                <input type="text" value={userEditForm.display_name} onChange={e => setUserEditForm({...userEditForm, display_name: e.target.value})} className="input mt-1 text-[13px]" placeholder="可选" />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">昵称</label>
+                <input type="text" value={userEditForm.nickname} onChange={e => setUserEditForm({...userEditForm, nickname: e.target.value})} className="input mt-1 text-[13px]" placeholder="用于 @查询" />
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">指派问题时可搜索此昵称</p>
+              </div>
+            </div>
+            <div className="border-t border-[var(--border-light)] px-5 py-3">
+              <button onClick={saveUserEdit} className="btn btn-primary btn-sm w-full">{t("common.save")}</button>
             </div>
           </div>
         </div>

@@ -22,6 +22,10 @@ export default function UserProfilePage() {
   const [sub, setSub] = useState(false);
   const [oauthConnecting, setOauthConnecting] = useState(false);
   const oauthHandled = useRef(false);
+  const [editForm, setEditForm] = useState({display_name: user?.display_name||"", nickname: user?.nickname||""});
+  const [showEdit, setShowEdit] = useState(false);
+  const [pwdForm, setPwdForm] = useState({old_password:"", new_password:""});
+  const [showPwd, setShowPwd] = useState(false);
 
   const fetch = async () => {
     const [c, oc] = await Promise.all([
@@ -86,6 +90,48 @@ export default function UserProfilePage() {
             <p className="text-[13px] text-[var(--text-muted)]">@{user?.username} · {user?.email} · <span className="rounded bg-[var(--bg-muted)] px-1 py-0.5 text-[11px]">{user?.role}</span></p>
           </div>
         </div>
+      </div>
+
+      {/* Profile Edit */}
+      <div className="card rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">个人信息</h2>
+          <button onClick={()=>setShowEdit(!showEdit)} className="btn btn-outline btn-sm">{showEdit?"取消":"编辑"}</button>
+        </div>
+        {showEdit && (
+          <div className="px-5 py-4 space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)]">显示名称</label>
+              <input type="text" value={editForm.display_name} onChange={e=>setEditForm({...editForm, display_name: e.target.value})} className="input mt-1 text-[13px]" placeholder="可选" />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)]">昵称</label>
+              <input type="text" value={editForm.nickname} onChange={e=>setEditForm({...editForm, nickname: e.target.value})} className="input mt-1 text-[13px]" placeholder="用于 @查询" />
+            </div>
+            <button onClick={async()=>{try{await api.put("/auth/me", editForm); setSuccess("已保存"); fetch();}catch(e:any){setError(e?.response?.data?.detail||e?.message);}}} className="btn btn-primary btn-sm">保存</button>
+          </div>
+        )}
+      </div>
+
+      {/* Password Change */}
+      <div className="card rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">修改密码</h2>
+          <button onClick={()=>setShowPwd(!showPwd)} className="btn btn-outline btn-sm">{showPwd?"取消":"修改"}</button>
+        </div>
+        {showPwd && (
+          <div className="px-5 py-4 space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)]">当前密码</label>
+              <input type="password" value={pwdForm.old_password} onChange={e=>setPwdForm({...pwdForm, old_password: e.target.value})} className="input mt-1 text-[13px]" />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)]">新密码</label>
+              <input type="password" value={pwdForm.new_password} onChange={e=>setPwdForm({...pwdForm, new_password: e.target.value})} className="input mt-1 text-[13px]" />
+            </div>
+            <button onClick={async()=>{try{await api.put("/auth/me/password", pwdForm); setSuccess("密码已修改"); setPwdForm({old_password:"", new_password:""}); setShowPwd(false);}catch(e:any){setError(e?.response?.data?.detail||e?.message);}}} className="btn btn-primary btn-sm">确认修改</button>
+          </div>
+        )}
       </div>
 
       {/* Project Roles */}

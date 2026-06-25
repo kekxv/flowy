@@ -258,5 +258,27 @@
     "merged": "已合并",
     "pr": "PR",
     "issue": "Issue"
+  },
+  "wechat_work_bot": {
+    "title": "企业微信机器人",
+    "desc": "配置智能机器人，通过群聊管理问题和里程碑",
+    "config": "配置",
+    "users": "用户管理",
+    "logs": "指令日志",
+    "bot_id": "Bot ID",
+    "secret": "Secret",
+    "ai_enabled": "AI 自然语言匹配",
+    "auto_reply": "自动回复提示",
+    "start": "启动",
+    "stop": "停止",
+    "running": "运行中",
+    "stopped": "已停止",
+    "add_user": "添加用户",
+    "wechat_user_id": "企业微信用户 ID",
+    "flowy_user": "关联 Flowy 用户",
+    "role": "角色",
+    "role_admin": "管理员",
+    "role_helper": "协助人员",
+    "role_viewer": "查看者"
   }
 }

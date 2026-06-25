@@ -23,7 +23,7 @@ from app.services import issue_service
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
