@@ -41,14 +41,22 @@ from app.services.sync_service import sync_service
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Auto-apply migrations using alembic
+    logger.info("Starting application lifespan...")
+
+    # Auto-apply migrations using alembic (run in thread to avoid blocking async loop)
+    import asyncio
     from alembic.config import Config
     from alembic import command
 
-    alembic_cfg = Config("alembic.ini")
-    try:
+    def _run_migrations():
+        alembic_cfg = Config("alembic.ini")
         command.upgrade(alembic_cfg, "head")
+
+    try:
+        await asyncio.to_thread(_run_migrations)
+        logger.info("alembic finish...")
     except Exception:
+        logger.warning("alembic finish...")
         # Fallback: create tables if alembic fails
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -77,15 +85,21 @@ async def lifespan(_app: FastAPI):
             logger.exception("Failed to seed default labels")
 
     await sync_service.start()
+    logger.info("External sync started")
 
     # Auto-start WeChat Work bot if configured
     from app.services.wechat_work_bot import bot_service
 
     try:
-        await bot_service.load_config_and_start()
+        started = await bot_service.load_config_and_start()
+        if started:
+            logger.info("WeChat Work bot auto-started")
+        else:
+            logger.info("WeChat Work bot not configured (no bot_id/secret)")
     except Exception:
         logger.exception("Failed to auto-start WeChat Work bot")
 
+    logger.info("Application startup complete")
     yield
 
     await bot_service.stop()

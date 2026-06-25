@@ -11,6 +11,8 @@ interface BotConfig {
   ai_enabled: boolean;
   auto_reply: boolean;
   is_running: boolean;
+  ai_base_url?: string;
+  ai_model?: string;
 }
 interface BotUser {
   id: string;
@@ -59,6 +61,7 @@ export default function WeChatWorkBotPage() {
   const [tab, setTab] = useState<Tab>("config");
   const [config, setConfig] = useState<BotConfig>({ bot_id: "", ai_enabled: false, auto_reply: true, is_running: false });
   const [formSecret, setFormSecret] = useState("");
+  const [formAiKey, setFormAiKey] = useState("");
   const [users, setUsers] = useState<BotUser[]>([]);
   const [logs, setLogs] = useState<BotLog[]>([]);
   const [flowyUsers, setFlowyUsers] = useState<FlowyUser[]>([]);
@@ -120,8 +123,14 @@ export default function WeChatWorkBotPage() {
         auto_reply: config.auto_reply,
       };
       if (formSecret) payload.secret = formSecret;
+      if (config.ai_enabled) {
+        if (config.ai_base_url) payload.ai_base_url = config.ai_base_url;
+        if (formAiKey) payload.ai_api_key = formAiKey;
+        if (config.ai_model) payload.ai_model = config.ai_model;
+      }
       await api.put("/wechat-work-bot/config", payload);
       setFormSecret("");
+      setFormAiKey("");
       await fetchConfig();
       flashSuccess(t("common.saved"));
     } catch (err: any) {
@@ -294,6 +303,27 @@ export default function WeChatWorkBotPage() {
                 自动回复提示
               </label>
             </div>
+
+            {config.ai_enabled && (
+              <div className="rounded-lg bg-[var(--bg-hover)] p-4 space-y-3">
+                <h3 className="text-[12px] font-semibold text-[var(--text-secondary)]">AI 后端配置</h3>
+                <div>
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">API Base URL</label>
+                  <input type="text" value={config.ai_base_url || ""} onChange={e => setConfig({ ...config, ai_base_url: e.target.value })}
+                    className="input mt-1 text-[13px]" placeholder="https://api.openai.com/v1 或自定义地址" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">API Key</label>
+                  <input type="password" value={formAiKey} onChange={e => setFormAiKey(e.target.value)}
+                    className="input mt-1 text-[13px]" placeholder={config.ai_base_url ? "留空保持不变" : "sk-..."} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">模型</label>
+                  <input type="text" value={config.ai_model || ""} onChange={e => setConfig({ ...config, ai_model: e.target.value })}
+                    className="input mt-1 text-[13px]" placeholder="gpt-4o-mini / qwen-turbo / deepseek-chat" />
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end pt-2">
               <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -37,16 +37,18 @@ class WeChatWorkBotService:
         self._started_at: float = 0
         self._bot_id: str = ""
         self._ai_enabled: bool = False
+        self._ai_config: dict | None = None
         # Pending assignments: wechat_user_id -> {assignee_name, issues: [(id, title), ...]}
         self._pending_assignments: dict[str, dict] = {}
 
-    async def start(self, bot_id: str, secret: str, ai_enabled: bool = False) -> None:
+    async def start(self, bot_id: str, secret: str, ai_enabled: bool = False, ai_config: dict | None = None) -> None:
         """Start the bot with given credentials."""
         if self._running:
             await self.stop()
 
         self._bot_id = bot_id
         self._ai_enabled = ai_enabled
+        self._ai_config = ai_config
         self._client = WeChatWorkBotClient(bot_id, secret)
         self._client.on_message(self.handle_message)
 
@@ -87,7 +89,7 @@ class WeChatWorkBotService:
             logger.debug(f"Frame headers: {frame['headers']}")
 
         msg_parser = MessageParser()
-        cmd_parser = CommandParser(ai_enabled=self._ai_enabled)
+        cmd_parser = CommandParser(ai_enabled=self._ai_enabled, ai_config=self._ai_config)
 
         # 1. Extract message context (including quoted content)
         msg_ctx = msg_parser.extract_context(frame)
@@ -143,7 +145,7 @@ class WeChatWorkBotService:
                         return
 
             # 3. Parse command
-            parsed = cmd_parser.parse(msg_ctx)
+            parsed = await cmd_parser.parse(msg_ctx)
 
             if not parsed:
                 # No command matched — send help hint if auto_reply
@@ -271,6 +273,7 @@ class WeChatWorkBotService:
         async with async_session() as db:
             config = await db.get(WeChatWorkBotConfig, "config")
             if not config:
+                logger.info("No bot config found in database")
                 return False
 
             cfg = config.config_dict
@@ -278,6 +281,7 @@ class WeChatWorkBotService:
             secret_encrypted = cfg.get("secret", "")
 
             if not bot_id or not secret_encrypted:
+                logger.info(f"Bot config incomplete: bot_id={bool(bot_id)}, secret={bool(secret_encrypted)}")
                 return False
 
             try:
@@ -287,9 +291,24 @@ class WeChatWorkBotService:
                 return False
 
             ai_enabled = cfg.get("ai_enabled", False)
+            ai_config = None
+            if ai_enabled:
+                ai_api_key_encrypted = cfg.get("ai_api_key", "")
+                ai_api_key = ""
+                if ai_api_key_encrypted:
+                    try:
+                        ai_api_key = decrypt_token(ai_api_key_encrypted)
+                    except Exception as e:
+                        logger.error(f"Failed to decrypt AI API key: {e}")
+                ai_config = {
+                    "ai_base_url": cfg.get("ai_base_url", "https://api.openai.com/v1"),
+                    "ai_api_key": ai_api_key,
+                    "ai_model": cfg.get("ai_model", "gpt-4o-mini"),
+                }
+                logger.info(f"AI enabled: model={ai_config['ai_model']}, base_url={ai_config['ai_base_url']}")
 
             try:
-                await self.start(bot_id, secret, ai_enabled)
+                await self.start(bot_id, secret, ai_enabled, ai_config)
                 return True
             except Exception as e:
                 logger.error(f"Failed to start bot from config: {e}")

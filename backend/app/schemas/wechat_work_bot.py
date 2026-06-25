@@ -6,6 +6,8 @@ class BotConfigResponse(BaseModel):
     ai_enabled: bool = False
     auto_reply: bool = True
     is_running: bool = False
+    ai_base_url: str = ""
+    ai_model: str = ""
 
 
 class BotConfigUpdate(BaseModel):
@@ -13,6 +15,9 @@ class BotConfigUpdate(BaseModel):
     secret: str = ""
     ai_enabled: bool = False
     auto_reply: bool = True
+    ai_base_url: str = ""
+    ai_api_key: str = ""
+    ai_model: str = ""
 
 
 class BotUserCreate(BaseModel):

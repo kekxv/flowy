@@ -50,6 +50,8 @@ async def get_config(
         ai_enabled=cfg.get("ai_enabled", False),
         auto_reply=cfg.get("auto_reply", True),
         is_running=bot_service.is_running,
+        ai_base_url=cfg.get("ai_base_url", ""),
+        ai_model=cfg.get("ai_model", ""),
     )
 
 
@@ -72,6 +74,12 @@ async def update_config(
         cfg["secret"] = encrypt_token(body.secret)
     cfg["ai_enabled"] = body.ai_enabled
     cfg["auto_reply"] = body.auto_reply
+    if body.ai_base_url:
+        cfg["ai_base_url"] = body.ai_base_url
+    if body.ai_api_key:
+        cfg["ai_api_key"] = encrypt_token(body.ai_api_key)
+    if body.ai_model:
+        cfg["ai_model"] = body.ai_model
 
     if config:
         config.value = json.dumps(cfg, ensure_ascii=False)
@@ -92,6 +100,8 @@ async def update_config(
         ai_enabled=cfg.get("ai_enabled", False),
         auto_reply=cfg.get("auto_reply", True),
         is_running=bot_service.is_running,
+        ai_base_url=cfg.get("ai_base_url", ""),
+        ai_model=cfg.get("ai_model", ""),
     )
 
 

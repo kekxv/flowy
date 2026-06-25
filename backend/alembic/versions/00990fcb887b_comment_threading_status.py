@@ -1,7 +1,7 @@
 """comment threading status
 
 Revision ID: 00990fcb887b
-Revises: m001
+Revises: manual_fix_assignee_pk
 Create Date: 2026-05-23 22:20:53.075357
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "00990fcb887b"
-down_revision: str | None = "m001"
+down_revision: str | None = "manual_fix_assignee_pk"
 branch_labels = None
 depends_on = None
 

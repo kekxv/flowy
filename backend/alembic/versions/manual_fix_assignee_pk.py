@@ -7,7 +7,7 @@ Create Date: 2026-05-23
 
 from alembic import op
 
-revision: str = "m001"
+revision: str = "manual_fix_assignee_pk"
 down_revision: str | None = "4692ab361441"
 branch_labels = None
 depends_on = None

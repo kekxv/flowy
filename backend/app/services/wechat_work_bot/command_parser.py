@@ -71,10 +71,11 @@ AI_KEYWORDS: dict[str, list[str]] = {
 class CommandParser:
     """Parses user messages into commands with context."""
 
-    def __init__(self, ai_enabled: bool = False):
+    def __init__(self, ai_enabled: bool = False, ai_config: dict | None = None):
         self.ai_enabled = ai_enabled
+        self._ai_config = ai_config
 
-    def parse(self, msg: MessageContext) -> ParsedCommand | None:
+    async def parse(self, msg: MessageContext) -> ParsedCommand | None:
         """Parse a MessageContext into a ParsedCommand.
 
         Returns None if no valid command could be extracted.
@@ -101,6 +102,12 @@ class CommandParser:
         parsed = self._ai_match(text, quote_context)
         if parsed:
             return parsed
+
+        # 3. Try LLM matching (if AI enabled and configured)
+        if self.ai_enabled and self._ai_config:
+            parsed = await self._llm_match(text, quote_context)
+            if parsed:
+                return parsed
 
         return None
 
@@ -170,6 +177,102 @@ class CommandParser:
                         raw_text=text,
                         quote_context=quote_context,
                     )
+
+        return None
+
+    async def _llm_match(self, text: str, quote_context: dict[str, Any]) -> ParsedCommand | None:
+        """Use LLM tool calling for intent matching when keyword matching fails."""
+        if not self._ai_config:
+            return None
+
+        try:
+            import httpx
+            import json
+
+            # Build tools definitions for function calling
+            tools = []
+            for cmd, info in COMMANDS.items():
+                # Only include commands that the user's role can access
+                aliases = info.get("aliases", [])
+                desc = f"指令: /{cmd}"
+                if aliases:
+                    desc += f" (别名: {', '.join(aliases)})"
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": cmd,
+                        "description": desc,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "args": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "指令参数列表",
+                                },
+                            },
+                            "required": ["args"],
+                        },
+                    },
+                })
+
+            # Add a "none" tool for unrecognized input
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": "none",
+                    "description": "无法识别的输入，不是任何已知指令",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                    },
+                },
+            })
+
+            headers = {
+                "Authorization": f"Bearer {self._ai_config.get('ai_api_key', '')}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": self._ai_config.get("ai_model", "gpt-4o-mini"),
+                "messages": [{"role": "user", "content": text}],
+                "tools": tools,
+                "tool_choice": "required",
+                "temperature": 0,
+            }
+
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    f"{self._ai_config.get('ai_base_url', 'https://api.openai.com/v1')}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                data = resp.json()
+
+                # Extract tool call
+                choice = data.get("choices", [{}])[0]
+                message = choice.get("message", {})
+                tool_calls = message.get("tool_calls", [])
+
+                if not tool_calls:
+                    return None
+
+                call = tool_calls[0].get("function", {})
+                cmd_name = call.get("name", "")
+
+                if cmd_name and cmd_name != "none" and cmd_name in COMMANDS:
+                    args_data = json.loads(call.get("arguments", "{}"))
+                    args = args_data.get("args", [])
+                    return ParsedCommand(
+                        command=cmd_name,
+                        args=args,
+                        raw_text=text,
+                        quote_context=quote_context,
+                    )
+
+        except Exception as e:
+            import logging
+            logging.getLogger("uvicorn").error(f"LLM tool call failed: {e}")
 
         return None
 
