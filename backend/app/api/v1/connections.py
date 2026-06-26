@@ -285,6 +285,7 @@ async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
     return token
 
 
+@router.get("/oauth/callback")
 async def oauth_callback_get(
     code: str = Query(...),
     state: str = Query(...),
