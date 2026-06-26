@@ -40,7 +40,7 @@ class CommandHandlers:
             return text
 
         # Quick markers that suggest the text is already Markdown.
-        _MD_PATTERNS = (
+        _md_patterns = (
             r'**', r'__',      # bold
             r'* ', r'- ',       # unordered list
             r'# ', r'## ',      # headings
@@ -49,7 +49,7 @@ class CommandHandlers:
             r'```',             # code fences
             r'> ',              # block quotes
         )
-        if any(p in text for p in _MD_PATTERNS):
+        if any(p in text for p in _md_patterns):
             return text
 
         # Plain text: double up single newlines for Markdown paragraphs.
