@@ -105,6 +105,7 @@ class CommandHandlers:
 | `/create` `/创建` [类型] <标题> [描述] | 创建问题/需求 |
 | `/update` `/修改` <id> <字段> <值> | 更新问题 |
 | `/close` `/关闭` <id> [原因] | 关闭问题 |
+| `/resolve` `/解决` <id> [说明] | 解决问题 |
 | `/assign` `/指派` <id> <用户名> | 指派问题 |
 | `/priority` `/优先级` <id> <级别> | 调整优先级 |
 | `/comment` `/评论` <id> [内容] | 评论问题 |
@@ -490,6 +491,43 @@ class CommandHandlers:
             msg += f"\n> 原因: {reason}"
         return msg
 
+    async def handle_resolve(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Resolve an issue (status → resolved), distinct from close."""
+        issue_id = None
+
+        if args and args[0].startswith("#"):
+            issue_id = args[0][1:]
+            args = args[1:]
+        elif args and args[0].isdigit():
+            issue_id = args[0]
+            args = args[1:]
+        elif quote.get("extracted_issue_ids"):
+            issue_id = str(quote["extracted_issue_ids"][0])
+
+        if not issue_id:
+            return "❌ 用法: `/解决 <id> [说明]` 或引用包含 #ID 的消息"
+
+        query = select(Issue).where(Issue.id.startswith(issue_id))
+        result = await self.db.execute(query)
+        issue = result.scalar_one_or_none()
+
+        if not issue:
+            return f"❌ 找不到问题 #{issue_id}"
+
+        if issue.status in ("resolved", "closed", "cancelled"):
+            labels = {"resolved": "已解决", "closed": "已关闭", "cancelled": "已取消"}
+            return f"⚠️ 问题 #{issue.id[:8]} 已经是{labels.get(issue.status, issue.status)}状态"
+
+        issue.status = "resolved"
+        issue.updated_at = datetime.now().isoformat()
+        await self.db.commit()
+
+        reason = " ".join(args) if args else ""
+        msg = f"✅ 已解决 #{issue.id[:8]}: {issue.title}"
+        if reason:
+            msg += f"\n> 说明: {reason}"
+        return msg
+
     async def handle_assign(self, args: list[str], quote: dict, frame: dict = None) -> str:
         issue_id = None
         if args and args[0].startswith("#"):
@@ -727,7 +765,10 @@ class CommandHandlers:
                             except ImportError:
                                 pass
                         # Save to local disk
-                        attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
+                        if os.environ.get("UPLOAD_DIR"):
+                            attachments_dir = os.path.join(os.environ["UPLOAD_DIR"], "bot_attachments")
+                        else:
+                            attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
                         os.makedirs(attachments_dir, exist_ok=True)
                         # Generate unique filename
                         ext = filename_hint.rsplit(".", 1)[-1] if filename_hint and "." in filename_hint else "bin"
@@ -881,11 +922,11 @@ class CommandHandlers:
                 return f"❌ 找不到里程碑 {ms_id}"
 
             # Count issues linked to this milestone
-            from app.models.issue import issue_milestones
+            from app.models.issue import issue_milestones_table
 
             total_q = (
-                select(func.count(issue_milestones.c.issue_id))
-                .where(issue_milestones.c.milestone_id == ms.id)
+                select(func.count(issue_milestones_table.c.issue_id))
+                .where(issue_milestones_table.c.milestone_id == ms.id)
             )
             total = (await self.db.execute(total_q)).scalar() or 0
 

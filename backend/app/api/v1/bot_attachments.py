@@ -16,18 +16,22 @@ from app.models.user import User
 
 router = APIRouter(prefix="/bot-attachments", tags=["bot-attachments"])
 
-ATTACHMENTS_DIR = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
+
+def _get_attachments_dir() -> str:
+    """Get attachments directory, preferring UPLOAD_DIR if set."""
+    base = os.environ.get("UPLOAD_DIR") or os.environ.get("STATIC_DIR", "static")
+    return os.path.join(base, "bot_attachments")
 
 
 def _ensure_dir():
-    os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+    os.makedirs(_get_attachments_dir(), exist_ok=True)
 
 
 @router.get("/{filename}")
 async def download_attachment(filename: str):
     """Download a bot attachment file (public - for img tags)."""
     _ensure_dir()
-    filepath = os.path.join(ATTACHMENTS_DIR, filename)
+    filepath = os.path.join(_get_attachments_dir(), filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "File not found")
     return FileResponse(filepath, filename=filename)
@@ -43,7 +47,7 @@ async def delete_attachment(
     if not await _can_delete_attachment(filename, _user, db):
         raise HTTPException(403, "Cannot delete this attachment")
     _ensure_dir()
-    filepath = os.path.join(ATTACHMENTS_DIR, filename)
+    filepath = os.path.join(_get_attachments_dir(), filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "File not found")
     os.remove(filepath)
@@ -71,8 +75,8 @@ async def list_attachments(
         raise HTTPException(403, "Admin access required")
     _ensure_dir()
     files = []
-    for f in os.listdir(ATTACHMENTS_DIR):
-        filepath = os.path.join(ATTACHMENTS_DIR, f)
+    for f in os.listdir(_get_attachments_dir()):
+        filepath = os.path.join(_get_attachments_dir(), f)
         if os.path.isfile(filepath):
             stat = os.stat(filepath)
             files.append({
