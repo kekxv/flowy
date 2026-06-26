@@ -39,8 +39,12 @@ for _logger_name in ("sqlalchemy", "alembic"):
 
 target_metadata = Base.metadata
 
-# Use synchronous SQLite driver for migrations
-DB_URL = "sqlite:///./flowy.db"
+# Read DATABASE_URL from environment, fall back to the same default as app/config.py.
+# Alembic runs synchronously — strip +aiosqlite so we use the plain sqlite driver.
+import os
+
+_raw_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./flowy.db")
+DB_URL = _raw_url.replace("+aiosqlite", "")
 
 
 def run_migrations_offline() -> None:
