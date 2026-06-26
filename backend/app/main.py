@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -18,10 +19,13 @@ _LOG_FORMAT = "%(levelprefix)s %(asctime)s %(message)s"
 _log_handler = logging.StreamHandler()
 _log_handler.setFormatter(DefaultFormatter(fmt=_LOG_FORMAT, datefmt="%H:%M:%S", use_colors=True))
 
+_log_level_name = os.getenv("LOG_LEVEL", "info").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+
 _uvicorn_logger = logging.getLogger("uvicorn")
 _uvicorn_logger.handlers.clear()
 _uvicorn_logger.addHandler(_log_handler)
-_uvicorn_logger.setLevel(logging.DEBUG)
+_uvicorn_logger.setLevel(_log_level)
 _uvicorn_logger.propagate = False
 
 logger = logging.getLogger("uvicorn")
