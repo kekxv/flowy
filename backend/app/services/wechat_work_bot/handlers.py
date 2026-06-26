@@ -28,6 +28,37 @@ class CommandHandlers:
 
     # ─── General ──────────────────────────────────────────────
 
+    @staticmethod
+    def _normalize_quoted_text(text: str) -> str:
+        """Convert plain-text newlines to Markdown paragraph breaks.
+
+        WeChat Work quoted messages are typically plain text with single \\n.
+        If the text doesn't contain Markdown syntax, convert \\n → \\n\\n so
+        it renders as proper paragraphs.
+        """
+        if not text:
+            return text
+
+        # Quick markers that suggest the text is already Markdown.
+        _MD_PATTERNS = (
+            r'**', r'__',      # bold
+            r'* ', r'- ',       # unordered list
+            r'# ', r'## ',      # headings
+            r'[',               # links / images
+            r'|',               # tables
+            r'```',             # code fences
+            r'> ',              # block quotes
+        )
+        if any(p in text for p in _MD_PATTERNS):
+            return text
+
+        # Plain text: double up single newlines for Markdown paragraphs.
+        import re
+        # Normalize: collapse 3+ newlines, then double single newlines.
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = text.replace('\n', '\n\n')
+        return text
+
     async def _get_assigned_issue_ids(self) -> list[str] | None:
         """Get issue IDs assigned to the current user.
 
@@ -140,30 +171,43 @@ class CommandHandlers:
             "accepted": "[已接受]", "resolved": "[已解决]", "closed": "[已关闭]",
         }
         priority_text = {
-            "critical": "🔴紧急", "high": "🟠高", "medium": "中", "low": "低",
+            "critical": "🔴紧急", "high": "🟠高", "medium": "中", "low": "低", "trivial": "⚪无关紧要",
         }
 
+        def _resolve_end(issue) -> dt:
+            """Return the time to measure against: closed_at for resolved/closed, now otherwise."""
+            if issue.status in ("resolved", "closed") and issue.closed_at:
+                try:
+                    return dt.fromisoformat(issue.closed_at[:19])
+                except (ValueError, TypeError):
+                    pass
+            return dt.now()
+
         def format_row(issue):
-            now = dt.now()
+            end = _resolve_end(issue)
             created = dt.fromisoformat(issue.created_at[:19])
-            hours = int((now - created).total_seconds() / 3600)
-            if hours < 1:
-                duration = f"{int((now - created).total_seconds() / 60)}分"
-            elif hours < 24:
-                duration = f"{hours}时"
+            seconds = int((end - created).total_seconds())
+            if seconds < 60:
+                duration = f"{seconds}秒"
+            elif seconds < 3600:
+                duration = f"{seconds // 60}分"
+            elif seconds < 86400:
+                duration = f"{seconds // 3600}时"
             else:
-                duration = f"{hours // 24}天"
+                duration = f"{seconds // 86400}天"
             st = status_text.get(issue.status, f"[{issue.status}]")
             pt = priority_text.get(issue.priority, issue.priority)
             title = issue.title[:25] + ".." if len(issue.title) > 25 else issue.title
-            return f"| {st} | **#{issue.id[:8]}** {title} | {pt} | {duration} |"
+            return f"| {st} | #{issue.id[:8]} | {title} | {pt} | {duration} |"
 
+        header = "| 状态 | ID | 标题 | 优先级 | 耗时 |"
+        sep = "| --- | --- | --- | --- | --- |"
         lines = []
 
         if my_issues:
             lines.append(f"### 📌 我的问题 ({len(my_issues)})")
-            lines.append("| 状态 | 标题 | 优先级 | 时长 |")
-            lines.append("| --- | --- | --- | --- |")
+            lines.append(header)
+            lines.append(sep)
             for issue in my_issues:
                 lines.append(format_row(issue))
             lines.append("")
@@ -171,8 +215,8 @@ class CommandHandlers:
         if other_issues or not my_issues:
             title = f"### 📋 所有问题 ({len(other_issues)})" if my_issues else f"### 📋 问题列表 ({len(all_issues)})"
             lines.append(title)
-            lines.append("| 状态 | 标题 | 优先级 | 时长 |")
-            lines.append("| --- | --- | --- | --- |")
+            lines.append(header)
+            lines.append(sep)
             for issue in (other_issues if my_issues else all_issues):
                 lines.append(format_row(issue))
 
@@ -228,7 +272,7 @@ class CommandHandlers:
             "accepted": "已接受", "resolved": "已解决", "closed": "已关闭",
         }
         priority_text = {
-            "critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "低",
+            "critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "无关紧要",
         }
 
         now_str = dt.now().strftime("%H:%M")
@@ -293,7 +337,9 @@ class CommandHandlers:
             return "❌ 用法: `/create [bug|feature] <标题>`"
 
         title = " ".join(args)
-        description = quote.get("multiline_body", "") or quote.get("quoted_content", "")
+        description = self._normalize_quoted_text(
+            quote.get("multiline_body", "") or quote.get("quoted_content", "")
+        )
 
         now = datetime.now().isoformat()
         issue = Issue(
@@ -597,9 +643,10 @@ class CommandHandlers:
         if args:
             body_parts.append(" ".join(args))
 
-        # Quoted text content
+        # Quoted text content — normalize newlines and wrap as blockquote.
         if quote.get("quoted_content"):
-            body_parts.append(f"> {quote['quoted_content']}")
+            normalized = self._normalize_quoted_text(quote["quoted_content"])
+            body_parts.append("> " + normalized.replace("\n", "\n> "))
 
         # Media from main message or quoted content (image, file, video)
         body = frame.get("body", {}) if frame else {}
@@ -703,7 +750,7 @@ class CommandHandlers:
             issue_id = str(quote["extracted_issue_ids"][0])
 
         if not issue_id or not args:
-            return " 用法: `/priority <id> <紧急|高|中|低|trivial>`"
+            return " 用法: `/priority <id> <紧急|高|中|低|无关紧要>`"
 
         # Support both English and Chinese priority names
         priority_map = {
@@ -715,7 +762,7 @@ class CommandHandlers:
         }
         new_priority = priority_map.get(args[0].lower(), args[0].lower())
         if new_priority not in ("critical", "high", "medium", "low", "trivial"):
-            return " 优先级必须是：紧急/高/中/低/trivial"
+            return " 优先级必须是：紧急/高/中/低/无关紧要"
 
         query = select(Issue).where(Issue.id.startswith(issue_id))
         result = await self.db.execute(query)
@@ -728,7 +775,7 @@ class CommandHandlers:
         issue.updated_at = dt.now().isoformat()
         await self.db.commit()
 
-        priority_text = {"critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "低"}
+        priority_text = {"critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "无关紧要"}
         return f" 已将 #{issue.id[:8]} 优先级从 {priority_text.get(old_priority, old_priority)} 改为 {priority_text.get(new_priority, new_priority)}"
 
     # ─── Milestone ────────────────────────────────────────────
