@@ -50,7 +50,7 @@ class WeChatWorkBotClient:
             return
 
         try:
-            from aibot import WSClient, WSClientOptions
+            from wecom_aibot_sdk import WSClient, WSClientOptions
 
             options = WSClientOptions(
                 bot_id=self.bot_id,
@@ -62,26 +62,26 @@ class WeChatWorkBotClient:
             if self._message_handler:
                 handler = self._message_handler
 
-                @self._ws_client.on("message.text")
                 async def _on_text(frame):
                     await handler(frame)
 
-                @self._ws_client.on("message.image")
                 async def _on_image(frame):
                     await handler(frame)
 
-                @self._ws_client.on("message.mixed")
                 async def _on_mixed(frame):
                     await handler(frame)
 
-                @self._ws_client.on("aibot_event_callback")
                 async def _on_event(frame):
                     await handler(frame)
 
+                self._ws_client.on("message.text", _on_text)
+                self._ws_client.on("message.image", _on_image)
+                self._ws_client.on("message.mixed", _on_mixed)
+                self._ws_client.on("aibot_event_callback", _on_event)
+
             self._running = True
-            # SDK run is synchronous, run in background executor
-            loop = asyncio.get_event_loop()
-            loop.run_in_executor(None, self._ws_client.run)
+            # SDK connect_async is async, run as background task
+            asyncio.create_task(self._ws_client.connect_async())
             logger.info("WeChat Work bot client started (SDK mode)")
 
         except ImportError:
@@ -215,7 +215,7 @@ class WeChatWorkBotClient:
             logger.warning("Bot client not running, cannot reply")
             return
         try:
-            from aibot import generate_req_id
+            from wecom_aibot_sdk import generate_req_id
 
             sid = generate_req_id("stream")
             await self._ws_client.reply_stream(frame, sid, text, finish)
