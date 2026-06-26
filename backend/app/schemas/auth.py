@@ -47,3 +47,19 @@ class UserUpdateRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str = Field(min_length=6, max_length=128)
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+    display_name: str = Field(default="", max_length=128)
+    role: str = Field(default="member")
+
+
+class PasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class AuthStatusResponse(BaseModel):
+    has_users: bool

@@ -283,15 +283,24 @@ class CommandHandlers:
             f"> {now_str} · {scope} · 共 **{total}** 个",
             "",
             "**按状态:**",
-            "| 状态 | 数量 | 占比 | 进度 |",
-            "| --- | ---: | ---: | --- |",
+            "| 状态 | 数量 | 占比 |",
+            "| --- | ---: | ---: |",
         ]
 
         for status, count in sorted(status_counts.items(), key=lambda x: -x[1]):
             label = status_text.get(status, status)
             pct = int(count / max(total, 1) * 100)
-            bar = "■" * min(pct // 10, 10) + "□" * (10 - min(pct // 10, 10))
-            lines.append(f"| {label} | `{count}` | {pct}% | {bar} |")
+            lines.append(f"| {label} | `{count}` | {pct}% |")
+
+        # Overall progress bar (resolved + closed vs total)
+        resolved_count = status_counts.get("resolved", 0) + status_counts.get("closed", 0)
+        progress_pct = int(resolved_count / max(total, 1) * 100)
+        progress_bar = "■" * min(progress_pct // 10, 10) + "□" * (10 - min(progress_pct // 10, 10))
+        lines.extend([
+            "",
+            "**📈 当前进度:**",
+            f"{progress_bar} {progress_pct}%（已解决 {resolved_count} / 总计 {total}）",
+        ])
 
         lines.extend([
             "",
@@ -327,6 +336,10 @@ class CommandHandlers:
         if not args:
             return "❌ 用法: `/create [bug|feature] <标题>`"
 
+        # Creating issues requires a linked Flowy account
+        if not self.bot_user or not self.bot_user.flowy_user_id:
+            return "⚠️ 创建问题需要绑定 Flowy 账号，请先联系管理员绑定"
+
         # First arg is optional type, rest is title
         issue_type = "bug"  # default
         if args[0].lower() in ("bug", "feature"):
@@ -359,9 +372,20 @@ class CommandHandlers:
         label = await self.db.execute(select(Label).where(Label.name == issue_type))
         label_obj = label.scalar_one_or_none()
         if label_obj:
-            self.db.execute(issue_labels_table.insert().values(
+            await self.db.execute(issue_labels_table.insert().values(
                 issue_id=issue.id, label_id=label_obj.id
             ))
+
+        # Auto-assign to linked Flowy user
+        if self.bot_user and self.bot_user.flowy_user_id:
+            await self.db.execute(
+                issue_assignees.insert().values(
+                    issue_id=issue.id,
+                    user_id=self.bot_user.flowy_user_id,
+                    role="member",
+                    assigned_at=now,
+                )
+            )
 
         await self.db.commit()
 

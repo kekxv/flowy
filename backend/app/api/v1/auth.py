@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError, jwt
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -9,6 +9,7 @@ from app.dependencies import get_current_user
 from app.models.tracking import UserProjectRole
 from app.models.user import User
 from app.schemas.auth import (
+    AuthStatusResponse,
     PasswordChangeRequest,
     RefreshTokenRequest,
     TokenResponse,
@@ -29,25 +30,29 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
+    # Only allow registration when the system has no users yet
+    count_result = await db.execute(select(func.count(User.id)))
+    user_count = count_result.scalar() or 0
+    if user_count > 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Registration is closed. Please contact an administrator to create your account.",
+        )
+
     existing = await db.execute(
         select(User).where((User.username == data.username) | (User.email == data.email))
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Username or email already exists")
 
+    # First user is always admin
     user = User(
         username=data.username,
         email=data.email,
         password_hash=hash_password(data.password),
         display_name=data.display_name or data.username,
-        role="admin",  # First user is admin; subsequent users can be managed
+        role="admin",
     )
-
-    # Check if this is the first user
-    count_result = await db.execute(select(User))
-    is_first = len(count_result.scalars().all()) == 0
-    if not is_first:
-        user.role = "member"
 
     db.add(user)
     await db.commit()
@@ -157,3 +162,10 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     user.password_hash = hash_password(data.new_password)
     await db.commit()
+
+
+@router.get("/status", response_model=AuthStatusResponse)
+async def auth_status(db: AsyncSession = Depends(get_db)):
+    count_result = await db.execute(select(func.count(User.id)))
+    user_count = count_result.scalar() or 0
+    return AuthStatusResponse(has_users=user_count > 0)

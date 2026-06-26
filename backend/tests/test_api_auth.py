@@ -42,51 +42,99 @@ class TestRegister:
 
     @pytest.mark.asyncio
     async def test_register_duplicate_username(self, db_session):
-        """Register with duplicate username fails."""
+        """Admin creating user with duplicate username fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # Register first user (admin, since system is empty)
             resp1 = await client.post(
                 "/api/v1/auth/register",
+                json={
+                    "username": "admin1",
+                    "email": "admin1@example.com",
+                    "password": "pass123",
+                },
+            )
+            assert resp1.status_code == 201
+
+            # Login as admin
+            login_resp = await client.post(
+                "/api/v1/auth/login",
+                json={"username_or_email": "admin1", "password": "pass123"},
+            )
+            token = login_resp.json()["access_token"]
+            headers = {"Authorization": f"Bearer {token}"}
+
+            # Create user via admin endpoint
+            resp2 = await client.post(
+                "/api/v1/users",
                 json={
                     "username": "dupuser",
                     "email": "dup1@example.com",
                     "password": "pass123",
                 },
+                headers=headers,
             )
-            assert resp1.status_code == 201
-            resp2 = await client.post(
-                "/api/v1/auth/register",
+            assert resp2.status_code == 201
+
+            # Duplicate username should fail
+            resp3 = await client.post(
+                "/api/v1/users",
                 json={
                     "username": "dupuser",
                     "email": "dup2@example.com",
                     "password": "pass123",
                 },
+                headers=headers,
             )
-            assert resp2.status_code == 409
+            assert resp3.status_code == 409
 
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, db_session):
-        """Register with duplicate email fails."""
+        """Admin creating user with duplicate email fails."""
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # Register first user (admin, since system is empty)
             resp1 = await client.post(
                 "/api/v1/auth/register",
+                json={
+                    "username": "admin2",
+                    "email": "admin2@example.com",
+                    "password": "pass123",
+                },
+            )
+            assert resp1.status_code == 201
+
+            # Login as admin
+            login_resp = await client.post(
+                "/api/v1/auth/login",
+                json={"username_or_email": "admin2", "password": "pass123"},
+            )
+            token = login_resp.json()["access_token"]
+            headers = {"Authorization": f"Bearer {token}"}
+
+            # Create user via admin endpoint
+            resp2 = await client.post(
+                "/api/v1/users",
                 json={
                     "username": "user1",
                     "email": "same@example.com",
                     "password": "pass123",
                 },
+                headers=headers,
             )
-            assert resp1.status_code == 201
-            resp2 = await client.post(
-                "/api/v1/auth/register",
+            assert resp2.status_code == 201
+
+            # Duplicate email should fail
+            resp3 = await client.post(
+                "/api/v1/users",
                 json={
                     "username": "user2",
                     "email": "same@example.com",
                     "password": "pass123",
                 },
+                headers=headers,
             )
-            assert resp2.status_code == 409
+            assert resp3.status_code == 409
 
     @pytest.mark.asyncio
     async def test_first_user_is_admin(self, db_session):
@@ -276,3 +324,41 @@ class TestRefreshToken:
                 },
             )
         assert resp.status_code == 401
+
+
+class TestRegistrationPolicy:
+    """Tests for the new registration policy: only open when system has no users."""
+
+    @pytest.mark.asyncio
+    async def test_register_closed_when_users_exist(self, db_session, test_user):
+        """Registration returns 403 when users already exist in the system."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": "another",
+                    "email": "another@example.com",
+                    "password": "password123",
+                },
+            )
+        assert resp.status_code == 403
+        assert "closed" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_auth_status_no_users(self, db_session):
+        """GET /auth/status returns has_users=false when DB is empty."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/auth/status")
+        assert resp.status_code == 200
+        assert resp.json()["has_users"] is False
+
+    @pytest.mark.asyncio
+    async def test_auth_status_has_users(self, db_session, test_user):
+        """GET /auth/status returns has_users=true when users exist."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/auth/status")
+        assert resp.status_code == 200
+        assert resp.json()["has_users"] is True

@@ -19,6 +19,11 @@ export async function login(data: {
   return res.data;
 }
 
+export async function getAuthStatus(): Promise<{ has_users: boolean }> {
+  const res = await api.get<{ has_users: boolean }>("/auth/status");
+  return res.data;
+}
+
 export async function getMe(): Promise<User> {
   const res = await api.get<User>("/auth/me");
   return res.data;

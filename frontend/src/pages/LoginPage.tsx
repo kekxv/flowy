@@ -3,14 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Globe } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { getAuthStatus } from "../api/auth";
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<"login"|"register">("login");
   const [username, setUsername] = useState(""); const [email, setEmail] = useState("");
   const [password, setPassword] = useState(""); const [displayName, setDisplayName] = useState("");
+  const [registrationOpen, setRegistrationOpen] = useState(true);
   const { login, register, error, isLoading, clearError, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getAuthStatus().then(s => setRegistrationOpen(!s.has_users)).catch(() => setRegistrationOpen(false));
+  }, []);
+
   useEffect(()=>{if(isAuthenticated)navigate("/dashboard",{replace:true});},[isAuthenticated,navigate]);
 
   const handle = async (e:React.FormEvent)=>{e.preventDefault();
@@ -37,7 +44,7 @@ export default function LoginPage() {
         <form onSubmit={handle} className="space-y-3.5">
           <div><label className="text-[13px] font-medium text-[var(--text-secondary)]">{t("auth.username_or_email")}</label>
             <input required value={username} onChange={e=>setUsername(e.target.value)} className="input mt-1" placeholder="admin"/></div>
-          {mode==="register"&&<>
+          {mode==="register"&&registrationOpen&&<>
             <div><label className="text-[13px] font-medium text-[var(--text-secondary)]">{t("auth.email")}</label>
               <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} className="input mt-1" placeholder="you@example.com"/></div>
             <div><label className="text-[13px] font-medium text-[var(--text-secondary)]">{t("auth.display_name")}</label>
@@ -49,8 +56,10 @@ export default function LoginPage() {
             {isLoading?t("common.loading"):mode==="login"?t("auth.sign_in"):t("auth.create_account")}</button>
         </form>
         <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
-          {mode==="login"?<>{t("auth.no_account")} <button onClick={()=>{clearError();setMode("register");}} className="font-medium text-[var(--primary)] hover:underline">{t("auth.sign_up")}</button></>
-          :<>{t("auth.has_account")} <button onClick={()=>{clearError();setMode("login");}} className="font-medium text-[var(--primary)] hover:underline">{t("auth.sign_in")}</button></>}
+          {mode==="login"?(
+            registrationOpen?<>{t("auth.no_account")} <button onClick={()=>{clearError();setMode("register");}} className="font-medium text-[var(--primary)] hover:underline">{t("auth.sign_up")}</button></>
+            :<span>{t("auth.no_account")} 请联系管理员创建账号</span>
+          ):<>{t("auth.has_account")} <button onClick={()=>{clearError();setMode("login");}} className="font-medium text-[var(--primary)] hover:underline">{t("auth.sign_in")}</button></>}
         </p>
       </div>
     </div>

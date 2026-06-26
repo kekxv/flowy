@@ -6,7 +6,8 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models.tracking import UserProjectRole
 from app.models.user import User
-from app.schemas.auth import UserResponse
+from app.schemas.auth import PasswordResetRequest, UserCreateRequest, UserResponse
+from app.services.auth import hash_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -93,3 +94,42 @@ async def set_user_project_roles(
         db.add(UserProjectRole(user_id=user_id, role=r))
     await db.commit()
     return {"roles": data.get("roles", [])}
+
+
+@router.post("", response_model=UserResponse, status_code=201)
+async def create_user(
+    data: UserCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    existing = await db.execute(
+        select(User).where((User.username == data.username) | (User.email == data.email))
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Username or email already exists")
+
+    user = User(
+        username=data.username,
+        email=data.email,
+        password_hash=hash_password(data.password),
+        display_name=data.display_name or data.username,
+        role=data.role if data.role in ("admin", "member") else "member",
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse.model_validate(user)
+
+
+@router.put("/{user_id}/reset-password", status_code=204)
+async def reset_user_password(
+    user_id: str,
+    data: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
