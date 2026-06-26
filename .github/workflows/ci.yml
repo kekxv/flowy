@@ -3,8 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'README.md'      # 排除具体的 README 文件
+      - 'docs/**'        # 排除 docs 目录下的所有文件修改
+      - '**/*.md'        # 排除所有 Markdown 文件的修改
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'README.md'      # 排除具体的 README 文件
+      - 'docs/**'        # 排除 docs 目录下的所有文件修改
+      - '**/*.md'        # 排除所有 Markdown 文件的修改
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
