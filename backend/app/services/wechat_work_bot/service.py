@@ -206,7 +206,7 @@ class WeChatWorkBotService:
                 if self._client:
                     await self._client.reply_markdown(frame, response, mentioned)
                 await self._log_command(
-                    db, wechat_user_id, bot_user.id, command_name,
+                    db, wechat_user_id, bot_user.id if bot_user else None, command_name,
                     parsed.args, response, "success", None
                 )
             except Exception as e:
@@ -215,7 +215,7 @@ class WeChatWorkBotService:
                 if self._client:
                     await self._client.reply_text(frame, error_msg, mentioned)
                 await self._log_command(
-                    db, wechat_user_id, bot_user.id, command_name,
+                    db, wechat_user_id, bot_user.id if bot_user else None, command_name,
                     parsed.args, error_msg, "failed", str(e)
                 )
 

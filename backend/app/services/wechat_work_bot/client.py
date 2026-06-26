@@ -44,6 +44,29 @@ class WeChatWorkBotClient:
         """Register a message handler callback."""
         self._message_handler = handler
 
+    @staticmethod
+    def _frame_to_dict(frame: Any) -> dict:
+        """Convert a WsFrame object (or any object) to a plain dict.
+
+        The wecom-aibot-sdk dispatches WsFrame objects to event handlers,
+        but the rest of the codebase expects plain dicts.
+        """
+        if isinstance(frame, dict):
+            return frame
+        # Try vars() first — works for regular objects and dataclasses.
+        try:
+            return vars(frame)
+        except TypeError:
+            pass
+        # Fallback: extract known attributes from the SDK frame object.
+        result: dict[str, Any] = {}
+        _missing = object()
+        for attr in ("cmd", "headers", "body"):
+            val = getattr(frame, attr, _missing)
+            if val is not _missing:
+                result[attr] = val
+        return result if result else {"cmd": "", "headers": {}, "body": {}}
+
     async def start(self) -> None:
         """Start the WebSocket connection."""
         if self._running:
@@ -63,16 +86,28 @@ class WeChatWorkBotClient:
                 handler = self._message_handler
 
                 async def _on_text(frame):
-                    await handler(frame)
+                    d = self._frame_to_dict(frame)
+                    if not isinstance(frame, dict):
+                        d["_ws_frame"] = frame
+                    await handler(d)
 
                 async def _on_image(frame):
-                    await handler(frame)
+                    d = self._frame_to_dict(frame)
+                    if not isinstance(frame, dict):
+                        d["_ws_frame"] = frame
+                    await handler(d)
 
                 async def _on_mixed(frame):
-                    await handler(frame)
+                    d = self._frame_to_dict(frame)
+                    if not isinstance(frame, dict):
+                        d["_ws_frame"] = frame
+                    await handler(d)
 
                 async def _on_event(frame):
-                    await handler(frame)
+                    d = self._frame_to_dict(frame)
+                    if not isinstance(frame, dict):
+                        d["_ws_frame"] = frame
+                    await handler(d)
 
                 self._ws_client.on("message.text", _on_text)
                 self._ws_client.on("message.image", _on_image)
@@ -122,7 +157,9 @@ class WeChatWorkBotClient:
             # aibot_respond_msg doesn't support "text" type, use "markdown" instead
             body = {"msgtype": "markdown", "markdown": {"content": content}}
             logger.debug(f"Sending reply (markdown): {body}")
-            await self._ws_client.reply(frame, body)
+            # Use the original WsFrame for SDK calls (stored by _frame_to_dict wrappers)
+            ws_frame = frame.get("_ws_frame", frame)
+            await self._ws_client.reply(ws_frame, body)
         except Exception as e:
             logger.error(f"Failed to reply: {e}")
             # Fallback to HTTP response_url
@@ -218,7 +255,9 @@ class WeChatWorkBotClient:
             from wecom_aibot_sdk import generate_req_id
 
             sid = generate_req_id("stream")
-            await self._ws_client.reply_stream(frame, sid, text, finish)
+            # Use the original WsFrame for SDK calls (stored by _frame_to_dict wrappers)
+            ws_frame = frame.get("_ws_frame", frame)
+            await self._ws_client.reply_stream(ws_frame, sid, text, finish)
         except Exception as e:
             logger.error(f"Failed to reply stream: {e}")
 
