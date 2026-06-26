@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, UserCog, Crown, Globe, Code2, Settings2, Lock, Briefcase, X } from "lucide-react";
+import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, UserCog, Crown, Globe, Code2, Settings2, Lock, Briefcase, X, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
@@ -29,6 +29,9 @@ export default function AdminPage() {
   const saveOAuthConfig = async (e:React.FormEvent) => { e.preventDefault();
     await api.put("/system/settings", oauthConfig); };
 
+  const [oauthExpanded, setOauthExpanded] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({username:"", email:"", password:"", display_name:"", role:"member"});
   const [roleEditUser, setRoleEditUser] = useState<string|null>(null);
   const [roleEditRoles, setRoleEditRoles] = useState<string[]>([]);
   const [userEditUser, setUserEditUser] = useState<UserItem|null>(null);
@@ -54,6 +57,13 @@ export default function AdminPage() {
     if (!userEditUser) return;
     await api.put(`/users/${userEditUser.id}`, userEditForm);
     setUserEditUser(null);
+    fetch();
+  };
+
+  const saveNewUser = async () => {
+    await api.post("/users", addUserForm);
+    setAddUserOpen(false);
+    setAddUserForm({username:"", email:"", password:"", display_name:"", role:"member"});
     fetch();
   };
 
@@ -96,11 +106,14 @@ export default function AdminPage() {
 
       {/* OAuth Configuration */}
       <div className="card rounded-xl overflow-hidden">
-        <div className="border-b border-[var(--border-light)] px-5 py-3.5">
+        <button onClick={() => setOauthExpanded(!oauthExpanded)}
+          className="w-full border-b border-[var(--border-light)] px-5 py-3.5 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             <Settings2 size={14}/>OAuth {t("settings.config","Configuration")}
           </h2>
-        </div>
+          {oauthExpanded ? <ChevronUp size={14} className="text-[var(--text-muted)]"/> : <ChevronDown size={14} className="text-[var(--text-muted)]"/>}
+        </button>
+        {oauthExpanded && (
         <form onSubmit={saveOAuthConfig} className="px-5 py-4 space-y-4">
           {/* Frontend URL */}
           <div>
@@ -155,15 +168,21 @@ export default function AdminPage() {
 
           <button type="submit" className="btn btn-primary btn-sm">{t("common.save")}</button>
         </form>
+        )}
       </div>
 
       {/* Users table */}
       <div className="card rounded-xl overflow-hidden">
         <div className="border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            <UserCog size={14}/>{t("admin.users")}
-            <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{users.length}</span>
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <UserCog size={14}/>{t("admin.users")}
+              <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{users.length}</span>
+            </h2>
+            <button onClick={() => setAddUserOpen(true)} className="btn btn-primary btn-sm flex items-center gap-1 text-xs">
+              <Plus size={14}/>添加用户
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -252,6 +271,49 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      {/* Add user modal */}
+      {addUserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setAddUserOpen(false)}>
+          <div className="card w-96 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
+              <h3 className="text-sm font-semibold">添加用户</h3>
+              <button onClick={() => setAddUserOpen(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
+            </div>
+            <form onSubmit={e => { e.preventDefault(); saveNewUser(); }} className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">用户名 <span className="text-red-400">*</span></label>
+                <input required value={addUserForm.username} onChange={e => setAddUserForm({...addUserForm, username: e.target.value})}
+                  className="input mt-1 text-[13px]" placeholder="newuser" minLength={3}/>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">邮箱 <span className="text-red-400">*</span></label>
+                <input required type="email" value={addUserForm.email} onChange={e => setAddUserForm({...addUserForm, email: e.target.value})}
+                  className="input mt-1 text-[13px]" placeholder="user@example.com"/>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">密码 <span className="text-red-400">*</span></label>
+                <input required type="text" value={addUserForm.password} onChange={e => setAddUserForm({...addUserForm, password: e.target.value})}
+                  className="input mt-1 text-[13px]" placeholder="至少6位" minLength={6}/>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">显示名称</label>
+                <input value={addUserForm.display_name} onChange={e => setAddUserForm({...addUserForm, display_name: e.target.value})}
+                  className="input mt-1 text-[13px]" placeholder="可选，默认同用户名"/>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)]">角色</label>
+                <select value={addUserForm.role} onChange={e => setAddUserForm({...addUserForm, role: e.target.value})}
+                  className="input mt-1 text-[13px]">
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+              <button type="submit" className="btn btn-primary btn-sm w-full">创建用户</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* User edit modal */}
       {userEditUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setUserEditUser(null)}>

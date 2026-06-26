@@ -102,7 +102,7 @@ class CommandHandlers:
 ### ✏️ 操作类
 | 指令 | 说明 |
 | --- | --- |
-| `/create` `/创建` [bug|feature] <标题> | 创建问题 |
+| `/create` `/创建` [类型] <标题> [描述] | 创建问题/需求 |
 | `/update` `/修改` <id> <字段> <值> | 更新问题 |
 | `/close` `/关闭` <id> [原因] | 关闭问题 |
 | `/assign` `/指派` <id> <用户名> | 指派问题 |
@@ -334,25 +334,37 @@ class CommandHandlers:
 
     async def handle_create(self, args: list[str], quote: dict, frame: dict = None) -> str:
         if not args:
-            return "❌ 用法: `/create [bug|feature] <标题>`"
+            return "❌ 用法: `/create [类型] <标题> [描述...]`\n\n类型: bug/问题/缺陷 | feature/需求/功能/特性（默认 bug）\n标题后的内容自动作为描述，引用消息内容也会合并到描述"
 
         # Creating issues requires a linked Flowy account
         if not self.bot_user or not self.bot_user.flowy_user_id:
             return "⚠️ 创建问题需要绑定 Flowy 账号，请先联系管理员绑定"
 
-        # First arg is optional type, rest is title
-        issue_type = "bug"  # default
-        if args[0].lower() in ("bug", "feature"):
-            issue_type = args[0].lower()
+        # Type mapping (English + Chinese)
+        type_map: dict[str, str] = {
+            "bug": "bug", "问题": "bug", "缺陷": "bug",
+            "feature": "feature", "需求": "feature", "功能": "feature", "特性": "feature",
+        }
+        issue_type = "bug"
+        if args[0].lower() in type_map:
+            issue_type = type_map[args[0].lower()]
             args = args[1:]
 
         if not args:
-            return "❌ 用法: `/create [bug|feature] <标题>`"
+            return "❌ 用法: `/create [类型] <标题> [描述...]`"
 
-        title = " ".join(args)
-        description = self._normalize_quoted_text(
+        # First non-type arg is the title, rest is description
+        title = args[0]
+        desc_parts: list[str] = []
+        if len(args) > 1:
+            desc_parts.append(" ".join(args[1:]))
+        # Quoted content appends to description
+        quoted = self._normalize_quoted_text(
             quote.get("multiline_body", "") or quote.get("quoted_content", "")
         )
+        if quoted:
+            desc_parts.append(quoted)
+        description = "\n\n".join(desc_parts)
 
         now = datetime.now().isoformat()
         issue = Issue(
@@ -389,7 +401,7 @@ class CommandHandlers:
 
         await self.db.commit()
 
-        return f"✅ 已创建{('Bug' if issue_type == 'bug' else '功能需求')}: **#{issue.id[:8]}** {title}"
+        return f"✅ 已创建{'Bug' if issue_type == 'bug' else '需求'}: **#{issue.id[:8]}** {title}"
 
 
     async def handle_update(self, args: list[str], quote: dict, frame: dict = None) -> str:

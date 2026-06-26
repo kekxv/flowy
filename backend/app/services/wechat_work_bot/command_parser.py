@@ -62,7 +62,7 @@ ROLE_LEVEL: dict[str, int] = {
 
 # AI keyword matching: keyword -> command
 AI_KEYWORDS: dict[str, list[str]] = {
-    "create": ["创建", "新建", "报bug", "报一个bug", "提bug", "提交bug", "新增", "建一个"],
+    "create": ["创建", "新建", "报bug", "报一个bug", "提bug", "提交bug", "提需求", "需求", "功能需求", "新增", "建一个"],
     "list": ["列表", "问题列表", "有哪些问题", "看看问题", "列出问题", "所有问题", "查看问题"],
     "stats": ["统计", "汇总", "问题统计", "数据分析", "概况"],
     "close": ["关闭", "解决", "已完成", "处理完", "修复"],
