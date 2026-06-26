@@ -30,7 +30,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, inspect, select, text
+from sqlalchemy import func, select
 
 # Ensure all models are loaded for SQLAlchemy mapper configuration
 import app.models  # noqa: E402, F401
@@ -149,18 +149,6 @@ def create_app() -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": "An unexpected error occurred"}
             },
         )
-
-    @app.get("/api/v1/health")
-    async def health_check():
-        try:
-            async with async_session() as db:
-                await db.execute(text("SELECT 1"))
-            return {"status": "ok"}
-        except Exception:
-            return JSONResponse(
-                status_code=503,
-                content={"status": "degraded", "db": "unreachable"},
-            )
 
     return app
 

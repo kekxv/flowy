@@ -11,9 +11,11 @@ if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "change-me-to-random-secret" ] || [
 fi
 
 if [ -z "$ENCRYPTION_KEY" ]; then
-  echo "ERROR: ENCRYPTION_KEY is not set."
-  echo "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-  exit 1
+  ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+  echo "WARNING: ENCRYPTION_KEY was not set. Generated a temporary key."
+  echo "  ENCRYPTION_KEY=$ENCRYPTION_KEY"
+  echo "  Add this to your .env file to persist it across restarts."
+  export ENCRYPTION_KEY
 fi
 
 # Run database migrations
