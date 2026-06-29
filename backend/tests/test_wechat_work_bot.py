@@ -525,7 +525,7 @@ class TestBotComment:
         user = User(**_make_user_kwargs(id="user-cm3", username="commenter3", email="cm3@ex.com"))
         db_session.add(user)
         await db_session.flush()
-        issue = await _create_issue(db_session, "数据库连接超时", user.id)
+        _ = await _create_issue(db_session, "数据库连接超时", user.id)
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
 
         result = await handlers.handle_comment(["数据库连接超时", "已排查到慢查询"], {})

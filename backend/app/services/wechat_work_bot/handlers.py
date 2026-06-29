@@ -119,7 +119,7 @@ class CommandHandlers:
         if len(issues) == 1:
             return issues[0]
         elif len(issues) > 1:
-            lines = [f"🔍 找到多个匹配的问题 (请更精确地指定):\n"]
+            lines = ["🔍 找到多个匹配的问题 (请更精确地指定):\n"]
             for i in issues[:5]:
                 lines.append(f"- #{i.id[:8]} {i.title}")
             if len(issues) > 5:
