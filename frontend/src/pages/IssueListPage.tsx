@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Search, Plus, ChevronRight, X, UserPlus } from "lucide-react";
+import { Search, Plus, ChevronRight, X, UserPlus, Flag } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listIssues, type IssueData } from "../api/issues";
@@ -19,10 +19,12 @@ export default function IssueListPage() {
   const [debouncedQ, setDebouncedQ] = useState(q);
   useEffect(()=>{const t=setTimeout(()=>setDebouncedQ(q),350);return()=>clearTimeout(t);},[q]);
   const [labels, setLabels] = useState<Array<{id:string;name:string;color:string}>>([]);
+  const [milestones, setMilestones] = useState<Array<{id:string;name:string;status:string}>>([]);
   const [labelId, setLabelId] = useState(sp.get("label_id")||"");
   const [activeTimerIds, setActiveTimerIds] = useState<Set<string>>(new Set<string>());
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState<{issue:IssueData;type:"status"|"priority"}|null>(null);
+  const [msPopup, setMsPopup] = useState<{issue:IssueData}|null>(null);
   const [labelPopup, setLabelPopup] = useState(false);
   const [claimId, setClaimId] = useState<string|null>(null);
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
@@ -30,7 +32,7 @@ export default function IssueListPage() {
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  useEffect(()=>{api.get("/labels").then(r=>setLabels(r.data));},[]);
+  useEffect(()=>{api.get("/labels").then(r=>setLabels(r.data));api.get("/milestones").then(r=>setMilestones(r.data));},[]);
   // Poll active timers
   useEffect(()=>{const poll=()=>api.get("/dashboard").then(r=>{const ids:Set<string>=new Set((r.data.active_timers||[]).map((t:any)=>t.issue_id as string));setActiveTimerIds(ids);});poll();const i=setInterval(poll,15000);return()=>clearInterval(i);},[]);
 
@@ -65,6 +67,15 @@ export default function IssueListPage() {
       }
       await api.put(`/issues/${claimId}`,{assignees:current});
       setClaimId(null); setClaimRoles([]); fetch();
+    } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error","Failed")); }
+  };
+  const toggleMilestone = async (issueId: string, mid: string) => {
+    try {
+      const r = await api.get(`/issues/${issueId}`);
+      const current: string[] = r.data.milestone_ids || [];
+      const next = current.includes(mid) ? current.filter((x: string) => x !== mid) : [...current, mid];
+      await api.put(`/issues/${issueId}`, { milestone_ids: next });
+      fetch();
     } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error","Failed")); }
   };
 
@@ -140,8 +151,13 @@ export default function IssueListPage() {
                     {(issue as any).assignees.length>3 && <span className="text-[var(--text-muted)]">+{(issue as any).assignees.length-3}</span>}
                   </span></>}
                   {issue.labels?.slice(0,2).map((l:any)=><span key={l.id} className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium" style={{backgroundColor:l.color+"14",color:l.color,borderColor:l.color+"30"}}>{l.name}</span>)}
+                  {(issue as any).milestone_ids?.length>0 && (issue as any).milestone_ids.map((mid:string)=>{const m=milestones.find(x=>x.id===mid);return m?<span key={mid} className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-medium text-violet-600 border border-violet-200/50"><Flag size={8}/>{m.name}</span>:null;})}
                 </div>
               </div>
+              <button onClick={e=>{e.stopPropagation();e.preventDefault();setMsPopup({issue});}}
+                className={`flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 ${(issue as any).milestone_ids?.length>0?"bg-violet-50 text-violet-600":"text-[var(--text-muted)]/50 hover:text-violet-500 hover:bg-violet-50"}`}>
+                <Flag size={9}/>{(issue as any).milestone_ids?.length>0?(issue as any).milestone_ids.length:""}
+              </button>
               <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"priority"});}}
                 className={`priority-${issue.priority} rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105`}>{t(`issues.priority.${issue.priority}`)}</button>
               <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"status"});}}
@@ -234,6 +250,36 @@ export default function IssueListPage() {
             </div>
             <button onClick={doClaim} disabled={claimRoles.length===0}
               className="btn btn-primary btn-sm w-full">{t("common.confirm")}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone popup */}
+      {msPopup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/20 backdrop-blur-sm sm:items-center" onClick={()=>setMsPopup(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-2xl animate-[fadeInUp_.2s_ease-out] sm:rounded-2xl" onClick={e=>e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5"><Flag size={14} className="text-violet-500"/>{t("issues.milestones","Milestones")}</h3>
+              <button onClick={()=>setMsPopup(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
+            </div>
+            <p className="mb-3 text-[11px] text-[var(--text-muted)] truncate">#{msPopup.issue.id.slice(0,8)} {msPopup.issue.title}</p>
+            {milestones.length===0
+              ? <p className="py-4 text-center text-[12px] text-[var(--text-muted)]">暂无里程碑</p>
+              : <div className="space-y-1 max-h-60 overflow-y-auto">
+                {milestones.map(m => {
+                  const linked = (msPopup.issue as any).milestone_ids?.includes(m.id);
+                  const msStatus = m.status === "open" ? "🟢" : m.status === "published" ? "🔵" : "⚫";
+                  return <button key={m.id} onClick={async()=>{await toggleMilestone(msPopup.issue.id, m.id); setMsPopup(null);}}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] transition-all hover:bg-[var(--bg-hover)] active:scale-[.98] ${linked?"bg-violet-50":" "}`}>
+                    <span className="flex items-center gap-2">
+                      <span className="text-[10px]">{msStatus}</span>
+                      <span className={linked?"font-medium text-violet-700":"text-[var(--text-secondary)]"}>{m.name}</span>
+                    </span>
+                    {linked && <span className="text-violet-500 text-[11px] font-medium">✓ 已关联</span>}
+                  </button>;
+                })}
+              </div>
+            }
           </div>
         </div>
       )}
