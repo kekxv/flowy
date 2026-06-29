@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.issue import Issue, issue_assignees
+from app.models.issue import Issue, issue_assignees, issue_milestones_table
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
@@ -492,6 +492,264 @@ class TestBotMilestone:
         result = await handlers.handle_milestone(["stats", ms.id[:8]], {})
         assert "Sprint Y" in result
         assert "0" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_no_args_defaults_to_list(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms5", username="mstone5", email="ms5@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone([], {})
+        assert "里程碑" in result or "暂无" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_list_table_format(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms6", username="mstone6", email="ms6@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint Z", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["list"], {})
+        assert "| 状态 |" in result
+        assert "| 名称 |" in result
+        assert "Sprint Z" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_view_by_name(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms7", username="mstone7", email="ms7@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Release 2.0", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["Release", "2.0"], {})
+        assert "Release 2.0" in result
+        assert "进度" in result
+        assert "关联问题" in result or "暂无关联问题" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_view_by_id_prefix(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms8", username="mstone8", email="ms8@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Beta 1.0", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone([ms.id[:8]], {})
+        assert "Beta 1.0" in result
+        assert "进度" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_view_with_issues(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms9", username="mstone9", email="ms9@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 5", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Fix login bug",
+            reporter_id=user.id,
+            status="open",
+            priority="high",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        await db_session.execute(
+            issue_milestones_table.insert().values(issue_id=issue.id, milestone_id=ms.id)
+        )
+        await db_session.commit()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["Sprint", "5"], {})
+        assert "Sprint 5" in result
+        assert "Fix login bug" in result
+        assert "100%" in result or "0%" in result  # progress shown
+
+    @pytest.mark.asyncio
+    async def test_milestone_stats_with_progress(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms10", username="mstone10", email="ms10@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 6", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+
+        open_issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Open issue",
+            reporter_id=user.id,
+            status="open",
+        )
+        closed_issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Closed issue",
+            reporter_id=user.id,
+            status="closed",
+        )
+        db_session.add_all([open_issue, closed_issue])
+        await db_session.flush()
+        await db_session.execute(
+            issue_milestones_table.insert().values(issue_id=open_issue.id, milestone_id=ms.id)
+        )
+        await db_session.execute(
+            issue_milestones_table.insert().values(issue_id=closed_issue.id, milestone_id=ms.id)
+        )
+        await db_session.commit()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["stats", ms.id[:8]], {})
+        assert "Sprint 6" in result
+        assert "50%" in result  # 1 closed out of 2
+        assert "2" in result  # total issues
+
+    @pytest.mark.asyncio
+    async def test_milestone_add_issue(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms11", username="mstone11", email="ms11@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 7", status="open", owner_id=user.id)
+        db_session.add(ms)
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Add to milestone",
+            reporter_id=user.id,
+            status="open",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["add", "Sprint 7", f"#{issue.id[:8]}"], {})
+        assert "已" in result and "关联" in result
+        assert "Sprint 7" in result
+
+        # Verify association in DB
+        row = await db_session.execute(
+            select(issue_milestones_table).where(
+                issue_milestones_table.c.milestone_id == ms.id,
+                issue_milestones_table.c.issue_id == issue.id,
+            )
+        )
+        assert row.first() is not None
+
+    @pytest.mark.asyncio
+    async def test_milestone_add_issue_already_linked(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms12", username="mstone12", email="ms12@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 8", status="open", owner_id=user.id)
+        db_session.add(ms)
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Already linked",
+            reporter_id=user.id,
+            status="open",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        await db_session.execute(
+            issue_milestones_table.insert().values(issue_id=issue.id, milestone_id=ms.id)
+        )
+        await db_session.commit()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["add", ms.id[:8], issue.id[:8]], {})
+        assert "已在" in result or "已" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_remove_issue(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms13", username="mstone13", email="ms13@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 9", status="open", owner_id=user.id)
+        db_session.add(ms)
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Remove from milestone",
+            reporter_id=user.id,
+            status="open",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        await db_session.execute(
+            issue_milestones_table.insert().values(issue_id=issue.id, milestone_id=ms.id)
+        )
+        await db_session.commit()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["remove", "Sprint 9", f"#{issue.id[:8]}"], {})
+        assert "移除" in result
+
+        # Verify association removed
+        row = await db_session.execute(
+            select(issue_milestones_table).where(
+                issue_milestones_table.c.milestone_id == ms.id,
+                issue_milestones_table.c.issue_id == issue.id,
+            )
+        )
+        assert row.first() is None
+
+    @pytest.mark.asyncio
+    async def test_milestone_remove_issue_not_linked(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms14", username="mstone14", email="ms14@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 10", status="open", owner_id=user.id)
+        db_session.add(ms)
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Not linked",
+            reporter_id=user.id,
+            status="open",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["remove", ms.id[:8], issue.id[:8]], {})
+        assert "不在" in result or "不在" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_add_nonexistent_issue(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms15", username="mstone15", email="ms15@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        ms = Milestone(id=str(uuid.uuid4()), name="Sprint 11", status="open", owner_id=user.id)
+        db_session.add(ms)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["add", "Sprint 11", "deadbeef"], {})
+        assert "找不到" in result
+
+    @pytest.mark.asyncio
+    async def test_milestone_add_nonexistent_milestone(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-ms16", username="mstone16", email="ms16@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = Issue(
+            id=str(uuid.uuid4()),
+            title="Orphan issue",
+            reporter_id=user.id,
+            status="open",
+        )
+        db_session.add(issue)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_milestone(["add", "非存在里程碑", issue.id[:8]], {})
+        assert "找不到" in result
 
 
 # ── TestBotUserMgmt ───────────────────────────────────────────────────────────

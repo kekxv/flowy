@@ -9,7 +9,14 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.issue import Comment, Issue, Label, issue_assignees, issue_labels_table
+from app.models.issue import (
+    Comment,
+    Issue,
+    Label,
+    issue_assignees,
+    issue_labels_table,
+    issue_milestones_table,
+)
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
@@ -859,26 +866,13 @@ class CommandHandlers:
 
     async def handle_milestone(self, args: list[str], quote: dict, frame: dict = None) -> str:
         if not args:
-            return "❌ 用法: `/milestone <create|list|close|stats> [参数]`"
+            return await self._milestone_list()
 
         subcmd = args[0].lower()
         sub_args = args[1:]
 
         if subcmd == "list":
-            query = select(Milestone).order_by(Milestone.created_at.desc())
-            result = await self.db.execute(query)
-            milestones = result.scalars().all()
-
-            if not milestones:
-                return "📭 暂无里程碑"
-
-            lines = ["## 🏁 里程碑列表\n"]
-            status_emoji = {"open": "🟢", "published": "🔵", "closed": "⚫"}
-            for ms in milestones:
-                emoji = status_emoji.get(ms.status, "⚪")
-                due = f" (截止: {ms.due_date})" if ms.due_date else ""
-                lines.append(f"{emoji} **{ms.name}**{due} — {ms.status}")
-            return "\n".join(lines)
+            return await self._milestone_list()
 
         elif subcmd == "create":
             if not sub_args:
@@ -913,26 +907,255 @@ class CommandHandlers:
 
         elif subcmd == "stats":
             if not sub_args:
-                return "❌ 用法: `/milestone stats <id>`"
-            ms_id = sub_args[0]
-            query = select(Milestone).where(Milestone.id.startswith(ms_id))
-            result = await self.db.execute(query)
-            ms = result.scalar_one_or_none()
-            if not ms:
-                return f"❌ 找不到里程碑 {ms_id}"
+                return "❌ 用法: `/milestone stats <id或标题>`"
+            return await self._milestone_view(" ".join(sub_args))
 
-            # Count issues linked to this milestone
-            from app.models.issue import issue_milestones_table
+        elif subcmd == "add":
+            if len(sub_args) < 2:
+                return "❌ 用法: `/milestone add <里程碑名称或ID> <#issue_id>`"
+            ms_query_text = sub_args[0]
+            issue_id = sub_args[1].lstrip("#")
+            return await self._milestone_link(ms_query_text, issue_id, link=True)
 
-            total_q = (
-                select(func.count(issue_milestones_table.c.issue_id))
-                .where(issue_milestones_table.c.milestone_id == ms.id)
-            )
+        elif subcmd == "remove":
+            if len(sub_args) < 2:
+                return "❌ 用法: `/milestone remove <里程碑名称或ID> <#issue_id>`"
+            ms_query_text = sub_args[0]
+            issue_id = sub_args[1].lstrip("#")
+            return await self._milestone_link(ms_query_text, issue_id, link=False)
+
+        else:
+            # Treat args as title or ID prefix query
+            return await self._milestone_view(" ".join(args))
+
+    async def _milestone_list(self) -> str:
+        """List all milestones as a markdown table."""
+        query = (
+            select(Milestone, User.display_name)
+            .outerjoin(User, Milestone.owner_id == User.id)
+            .order_by(Milestone.created_at.desc())
+        )
+        result = await self.db.execute(query)
+        rows = result.all()
+
+        if not rows:
+            return "📭 暂无里程碑"
+
+        status_emoji = {"open": "🟢", "published": "🔵", "closed": "⚫"}
+        lines = [
+            "## 🏁 里程碑列表\n",
+            "| 状态 | 名称 | 负责人 | 截止日期 | 进度 |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+
+        for ms, owner_name in rows:
+            emoji = status_emoji.get(ms.status, "⚪")
+
+            total_q = select(func.count()).where(issue_milestones_table.c.milestone_id == ms.id)
             total = (await self.db.execute(total_q)).scalar() or 0
 
-            return f"## 🏁 {ms.name}\n状态: {ms.status}\n关联问题数: {total}"
+            closed_q = (
+                select(func.count())
+                .where(
+                    issue_milestones_table.c.milestone_id == ms.id,
+                    Issue.id == issue_milestones_table.c.issue_id,
+                    Issue.status.in_(["closed", "resolved"]),
+                )
+            )
+            closed = (await self.db.execute(closed_q)).scalar() or 0
 
-        return f"❌ 未知子命令: {subcmd}"
+            progress = f"{round((closed / total) * 100)}% ({closed}/{total})" if total > 0 else "-"
+            due = ms.due_date or "-"
+            owner = owner_name or "-"
+
+            lines.append(f"| {emoji} | {ms.name} | {owner} | {due} | {progress} |")
+
+        return "\n".join(lines)
+
+    async def _resolve_milestone(self, query_text: str) -> "Milestone | str":
+        """Resolve a milestone by ID prefix or name fuzzy match.
+        Returns the Milestone object on success, or an error message string.
+        """
+        result = await self.db.execute(
+            select(Milestone).where(Milestone.id.startswith(query_text))
+        )
+        ms = result.scalar_one_or_none()
+        if ms:
+            return ms
+
+        result = await self.db.execute(
+            select(Milestone).where(Milestone.name.like(f"%{query_text}%"))
+        )
+        milestones = result.scalars().all()
+        if len(milestones) == 1:
+            return milestones[0]
+        elif len(milestones) > 1:
+            names = "\n".join(f"- {m.name} (ID: {m.id[:8]})" for m in milestones)
+            return f"🔍 找到多个匹配的里程碑:\n{names}"
+        return f"❌ 找不到里程碑: {query_text}"
+
+    async def _milestone_link(self, ms_query_text: str, issue_id: str, link: bool) -> str:
+        """Link or unlink an issue to/from a milestone."""
+        resolved = await self._resolve_milestone(ms_query_text)
+        if isinstance(resolved, str):
+            return resolved
+        ms = resolved
+
+        # Find issue by ID prefix
+        result = await self.db.execute(
+            select(Issue).where(Issue.id.startswith(issue_id))
+        )
+        issue = result.scalar_one_or_none()
+        if not issue:
+            return f"❌ 找不到问题 #{issue_id}"
+
+        # Check current association
+        existing = await self.db.execute(
+            select(issue_milestones_table).where(
+                issue_milestones_table.c.milestone_id == ms.id,
+                issue_milestones_table.c.issue_id == issue.id,
+            )
+        )
+        already_linked = existing.first() is not None
+
+        if link and already_linked:
+            return f"⚠️ 问题 #{issue.id[:8]} 已在里程碑 **{ms.name}** 中"
+        if not link and not already_linked:
+            return f"⚠️ 问题 #{issue.id[:8]} 不在里程碑 **{ms.name}** 中"
+
+        if link:
+            await self.db.execute(
+                issue_milestones_table.insert().values(
+                    issue_id=issue.id, milestone_id=ms.id
+                )
+            )
+            await self.db.commit()
+            return f"✅ 已将 #{issue.id[:8]} 关联到里程碑 **{ms.name}**"
+        else:
+            await self.db.execute(
+                issue_milestones_table.delete().where(
+                    issue_milestones_table.c.milestone_id == ms.id,
+                    issue_milestones_table.c.issue_id == issue.id,
+                )
+            )
+            await self.db.commit()
+            return f"✅ 已将 #{issue.id[:8]} 从里程碑 **{ms.name}** 中移除"
+
+    async def _milestone_view(self, query_text: str) -> str:
+        """View milestone details, progress stats, and associated issues."""
+        from datetime import datetime as dt
+        from datetime import timedelta
+
+        resolved = await self._resolve_milestone(query_text)
+        if isinstance(resolved, str):
+            return resolved
+        ms = resolved
+
+        # Owner name
+        owner_name = "-"
+        if ms.owner_id:
+            owner_name = (await self.db.execute(
+                select(User.display_name).where(User.id == ms.owner_id)
+            )).scalar() or "-"
+
+        # Status distribution (exclude cancelled)
+        status_counts_q = (
+            select(Issue.status, func.count())
+            .join(issue_milestones_table, Issue.id == issue_milestones_table.c.issue_id)
+            .where(issue_milestones_table.c.milestone_id == ms.id, Issue.status != "cancelled")
+            .group_by(Issue.status)
+        )
+        status_counts = dict((await self.db.execute(status_counts_q)).all())
+
+        total = sum(status_counts.values())
+        closed = status_counts.get("closed", 0) + status_counts.get("resolved", 0)
+        progress = round((closed / total) * 100) if total > 0 else 0
+
+        status_emoji = {"open": "🟢", "published": "🔵", "closed": "⚫"}
+        emoji = status_emoji.get(ms.status, "⚪")
+
+        lines = [f"## 🏁 {ms.name}"]
+        lines.append(f"**状态**: {emoji} {ms.status}")
+        lines.append(f"**负责人**: {owner_name}")
+        if ms.due_date:
+            lines.append(f"**截止日期**: {ms.due_date}")
+        if ms.description:
+            lines.append(f"**描述**: {ms.description}")
+        lines.append(f"**进度**: {progress}% ({closed}/{total})")
+
+        status_labels = {
+            "open": "待处理", "proposed": "提议", "in_progress": "进行中",
+            "accepted": "已接受", "resolved": "已解决", "closed": "已关闭",
+        }
+        dist_parts = [f"{status_labels.get(s, s)}: {c}" for s, c in status_counts.items()]
+        if dist_parts:
+            lines.append(f"**分布**: {' / '.join(dist_parts)}")
+
+        lines.append("")
+
+        # Associated issues with time filter (same rules as handle_list)
+        days_limit = 30
+        cutoff_date = (dt.now() - timedelta(days=days_limit)).isoformat()
+
+        issues_q = (
+            select(Issue)
+            .join(issue_milestones_table, Issue.id == issue_milestones_table.c.issue_id)
+            .where(
+                issue_milestones_table.c.milestone_id == ms.id,
+                Issue.status != "cancelled",
+                (Issue.status.in_(["open", "proposed", "in_progress", "accepted"]))
+                | (Issue.updated_at >= cutoff_date),
+            )
+            .order_by(Issue.created_at.desc())
+            .limit(50)
+        )
+        result = await self.db.execute(issues_q)
+        issues = result.scalars().all()
+
+        if issues:
+            status_text = {
+                "open": "[待处理]", "proposed": "[提议]", "in_progress": "[进行中]",
+                "accepted": "[已接受]", "resolved": "[已解决]", "closed": "[已关闭]",
+            }
+            priority_text = {
+                "critical": "🔴紧急", "high": "🟠高", "medium": "中",
+                "low": "低", "trivial": "⚪无关紧要",
+            }
+
+            def _resolve_end(issue) -> dt:
+                if issue.status in ("resolved", "closed") and issue.closed_at:
+                    try:
+                        return dt.fromisoformat(issue.closed_at[:19])
+                    except (ValueError, TypeError):
+                        pass
+                return dt.now()
+
+            def format_row(issue):
+                end = _resolve_end(issue)
+                created = dt.fromisoformat(issue.created_at[:19])
+                seconds = int((end - created).total_seconds())
+                if seconds < 60:
+                    duration = f"{seconds}秒"
+                elif seconds < 3600:
+                    duration = f"{seconds // 60}分"
+                elif seconds < 86400:
+                    duration = f"{seconds // 3600}时"
+                else:
+                    duration = f"{seconds // 86400}天"
+                st = status_text.get(issue.status, f"[{issue.status}]")
+                pt = priority_text.get(issue.priority, issue.priority)
+                title = issue.title[:25] + ".." if len(issue.title) > 25 else issue.title
+                return f"| {st} | #{issue.id[:8]} | {title} | {pt} | {duration} |"
+
+            lines.append(f"### 📋 关联问题 ({len(issues)})")
+            lines.append("| 状态 | ID | 标题 | 优先级 | 耗时 |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for issue in issues:
+                lines.append(format_row(issue))
+        else:
+            lines.append("_暂无关联问题_")
+
+        return "\n".join(lines)
 
     # ─── User Management (admin only) ─────────────────────────
 
