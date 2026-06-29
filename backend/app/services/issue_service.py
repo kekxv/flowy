@@ -89,10 +89,8 @@ async def create_issue(db: AsyncSession, data: IssueCreate, reporter_id: str) ->
         priority=data.priority,
         reporter_id=reporter_id,
     )
-    if data.assignees:
-        user_ids = [a.user_id for a in data.assignees]
-        result = await db.execute(select(User).where(User.id.in_(user_ids)))
-        issue.assignees = list(result.scalars().all())
+    # Don't set issue.assignees via relationship - we'll insert manually below
+    # to include role and assigned_at columns
     if data.label_ids:
         result = await db.execute(select(Label).where(Label.id.in_(data.label_ids)))
         issue.labels = list(result.scalars().all())

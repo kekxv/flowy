@@ -93,6 +93,40 @@ class CommandHandlers:
         result = await self.db.execute(query)
         return [row[0] for row in result.all()]
 
+    async def _resolve_issue(self, query_text: str) -> "Issue | str":
+        """Resolve an issue by ID prefix or title fuzzy match.
+
+        Returns the Issue object on success, or an error message string:
+        - "not_found": no match at all
+        - A formatted string when multiple title matches exist
+        """
+        # Try ID prefix match first
+        result = await self.db.execute(
+            select(Issue).where(Issue.id.startswith(query_text))
+        )
+        issue = result.scalar_one_or_none()
+        if issue:
+            return issue
+
+        # Try title fuzzy match
+        result = await self.db.execute(
+            select(Issue)
+            .where(Issue.title.like(f"%{query_text}%"))
+            .order_by(Issue.updated_at.desc())
+            .limit(10)
+        )
+        issues = result.scalars().all()
+        if len(issues) == 1:
+            return issues[0]
+        elif len(issues) > 1:
+            lines = [f"🔍 找到多个匹配的问题 (请更精确地指定):\n"]
+            for i in issues[:5]:
+                lines.append(f"- #{i.id[:8]} {i.title}")
+            if len(issues) > 5:
+                lines.append(f"- _...还有 {len(issues) - 5} 条_")
+            return "\n".join(lines)
+        return "not_found"
+
     async def handle_help(self, args: list[str], quote: dict, frame: dict = None) -> str:
         chattype = quote.get("chattype", "single")
         chat_hint = "💬 群聊模式" if chattype == "group" else "💬 私聊模式"
@@ -415,23 +449,27 @@ class CommandHandlers:
     async def handle_update(self, args: list[str], quote: dict, frame: dict = None) -> str:
         issue_id = None
 
-        # Try to get issue ID from args or quoted content
+        # Try to get issue reference from args or quoted content
         if args and args[0].startswith("#"):
             issue_id = args[0][1:]
             args = args[1:]
+        elif args and args[0].isdigit():
+            issue_id = args[0]
+            args = args[1:]
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+        elif args:
+            # Treat first arg as potential title search
+            issue_id = args[0]
+            args = args[1:]
 
         if not issue_id or len(args) < 2:
-            return "❌ 用法: `/update <id> <field> <value>` 或引用包含 #ID 的消息"
+            return "❌ 用法: `/update <id或标题> <字段> <值>` 或引用包含 #ID 的消息"
 
-        # Find issue by prefix match
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-
-        if not issue:
-            return f"❌ 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f"❌ 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         field_name = args[0].lower()
         value = " ".join(args[1:])
@@ -474,16 +512,18 @@ class CommandHandlers:
         # Try quoted content
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+        elif args:
+            # Treat first arg as potential title search
+            issue_id = args[0]
+            args = args[1:]
 
         if not issue_id:
-            return "❌ 用法: `/close <id> [原因]` 或引用包含 #ID 的消息"
+            return "❌ 用法: `/close <id或标题> [原因]` 或引用包含 #ID 的消息"
 
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-
-        if not issue:
-            return f"❌ 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f"❌ 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         if issue.status in ("closed", "cancelled"):
             return f"⚠️ 问题 #{issue.id[:8]} 已经是关闭状态"
@@ -510,16 +550,17 @@ class CommandHandlers:
             args = args[1:]
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+        elif args:
+            issue_id = args[0]
+            args = args[1:]
 
         if not issue_id:
-            return "❌ 用法: `/解决 <id> [说明]` 或引用包含 #ID 的消息"
+            return "❌ 用法: `/解决 <id或标题> [说明]` 或引用包含 #ID 的消息"
 
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-
-        if not issue:
-            return f"❌ 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f"❌ 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         if issue.status in ("resolved", "closed", "cancelled"):
             labels = {"resolved": "已解决", "closed": "已关闭", "cancelled": "已取消"}
@@ -545,6 +586,18 @@ class CommandHandlers:
             args = args[1:]
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+
+        # If no issue_id yet, try to resolve first non-@ arg as title search
+        if not issue_id and args and not args[0].startswith("@"):
+            candidate = args[0]
+            resolved = await self._resolve_issue(candidate)
+            if isinstance(resolved, Issue):
+                issue_id = resolved.id
+                args = args[1:]
+            elif isinstance(resolved, str) and resolved != "not_found":
+                # Multiple matches or other error → show to user
+                return resolved
+            # else "not_found" → leave arg as-is, will be treated as assignee_name
 
         # Support @mention as assignee target
         assignee_name = None
@@ -598,7 +651,7 @@ class CommandHandlers:
             return "\n".join(lines)
 
         if not issue_id or not assignee_name:
-            return " 用法: `/assign <id> <用户名>` 或 @某人后发送 /assign"
+            return " 用法: `/assign <id或标题> <用户名>` 或 @某人后发送 /assign"
 
         return await self._complete_assign(issue_id, assignee_name)
 
@@ -610,12 +663,10 @@ class CommandHandlers:
         2. Try matching by Flowy username/display_name
         3. Treat as external WeChat Work user
         """
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-
-        if not issue:
-            return f" 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f" 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         # Step 1: Check if assignee_name is a WeChat Work user ID in bot users table
         bot_user_q = select(WeChatWorkBotUser).where(
@@ -697,7 +748,7 @@ class CommandHandlers:
         """Handle /comment command with image support."""
         issue_id = None
 
-        # Get issue ID from args or quoted content
+        # Get issue reference from args or quoted content
         if args and args[0].startswith("#"):
             issue_id = args[0][1:]
             args = args[1:]
@@ -706,16 +757,18 @@ class CommandHandlers:
             args = args[1:]
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+        elif args:
+            issue_id = args[0]
+            args = args[1:]
 
         if not issue_id:
-            return " 用法: `/comment <id> [内容]` 或引用问题消息后发送 /comment"
+            return " 用法: `/comment <id或标题> [内容]` 或引用问题消息后发送 /comment"
 
         # Find the issue
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-        if not issue:
-            return f" 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f" 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         # Build comment body
         body_parts = []
@@ -832,9 +885,12 @@ class CommandHandlers:
             args = args[1:]
         elif quote.get("extracted_issue_ids"):
             issue_id = str(quote["extracted_issue_ids"][0])
+        elif args and len(args) >= 2:
+            issue_id = args[0]
+            args = args[1:]
 
         if not issue_id or not args:
-            return " 用法: `/priority <id> <紧急|高|中|低|无关紧要>`"
+            return " 用法: `/priority <id或标题> <紧急|高|中|低|无关紧要>`"
 
         # Support both English and Chinese priority names
         priority_map = {
@@ -848,11 +904,10 @@ class CommandHandlers:
         if new_priority not in ("critical", "high", "medium", "low", "trivial"):
             return " 优先级必须是：紧急/高/中/低/无关紧要"
 
-        query = select(Issue).where(Issue.id.startswith(issue_id))
-        result = await self.db.execute(query)
-        issue = result.scalar_one_or_none()
-        if not issue:
-            return f" 找不到问题 #{issue_id}"
+        resolved = await self._resolve_issue(issue_id)
+        if isinstance(resolved, str):
+            return f" 找不到问题: {issue_id}" if resolved == "not_found" else resolved
+        issue = resolved
 
         old_priority = issue.priority
         issue.priority = new_priority

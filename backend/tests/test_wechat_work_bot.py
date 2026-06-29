@@ -271,6 +271,19 @@ class TestBotUpdate:
         result = await handlers.handle_update(["#nonexist", "status", "open"], {})
         assert "找不到" in result
 
+    @pytest.mark.asyncio
+    async def test_update_by_title(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-up5", username="updater5", email="up5@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "Unique title for update", user.id, "open")
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_update(["Unique title", "status", "in_progress"], {})
+        assert "✅" in result
+        await db_session.refresh(issue)
+        assert issue.status == "in_progress"
+
 
 # ── TestBotClose ──────────────────────────────────────────────────────────────
 
@@ -308,6 +321,19 @@ class TestBotClose:
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
 
         result = await handlers.handle_close([], {"extracted_issue_ids": [issue.id[:8]]})
+        assert "已关闭" in result
+        await db_session.refresh(issue)
+        assert issue.status == "closed"
+
+    @pytest.mark.asyncio
+    async def test_close_by_title(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cl4", username="closer4", email="cl4@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "登录页面崩溃", user.id, "open")
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_close(["登录页面崩溃"], {})
         assert "已关闭" in result
         await db_session.refresh(issue)
         assert issue.status == "closed"
@@ -350,6 +376,19 @@ class TestBotResolve:
         result = await handlers.handle_resolve(["#nonexist"], {})
         assert "找不到" in result
 
+    @pytest.mark.asyncio
+    async def test_resolve_by_title(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-rs4", username="resolver4", email="rs4@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "修复支付流程", user.id, "open")
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_resolve(["修复支付流程"], {})
+        assert "已解决" in result
+        await db_session.refresh(issue)
+        assert issue.status == "resolved"
+
 
 # ── TestBotAssign ─────────────────────────────────────────────────────────────
 
@@ -379,6 +418,35 @@ class TestBotAssign:
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
         result = await handlers.handle_assign(["#NOEXIST", "someone"], {})
         assert "找不到" in result
+
+    @pytest.mark.asyncio
+    async def test_assign_by_title(self, db_session: AsyncSession):
+        reporter = User(**_make_user_kwargs(id="user-as4", username="assigner3", email="as4@ex.com"))
+        target = User(**_make_user_kwargs(id="user-as5", username="target2", email="as5@ex.com", display_name="Target2"))
+        db_session.add_all([reporter, target])
+        await db_session.flush()
+        issue = await _create_issue(db_session, "修复登录验证码", reporter.id)
+        handlers = await _make_handlers(db_session, flowy_user_id=reporter.id)
+
+        result = await handlers.handle_assign(["修复登录验证码", "target2"], {})
+        assert "指派" in result
+
+        assignee_q = await db_session.execute(
+            select(issue_assignees).where(issue_assignees.c.issue_id == issue.id)
+        )
+        assert assignee_q.first() is not None
+
+    @pytest.mark.asyncio
+    async def test_resolve_multiple_title_matches(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-rs5", username="resolver5", email="rs5@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        await _create_issue(db_session, "登录页面崩溃", user.id, "open")
+        await _create_issue(db_session, "登录按钮失效", user.id, "open")
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_resolve(["登录"], {})
+        assert "找到多个" in result or "匹配" in result
 
 
 # ── TestBotPriority ───────────────────────────────────────────────────────────
@@ -412,6 +480,19 @@ class TestBotPriority:
         await db_session.refresh(issue)
         assert issue.priority == "critical"
 
+    @pytest.mark.asyncio
+    async def test_priority_by_title(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-pr3", username="prior3", email="pr3@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "首页加载超时", user.id, priority="medium")
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_priority(["首页加载超时", "高"], {})
+        assert "已将" in result
+        await db_session.refresh(issue)
+        assert issue.priority == "high"
+
 
 # ── TestBotComment ────────────────────────────────────────────────────────────
 
@@ -438,6 +519,17 @@ class TestBotComment:
         handlers = CommandHandlers(db=db_session, bot_user=bot_user, wechat_user_id="wx-nobind2")
         result = await handlers.handle_comment([_id(issue), "test"], {})
         assert "绑定" in result
+
+    @pytest.mark.asyncio
+    async def test_comment_by_title(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cm3", username="commenter3", email="cm3@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "数据库连接超时", user.id)
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_comment(["数据库连接超时", "已排查到慢查询"], {})
+        assert "已评论" in result
 
 
 # ── TestBotMilestone ──────────────────────────────────────────────────────────
