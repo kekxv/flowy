@@ -19,9 +19,10 @@ class PaginationParams:
     def _parse_sort(sort: str) -> tuple[str, bool]:
         desc = sort.startswith("-")
         field = sort[1:] if desc else sort
-        allowed = {"created_at", "updated_at", "priority", "status", "title"}
+        allowed = {"created_at", "updated_at", "priority", "status", "title", "status_priority"}
         if field not in allowed:
-            field = "created_at"
+            field = "status_priority"
+            desc = False
         return field, desc
 
     @property

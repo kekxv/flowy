@@ -205,12 +205,12 @@ class CommandHandlers:
         if not all_issues:
             return " 没有找到匹配的问题"
 
-        my_issues = [i for i in all_issues if i.id in assigned_set]
-        other_issues = [i for i in all_issues if i.id not in assigned_set]
+        assigned_set_local = assigned_set
 
         status_text = {
             "open": "[待处理]", "proposed": "[提议]", "in_progress": "[进行中]",
             "accepted": "[已接受]", "resolved": "[已解决]", "closed": "[已关闭]",
+            "cancelled": "[已取消]", "rejected": "[已拒绝]",
         }
         priority_text = {
             "critical": "🔴紧急", "high": "🟠高", "medium": "中", "low": "低", "trivial": "⚪无关紧要",
@@ -225,7 +225,7 @@ class CommandHandlers:
                     pass
             return dt.now()
 
-        def format_row(issue):
+        def format_row(issue, is_mine: bool = False):
             end = _resolve_end(issue)
             created = dt.fromisoformat(issue.created_at[:19])
             seconds = int((end - created).total_seconds())
@@ -240,33 +240,46 @@ class CommandHandlers:
             st = status_text.get(issue.status, f"[{issue.status}]")
             pt = priority_text.get(issue.priority, issue.priority)
             title = issue.title[:25] + ".." if len(issue.title) > 25 else issue.title
-            return f"| {st} | #{issue.id[:8]} | {title} | {pt} | {duration} |"
+            prefix = "★ " if is_mine else ""
+            return f"| {st} | #{issue.id[:8]} | {prefix}{title} | {pt} | {duration} |"
+
+        # Group by status category: 待处理 / 处理中 / 已处理
+        groups = [
+            ("🔴 待处理", ["open", "proposed"]),
+            ("🔵 处理中", ["in_progress", "accepted"]),
+            ("✅ 已处理", ["resolved", "closed", "cancelled", "rejected"]),
+        ]
 
         header = "| 状态 | ID | 标题 | 优先级 | 耗时 |"
         sep = "| --- | --- | --- | --- | --- |"
-        lines = []
+        lines: list[str] = []
 
-        if my_issues:
-            lines.append(f"### 📌 我的问题 ({len(my_issues)})")
+        for group_label, group_statuses in groups:
+            group_issues = [i for i in all_issues if i.status in group_statuses]
+            if not group_issues:
+                continue
+
+            # Within group: my issues first, then others
+            my_in_group = [i for i in group_issues if i.id in assigned_set_local]
+            other_in_group = [i for i in group_issues if i.id not in assigned_set_local]
+
+            lines.append(f"### {group_label} ({len(group_issues)})")
             lines.append(header)
             lines.append(sep)
-            for issue in my_issues:
-                lines.append(format_row(issue))
+            for issue in my_in_group:
+                lines.append(format_row(issue, is_mine=True))
+            for issue in other_in_group:
+                lines.append(format_row(issue, is_mine=False))
             lines.append("")
 
-        if other_issues or not my_issues:
-            title = f"### 📋 所有问题 ({len(other_issues)})" if my_issues else f"### 📋 问题列表 ({len(all_issues)})"
-            lines.append(title)
-            lines.append(header)
-            lines.append(sep)
-            for issue in (other_issues if my_issues else all_issues):
-                lines.append(format_row(issue))
+        if not lines:
+            return " 没有找到匹配的问题"
 
         scope = "全部" if show_all else f"近{days_limit}天"
         if len(all_issues) == 50:
             lines.append(f"> _仅显示最近 50 条 · {scope}_")
 
-        return "\n".join(lines)
+        return "\n".join(lines).rstrip()
     async def handle_stats(self, args: list[str], quote: dict, frame: dict = None) -> str:
         from datetime import datetime as dt
         from datetime import timedelta
@@ -1171,6 +1184,7 @@ class CommandHandlers:
             status_text = {
                 "open": "[待处理]", "proposed": "[提议]", "in_progress": "[进行中]",
                 "accepted": "[已接受]", "resolved": "[已解决]", "closed": "[已关闭]",
+                "cancelled": "[已取消]", "rejected": "[已拒绝]",
             }
             priority_text = {
                 "critical": "🔴紧急", "high": "🟠高", "medium": "中",
@@ -1202,11 +1216,26 @@ class CommandHandlers:
                 title = issue.title[:25] + ".." if len(issue.title) > 25 else issue.title
                 return f"| {st} | #{issue.id[:8]} | {title} | {pt} | {duration} |"
 
-            lines.append(f"### 📋 关联问题 ({len(issues)})")
-            lines.append("| 状态 | ID | 标题 | 优先级 | 耗时 |")
-            lines.append("| --- | --- | --- | --- | --- |")
-            for issue in issues:
-                lines.append(format_row(issue))
+            # Group by status category: 待处理 / 处理中 / 已处理
+            group_defs = [
+                ("🔴 待处理", ["open", "proposed"]),
+                ("🔵 处理中", ["in_progress", "accepted"]),
+                ("✅ 已处理", ["resolved", "closed", "cancelled", "rejected"]),
+            ]
+
+            table_header = "| 状态 | ID | 标题 | 优先级 | 耗时 |"
+            table_sep = "| --- | --- | --- | --- | --- |"
+
+            for group_label, group_statuses in group_defs:
+                group_issues = [i for i in issues if i.status in group_statuses]
+                if not group_issues:
+                    continue
+                lines.append(f"### {group_label} ({len(group_issues)})")
+                lines.append(table_header)
+                lines.append(table_sep)
+                for issue in group_issues:
+                    lines.append(format_row(issue))
+                lines.append("")
         else:
             lines.append("_暂无关联问题_")
 

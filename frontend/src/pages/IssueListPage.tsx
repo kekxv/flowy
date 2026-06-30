@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Plus, ChevronRight, X, UserPlus, Flag } from "lucide-react";
@@ -8,7 +8,15 @@ import { listIssues, type IssueData } from "../api/issues";
 import { ALL_ROLES, STAT, PRIS } from "../constants";
 import Loader from "../components/Loader";
 import { timeAgo } from "../utils/time";
-const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400" })[s]||"";
+const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", proposed:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", accepted:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400", rejected:"border-l-red-400" })[s]||"";
+
+type StatusGroup = {key: string; label: string; emoji: string; color: string; statuses: string[]};
+const STATUS_GROUPS: StatusGroup[] = [
+  { key: "pending", label: "待处理", emoji: "🔴", color: "#f59e0b", statuses: ["open", "proposed"] },
+  { key: "active",  label: "处理中", emoji: "🔵", color: "#3b82f6", statuses: ["in_progress", "accepted"] },
+  { key: "done",    label: "已处理", emoji: "✅", color: "#10b981", statuses: ["resolved", "closed", "cancelled", "rejected"] },
+];
+const getGroup = (s: string): StatusGroup => STATUS_GROUPS.find(g => g.statuses.includes(s)) || STATUS_GROUPS[2]!;
 
 export default function IssueListPage() {
   const { t } = useTranslation();
@@ -31,6 +39,56 @@ export default function IssueListPage() {
   const [myRoles, setMyRoles] = useState<string[]>([]);
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  // Group issues by status category for visual section headers
+  const groupedIssues: Array<{group: StatusGroup, items: IssueData[]}> = [];
+  for (const issue of issues) {
+    const group = getGroup(issue.status);
+    const last = groupedIssues[groupedIssues.length - 1];
+    if (last && last.group.key === group.key) {
+      last.items.push(issue);
+    } else {
+      groupedIssues.push({group, items: [issue]});
+    }
+  }
+
+  const renderRow = (issue: IssueData, idx: number) => (
+    <div key={issue.id} className={`relative group border-l-[3px] ${statusL(issue.status)} ${idx%2?"bg-[var(--bg)]/40":""}`}>
+    <Link to={`/issues/${issue.id}`} className="flex items-center gap-3 px-4 py-3 transition-all duration-150 hover:bg-[var(--bg-hover)]">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 truncate text-[13px] font-medium group-hover:text-[var(--primary)] transition-colors">
+          {activeTimerIds.has(issue.id) && <span className="flex h-1.5 w-1.5 shrink-0"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75"/><span className="relative h-1.5 w-1.5 rounded-full bg-red-500"/></span>}
+          <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600"}`}>{t(`issues.type.${(issue as any).issue_type||"bug"}`)}</span>
+          <span className="truncate">{issue.title}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-muted)]">
+          <span className="font-mono text-[var(--text-muted)]/70">#{issue.id.slice(0,8)}</span>
+          <span>{issue.reporter?.display_name||issue.reporter?.username}</span>
+          <span>{timeAgo(issue.created_at)}</span>
+          {(issue as any).assignees?.length>0 && <><span className="hidden sm:inline text-[var(--border)]">·</span><span className="hidden sm:flex items-center gap-1">
+            {(issue as any).assignees.slice(0,3).map((a:any)=><span key={`${a.id}-${a.role}`} className={`role-badge role-${a.role}`}>{a.display_name||a.username}</span>)}
+            {(issue as any).assignees.length>3 && <span className="text-[var(--text-muted)]">+{(issue as any).assignees.length-3}</span>}
+          </span></>}
+          {issue.labels?.slice(0,2).map((l:any)=><span key={l.id} className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium" style={{backgroundColor:l.color+"14",color:l.color,borderColor:l.color+"30"}}>{l.name}</span>)}
+          {(issue as any).milestone_ids?.length>0 && (issue as any).milestone_ids.map((mid:string)=>{const m=milestones.find(x=>x.id===mid);return m?<span key={mid} className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-medium text-violet-600 border border-violet-200/50"><Flag size={8}/>{m.name}</span>:null;})}
+        </div>
+      </div>
+      <button onClick={e=>{e.stopPropagation();e.preventDefault();setMsPopup({issue});}}
+        className={`flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 ${(issue as any).milestone_ids?.length>0?"bg-violet-50 text-violet-600":"text-[var(--text-muted)]/50 hover:text-violet-500 hover:bg-violet-50"}`}>
+        <Flag size={9}/>{(issue as any).milestone_ids?.length>0?(issue as any).milestone_ids.length:""}
+      </button>
+      <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"priority"});}}
+        className={`priority-${issue.priority} rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105`}>{t(`issues.priority.${issue.priority}`)}</button>
+      <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"status"});}}
+        className={`status-${issue.status} cursor-pointer transition-transform duration-150 hover:scale-105`}>{t(`issues.status.${issue.status}`)}</button>
+      <button onClick={e=>{e.stopPropagation();e.preventDefault();openClaim(issue.id);}}
+        className="hidden sm:flex rounded-full p-1 text-[var(--text-muted)] hover:bg-[var(--primary-light)] hover:text-[var(--primary)] transition-all opacity-0 group-hover:opacity-100">
+        <UserPlus size={13}/>
+      </button>
+      <ChevronRight size={14} className="hidden sm:block shrink-0 text-[var(--text-muted)]/30 transition-all duration-150 group-hover:text-[var(--text-muted)]/60 group-hover:translate-x-0.5" />
+    </Link>
+    </div>
+  );
 
   useEffect(()=>{api.get("/labels").then(r=>setLabels(r.data));api.get("/milestones").then(r=>setMilestones(r.data));},[]);
   // Poll active timers
@@ -133,42 +191,15 @@ export default function IssueListPage() {
       {loading ? <Loader />
       : issues.length===0 ? <div className="card flex flex-col items-center justify-center py-16 rounded-[var(--radius-lg)]"><div className="mb-3 text-4xl">🔍</div><p className="text-[13px] text-[var(--text-muted)]">{t("issues.no_issues")}</p></div>
       : <div className="card overflow-hidden rounded-[var(--radius-lg)]">
-          {issues.map((issue,idx)=>(
-            <div key={issue.id} className={`relative group border-l-[3px] ${statusL(issue.status)} ${idx%2?"bg-[var(--bg)]/40":""}`}>
-            <Link to={`/issues/${issue.id}`} className="flex items-center gap-3 px-4 py-3 transition-all duration-150 hover:bg-[var(--bg-hover)]">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 truncate text-[13px] font-medium group-hover:text-[var(--primary)] transition-colors">
-                  {activeTimerIds.has(issue.id) && <span className="flex h-1.5 w-1.5 shrink-0"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75"/><span className="relative h-1.5 w-1.5 rounded-full bg-red-500"/></span>}
-                  <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600"}`}>{t(`issues.type.${(issue as any).issue_type||"bug"}`)}</span>
-                  <span className="truncate">{issue.title}</span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-muted)]">
-                  <span className="font-mono text-[var(--text-muted)]/70">#{issue.id.slice(0,8)}</span>
-                  <span>{issue.reporter?.display_name||issue.reporter?.username}</span>
-                  <span>{timeAgo(issue.created_at)}</span>
-                  {(issue as any).assignees?.length>0 && <><span className="hidden sm:inline text-[var(--border)]">·</span><span className="hidden sm:flex items-center gap-1">
-                    {(issue as any).assignees.slice(0,3).map((a:any)=><span key={`${a.id}-${a.role}`} className={`role-badge role-${a.role}`}>{a.display_name||a.username}</span>)}
-                    {(issue as any).assignees.length>3 && <span className="text-[var(--text-muted)]">+{(issue as any).assignees.length-3}</span>}
-                  </span></>}
-                  {issue.labels?.slice(0,2).map((l:any)=><span key={l.id} className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium" style={{backgroundColor:l.color+"14",color:l.color,borderColor:l.color+"30"}}>{l.name}</span>)}
-                  {(issue as any).milestone_ids?.length>0 && (issue as any).milestone_ids.map((mid:string)=>{const m=milestones.find(x=>x.id===mid);return m?<span key={mid} className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-medium text-violet-600 border border-violet-200/50"><Flag size={8}/>{m.name}</span>:null;})}
-                </div>
+          {groupedIssues.map(({group, items}, gi) => (
+            <Fragment key={gi}>
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--bg)] border-t border-[var(--border)] first:border-t-0">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{backgroundColor: group.color}}/>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{group.label}</span>
+                <span className="text-[10px] text-[var(--text-muted)]/60">{items.length}</span>
               </div>
-              <button onClick={e=>{e.stopPropagation();e.preventDefault();setMsPopup({issue});}}
-                className={`flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 ${(issue as any).milestone_ids?.length>0?"bg-violet-50 text-violet-600":"text-[var(--text-muted)]/50 hover:text-violet-500 hover:bg-violet-50"}`}>
-                <Flag size={9}/>{(issue as any).milestone_ids?.length>0?(issue as any).milestone_ids.length:""}
-              </button>
-              <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"priority"});}}
-                className={`priority-${issue.priority} rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105`}>{t(`issues.priority.${issue.priority}`)}</button>
-              <button onClick={e=>{e.stopPropagation();e.preventDefault();setPopup({issue,type:"status"});}}
-                className={`status-${issue.status} cursor-pointer transition-transform duration-150 hover:scale-105`}>{t(`issues.status.${issue.status}`)}</button>
-              <button onClick={e=>{e.stopPropagation();e.preventDefault();openClaim(issue.id);}}
-                className="hidden sm:flex rounded-full p-1 text-[var(--text-muted)] hover:bg-[var(--primary-light)] hover:text-[var(--primary)] transition-all opacity-0 group-hover:opacity-100">
-                <UserPlus size={13}/>
-              </button>
-              <ChevronRight size={14} className="hidden sm:block shrink-0 text-[var(--text-muted)]/30 transition-all duration-150 group-hover:text-[var(--text-muted)]/60 group-hover:translate-x-0.5" />
-            </Link>
-            </div>
+              {items.map((issue, idx) => renderRow(issue, idx))}
+            </Fragment>
           ))}
         </div>}
 

@@ -71,7 +71,7 @@ async def list_issues(
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
-    sort: str = Query(default="-created_at"),
+    sort: str = Query(default="status_priority"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):

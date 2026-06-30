@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,8 +57,24 @@ async def list_issues(
             or_(Issue.title.ilike(search), Issue.description.ilike(search))
         )
 
-    order_col = getattr(Issue, pagination.order_by)
-    query = query.order_by(order_col.desc() if pagination.order_desc else order_col.asc())
+    if pagination.order_by == "status_priority":
+        # Group statuses by action needed:
+        #   1 = 待处理 (open, proposed) — needs action
+        #   2 = 处理中 (in_progress, accepted) — in progress
+        #   3 = 已处理 (resolved, closed, cancelled, rejected) — done
+        status_order = case(
+            (Issue.status.in_(["open", "proposed"]), 1),
+            (Issue.status.in_(["in_progress", "accepted"]), 2),
+            (Issue.status.in_(["resolved", "closed", "cancelled", "rejected"]), 3),
+            else_=4,
+        )
+        if pagination.order_desc:
+            query = query.order_by(status_order.desc(), Issue.created_at.desc())
+        else:
+            query = query.order_by(status_order.asc(), Issue.created_at.desc())
+    else:
+        order_col = getattr(Issue, pagination.order_by)
+        query = query.order_by(order_col.desc() if pagination.order_desc else order_col.asc())
 
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
