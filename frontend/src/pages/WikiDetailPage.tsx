@@ -177,7 +177,7 @@ export default function WikiDetailPage() {
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, _isImage: boolean) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -316,7 +316,7 @@ export default function WikiDetailPage() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => handleFileUpload(e, true)}
+                    onChange={(e) => handleFileUpload(e)}
                   />
                   <button
                     type="button"
@@ -332,7 +332,7 @@ export default function WikiDetailPage() {
                     type="file"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.zip,.rar"
                     className="hidden"
-                    onChange={(e) => handleFileUpload(e, false)}
+                    onChange={(e) => handleFileUpload(e)}
                   />
                   <button
                     type="button"
