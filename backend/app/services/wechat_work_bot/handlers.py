@@ -41,6 +41,8 @@ class CommandHandlers:
         self.wechat_user_id = wechat_user_id
         self.client = client
         self.frame = frame
+        # Set by handlers to pass pending selection data back to service
+        self.pending_wiki_results: list[str] | None = None
 
     # ─── General ──────────────────────────────────────────────
 
@@ -1493,75 +1495,15 @@ class CommandHandlers:
             )
             related_user_ids = [row[0] for row in result.all() if row[0] != user_id]
 
-        search_result = await wiki_service.search_for_bot(
-            self.db, keyword, user_id, related_user_ids
+        # Use fuzzy search
+        pages = await wiki_service.fuzzy_search(
+            self.db, keyword, user_id, related_user_ids, limit=10
         )
-        related_pages = search_result["related"]
-        public_pages = search_result["public"]
 
-        if not related_pages and not public_pages:
-            return f"🔍 未找到与 \"{keyword}\" 相关的知识库页面"
+        if not pages:
+            return f"❌ 未找到与「{keyword}」相关的知识库页面"
 
-        import re
-
-        def _extract_text_preview(content: str, max_len: int = 150) -> str:
-            """Extract plain text preview from markdown, stripping images/files."""
-            if not content:
-                return ""
-            # Remove images: ![alt](url)
-            text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', content)
-            # Remove file links: [filename](/api/v1/wiki/files/...)
-            text = re.sub(r'\[([^\]]+)\]\(/api/v1/wiki/files/[^)]+\)', '', text)
-            # Remove other markdown: links, bold, italic, headers
-            text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
-            text = re.sub(r'[*_#>`\-|]', '', text)
-            text = re.sub(r'\n+', ' ', text).strip()
-            return (text[:max_len] + "...") if len(text) > max_len else text
-
-        def _extract_images(content: str) -> list[str]:
-            """Extract image URLs from markdown content."""
-            if not content:
-                return []
-            return re.findall(r'!\[[^\]]*\]\(([^)]+)\)', content)
-
-        def _extract_files(content: str) -> list[tuple[str, str]]:
-            """Extract file links (name, url) from wiki content."""
-            if not content:
-                return []
-            # Match [filename](/api/v1/wiki/files/...) but not images
-            return re.findall(r'\[([^\]]+)\]\((/api/v1/wiki/files/[^)]+)\)', content)
-
-        def _format_page_detail(p, idx: int | None = None) -> list[str]:
-            """Format a wiki page with text preview + images + files."""
-            owner_name = p.owner.display_name or p.owner.username if p.owner else "未知"
-            prefix = f"{idx}. " if idx else "- "
-            result = [f"{prefix}**{p.title}** _({owner_name})_"]
-
-            text_preview = _extract_text_preview(p.content, 150)
-            if text_preview:
-                result.append(f"   _{text_preview}_")
-
-            images = _extract_images(p.content)
-            if images:
-                img_lines = []
-                for url in images[:3]:
-                    img_lines.append(f"![img]({url})")
-                result.append("   " + " ".join(img_lines))
-                if len(images) > 3:
-                    result.append(f"   _...还有 {len(images) - 3} 张图片_")
-
-            files = _extract_files(p.content)
-            # Filter out image urls from files list
-            files = [(name, url) for name, url in files if not any(name.lower().endswith(ext) for ext in ('.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp'))]
-            if files:
-                file_links = [f"[{name}]({url})" for name, url in files[:3]]
-                result.append(f"   📎 {' · '.join(file_links)}")
-                if len(files) > 3:
-                    result.append(f"   _...还有 {len(files) - 3} 个文件_")
-
-            return result
-
-        # Replace local wiki file paths with public URLs for inline display in WeChat Work markdown
+        # Convert local wiki file paths to public URLs for inline display
         from app.utils.settings import get_frontend_url
         try:
             public_url = await get_frontend_url(self.db)
@@ -1576,28 +1518,25 @@ class CommandHandlers:
             return _re.sub(
                 r'\(/api/v1/wiki/files/',
                 f'({public_url}/api/v1/wiki/files/',
-                content
+                content,
             )
 
-        lines = [f"🔍 **搜索: {keyword}**\n"]
+        # Single result: return title + full content directly
+        if len(pages) == 1:
+            p = pages[0]
+            content = _make_public_url(p.content or "_暂无内容_")
+            return f"**{p.title}**\n\n{content}"
 
-        if related_pages:
-            lines.append("**📎 关联人员知识库:**")
-            for p in related_pages[:5]:
-                lines.extend(_format_page_detail(p))
-            if len(related_pages) > 5:
-                lines.append(f"  _...还有 {len(related_pages) - 5} 条_")
+        # Multiple results: numbered list for user selection
+        lines = [f"📚 找到 {len(pages)} 条与「{keyword}」相关的知识库页面：\n"]
+        for i, p in enumerate(pages, 1):
+            owner_name = p.owner.display_name or p.owner.username if p.owner else "未知"
+            visibility = "🌐" if p.is_public else "🔒"
+            lines.append(f"{i}. {visibility} **{p.title}** _({owner_name})_")
 
-        if public_pages:
-            lines.append("")
-            lines.append("**🌐 公共知识库:** _(回复编号确认采用)_")
-            for i, p in enumerate(public_pages[:5], 1):
-                lines.extend(_format_page_detail(p, idx=i))
-            if len(public_pages) > 5:
-                lines.append(f"   _...还有 {len(public_pages) - 5} 条_")
+        lines.append("\n> _回复序号查看详细内容_")
 
-        response = "\n".join(lines)
-        # Convert local file paths to public URLs for inline image display
-        response = _make_public_url(response)
+        # Store pending results for numeric selection
+        self.pending_wiki_results = [p.id for p in pages]
 
-        return response
+        return "\n".join(lines)

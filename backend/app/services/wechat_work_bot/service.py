@@ -27,6 +27,49 @@ from app.services.wechat_work_bot.message_parser import MessageParser
 
 logger = logging.getLogger("uvicorn")
 
+# WeChat Work markdown message size limit (bytes)
+WECOM_MSG_MAX_BYTES = 20480
+
+
+def split_for_wecom(text: str, max_bytes: int = WECOM_MSG_MAX_BYTES) -> list[str]:
+    """Split text into chunks that fit WeChat Work message size limit.
+
+    Merges paragraphs together as much as possible without exceeding max_bytes.
+    Single paragraphs that exceed the limit are hard-split by byte boundary.
+    """
+    if len(text.encode("utf-8")) <= max_bytes:
+        return [text]
+
+    paragraphs = text.split("\n\n")
+    chunks: list[str] = []
+    current = ""
+
+    for para in paragraphs:
+        candidate = f"{current}\n\n{para}".strip() if current else para
+        if len(candidate.encode("utf-8")) <= max_bytes:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            # Single paragraph too long: hard-split by bytes
+            if len(para.encode("utf-8")) > max_bytes:
+                encoded = para.encode("utf-8")
+                pos = 0
+                while pos < len(encoded):
+                    end = min(pos + max_bytes, len(encoded))
+                    chunk = encoded[pos:end].decode("utf-8", errors="ignore")
+                    if chunk:
+                        chunks.append(chunk)
+                    pos = end
+                current = ""
+            else:
+                current = para
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
 
 class WeChatWorkBotService:
     """Manages the WeChat Work bot lifecycle and message processing."""
@@ -40,6 +83,8 @@ class WeChatWorkBotService:
         self._ai_config: dict | None = None
         # Pending assignments: wechat_user_id -> {assignee_name, issues: [(id, title), ...]}
         self._pending_assignments: dict[str, dict] = {}
+        # Pending wiki selection: wechat_user_id -> [page_ids]
+        self._pending_wiki: dict[str, list[str]] = {}
 
     async def start(self, bot_id: str, secret: str, ai_enabled: bool = False, ai_config: dict | None = None) -> None:
         """Start the bot with given credentials."""
@@ -144,6 +189,50 @@ class WeChatWorkBotService:
                             await self._client.reply_text(frame, f"❌ 无效序号，请输入 1-{len(issues)}")
                         return
 
+            # 2.6. Check for pending wiki selection numeric reply
+            if wechat_user_id in self._pending_wiki:
+                text = msg_ctx.text.strip()
+                if text.isdigit():
+                    page_ids = self._pending_wiki[wechat_user_id]
+                    idx = int(text) - 1
+                    if 0 <= idx < len(page_ids):
+                        from app.services import wiki_service
+                        page = await wiki_service.get_page_by_id(db, page_ids[idx])
+                        if page:
+                            # Convert local file paths to public URLs
+                            import re as _re
+
+                            from app.utils.settings import get_frontend_url
+                            try:
+                                public_url = await get_frontend_url(db)
+                            except Exception:
+                                public_url = ""
+                            content = page.content or "_暂无内容_"
+                            if public_url:
+                                content = _re.sub(
+                                    r'\(/api/v1/wiki/files/',
+                                    f'({public_url}/api/v1/wiki/files/',
+                                    content,
+                                )
+                            response = f"**{page.title}**\n\n{content}"
+                            # Split into chunks if too long
+                            if self._client:
+                                for chunk in split_for_wecom(response):
+                                    await self._client.reply_markdown(frame, chunk)
+                            await self._log_command(
+                                db, wechat_user_id, bot_user.id if bot_user else None,
+                                "wiki", [str(idx + 1)], response, "success", None
+                            )
+                        else:
+                            if self._client:
+                                await self._client.reply_text(frame, "❌ 该页面不存在或已被删除")
+                        del self._pending_wiki[wechat_user_id]
+                        return
+                    else:
+                        if self._client:
+                            await self._client.reply_text(frame, f"❌ 无效序号，请输入 1-{len(page_ids)}")
+                        return
+
             # 3. Parse command
             parsed = await cmd_parser.parse(msg_ctx)
 
@@ -203,8 +292,15 @@ class WeChatWorkBotService:
 
             try:
                 response = await handler_func(parsed.args, parsed.quote_context, frame)
+
+                # Transfer pending wiki results from handler to service
+                if handlers.pending_wiki_results:
+                    self._pending_wiki[wechat_user_id] = handlers.pending_wiki_results
+
                 if self._client:
-                    await self._client.reply_markdown(frame, response, mentioned)
+                    # Split long messages for WeChat Work limit
+                    for chunk in split_for_wecom(response):
+                        await self._client.reply_markdown(frame, chunk, mentioned)
                 await self._log_command(
                     db, wechat_user_id, bot_user.id if bot_user else None, command_name,
                     parsed.args, response, "success", None

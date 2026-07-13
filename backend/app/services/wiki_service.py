@@ -309,6 +309,104 @@ def can_view(page: WikiPage, user_id: str) -> bool:
 # ─── Bot Search ──────────────────────────────────────────────
 
 
+def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
+    """Calculate relevance score for a wiki page against search tokens.
+
+    Scoring:
+    - Title exact match (all tokens): 100 per token
+    - Title contains token: 50 per token
+    - Tags contain token: 30 per token
+    - Content contains token: 10 per token
+    - Weight bonus: page.weight * 2
+    """
+    score = 0
+    title_lower = page.title.lower()
+    content_lower = (page.content or "").lower()
+    tags_lower = (page.tags or "").lower()
+
+    for token in tokens:
+        token_lower = token.lower()
+        if title_lower == token_lower:
+            score += 100
+        elif token_lower in title_lower:
+            score += 50
+        if token_lower in tags_lower:
+            score += 30
+        if token_lower in content_lower:
+            score += 10
+
+    # Weight bonus
+    score += page.weight * 2
+    return score
+
+
+async def fuzzy_search(
+    db: AsyncSession,
+    keyword: str,
+    user_id: str,
+    related_user_ids: list[str] | None = None,
+    limit: int = 10,
+) -> list[WikiPage]:
+    """Fuzzy search wiki pages, ranked by relevance.
+
+    Searches both related users' wiki and public wiki.
+    Returns pages sorted by relevance score (title match > tags > content).
+    """
+    if not keyword or not keyword.strip():
+        return []
+
+    # Split keyword into tokens (support Chinese and space-separated)
+    import re
+    tokens = [t.strip() for t in re.split(r'[\s,，、]+', keyword) if t.strip()]
+    if not tokens:
+        return []
+
+    # Build visibility filter: related users' pages + public pages
+    own_filter = WikiPage.owner_id == user_id
+    related_filter = WikiPage.owner_id.in_(related_user_ids) if related_user_ids else None
+    public_filter = WikiPage.is_public == True  # noqa: E712
+    collab_filter = WikiPage.id.in_(
+        select(wiki_collaborators_table.c.wiki_id).where(
+            wiki_collaborators_table.c.user_id == user_id
+        )
+    )
+
+    visibility_conditions = [own_filter, public_filter, collab_filter]
+    if related_filter is not None:
+        visibility_conditions.append(related_filter)
+    visibility = or_(*visibility_conditions)
+
+    # Build search filter: any token matches any field
+    token_filters = []
+    for token in tokens:
+        pattern = f"%{token}%"
+        token_filters.append(
+            or_(
+                WikiPage.title.ilike(pattern),
+                WikiPage.content.ilike(pattern),
+                WikiPage.tags.ilike(pattern),
+            )
+        )
+    # At least one token must match
+    search_filter = or_(*token_filters)
+
+    # Fetch all matching pages
+    result = await db.execute(
+        select(WikiPage)
+        .where(visibility, search_filter)
+        .options(selectinload(WikiPage.owner))
+        .order_by(WikiPage.weight.desc(), WikiPage.updated_at.desc())
+        .limit(50)  # Fetch more to re-rank
+    )
+    pages = list(result.scalars().all())
+
+    # Score and sort by relevance
+    scored = [(p, _relevance_score(p, tokens)) for p in pages]
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    return [p for p, _score in scored[:limit]]
+
+
 async def search_for_bot(
     db: AsyncSession,
     keyword: str,
