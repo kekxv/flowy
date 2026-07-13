@@ -49,7 +49,7 @@ export default function WikiListPage() {
 
   const getPreview = (content: string, maxLen = 120) => {
     if (!content) return t("wiki.empty_content", "No content");
-    const plain = content.replace(/[#*`>\-\[\]()!|]/g, "").trim();
+    const plain = content.replace(/[#*>[\]()!|-]/g, "").trim();
     return plain.length > maxLen ? plain.slice(0, maxLen) + "..." : plain;
   };
 
