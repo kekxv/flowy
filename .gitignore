@@ -51,3 +51,4 @@ docker-compose.override.yml
 # Alembic
 backend/alembic/__pycache__/
 /backend/static/bot_attachments/
+/backend/static/wiki_attachments/

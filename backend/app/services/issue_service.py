@@ -58,15 +58,21 @@ async def list_issues(
         )
 
     if pagination.order_by == "status_priority":
-        # Group statuses by action needed:
-        #   1 = 待处理 (open, proposed) — needs action
-        #   2 = 处理中 (in_progress, accepted) — in progress
-        #   3 = 已处理 (resolved, closed, cancelled, rejected) — done
+        # Group statuses by workflow order:
+        #   1 = 待处理 (open)
+        #   2 = 进行中 (in_progress)
+        #   3 = 待审核 (proposed, accepted)
+        #   4 = 已解决 (resolved)
+        #   5 = 已关闭 (closed)
+        #   6 = 已结束 (cancelled, rejected)
         status_order = case(
-            (Issue.status.in_(["open", "proposed"]), 1),
-            (Issue.status.in_(["in_progress", "accepted"]), 2),
-            (Issue.status.in_(["resolved", "closed", "cancelled", "rejected"]), 3),
-            else_=4,
+            (Issue.status == "open", 1),
+            (Issue.status == "in_progress", 2),
+            (Issue.status.in_(["proposed", "accepted"]), 3),
+            (Issue.status == "resolved", 4),
+            (Issue.status == "closed", 5),
+            (Issue.status.in_(["cancelled", "rejected"]), 6),
+            else_=7,
         )
         if pagination.order_desc:
             query = query.order_by(status_order.desc(), Issue.created_at.desc())

@@ -5,3 +5,4 @@ from app.models.settings import AppSetting
 from app.models.tracking import IssueAssigneeLog, Milestone, TimeEntry, UserProjectRole
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotConfig, WeChatWorkBotLog, WeChatWorkBotUser
+from app.models.wiki import WikiPage, wiki_collaborators_table

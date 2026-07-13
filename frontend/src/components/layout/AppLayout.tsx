@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, ListTodo, Flag, Tags, Shield, Settings, Bell, Globe, LogOut, Menu, X, ChevronRight, Bot } from "lucide-react";
+import { LayoutDashboard, ListTodo, Flag, Tags, Shield, Settings, Bell, Globe, LogOut, Menu, X, ChevronRight, Bot, BookOpen } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 function useNavItems() {
@@ -11,6 +11,7 @@ function useNavItems() {
     { to: "/dashboard", label: t("dashboard.title"), icon: LayoutDashboard },
     { to: "/issues", label: t("issues.title"), icon: ListTodo },
     { to: "/milestones", label: t("milestone.title"), icon: Flag },
+    { to: "/wiki", label: t("wiki.title", "Knowledge Base"), icon: BookOpen },
   ];
   if (user?.role === "admin") {
     items.push({ to: "/labels", label: t("common.labels"), icon: Tags });

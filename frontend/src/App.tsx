@@ -19,6 +19,9 @@ const AdminPage = lazy(() => import("./pages/AdminPage"))
 const MilestonesPage = lazy(() => import("./pages/MilestonesPage"))
 const MilestoneDetailPage = lazy(() => import("./pages/MilestoneDetailPage"))
 const WeChatWorkBotPage = lazy(() => import("./pages/WeChatWorkBotPage"))
+const WikiListPage = lazy(() => import("./pages/WikiListPage"))
+const WikiCreatePage = lazy(() => import("./pages/WikiCreatePage"))
+const WikiDetailPage = lazy(() => import("./pages/WikiDetailPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -47,6 +50,9 @@ function App() {
                       <Route path="/labels" element={<LabelsPage />} />
                       <Route path="/milestones" element={<MilestonesPage />} />
                       <Route path="/milestones/:id" element={<MilestoneDetailPage />} />
+                      <Route path="/wiki" element={<WikiListPage />} />
+                      <Route path="/wiki/new" element={<WikiCreatePage />} />
+                      <Route path="/wiki/:id" element={<WikiDetailPage />} />
                       <Route path="/profile" element={<UserProfilePage />} />
                       <Route path="/settings/notifications" element={<NotificationsPage />} />
                       <Route path="/settings/wechat-work-bot" element={<WeChatWorkBotPage />} />

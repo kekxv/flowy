@@ -14,11 +14,11 @@ export type Role = typeof ALL_ROLES[number];
 export const STAT = [
   "open",
   "in_progress",
+  "proposed",
+  "accepted",
   "resolved",
   "closed",
   "cancelled",
-  "proposed",
-  "accepted",
   "rejected",
 ] as const;
 

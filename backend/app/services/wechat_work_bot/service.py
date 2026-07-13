@@ -123,7 +123,7 @@ class WeChatWorkBotService:
                         issue_id = issues[idx][0]
                         assignee_name = pending.get("assignee_name", "")
                         # Complete the assignment
-                        handlers = CommandHandlers(db, bot_user, wechat_user_id)
+                        handlers = CommandHandlers(db, bot_user, wechat_user_id, client=self._client, frame=frame)
                         try:
                             response = await handlers._complete_assign(issue_id, assignee_name)
                             if self._client:
@@ -186,7 +186,7 @@ class WeChatWorkBotService:
                 return
 
             # 6. Execute handler
-            handlers = CommandHandlers(db, bot_user, wechat_user_id)
+            handlers = CommandHandlers(db, bot_user, wechat_user_id, client=self._client, frame=frame)
             handler_name = cmd_def.get("handler", "")
             handler_func = getattr(handlers, handler_name, None)
 

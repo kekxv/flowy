@@ -246,6 +246,29 @@ class WeChatWorkBotClient:
             except Exception as e2:
                 logger.error(f"Failed to reply markdown via HTTP: {e2}")
 
+    async def reply_media(self, frame: dict, file_path: str) -> None:
+        """Reply with a media file (image/video/file) via the SDK."""
+        if not self._ws_client:
+            logger.warning("Bot client not running, cannot reply media")
+            return
+        try:
+            ws_frame = frame.get("_ws_frame", frame)
+            await self._ws_client.reply_media(ws_frame, file_path)
+            logger.info(f"Sent media reply: {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to reply media: {e}")
+
+    async def send_media_message(self, chatid: str, file_path: str) -> None:
+        """Send a media file to a specific chat."""
+        if not self._ws_client:
+            logger.warning("Bot client not running, cannot send media")
+            return
+        try:
+            await self._ws_client.send_media_message(chatid, file_path)
+            logger.info(f"Sent media to {chatid}: {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to send media: {e}")
+
     async def reply_stream(self, frame: dict, text: str, finish: bool = True) -> None:
         """Reply with streaming text."""
         if not self._ws_client:

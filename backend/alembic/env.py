@@ -21,6 +21,7 @@ from app.models.tracking import (  # noqa: F401
     UserProjectRole,
 )
 from app.models.user import User  # noqa: F401
+from app.models.wiki import WikiPage, wiki_collaborators_table  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

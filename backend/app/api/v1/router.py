@@ -15,6 +15,7 @@ from app.api.v1 import (
     sync,
     users,
     wechat_work_bot,
+    wiki,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -32,3 +33,4 @@ api_router.include_router(settings_api.router)
 api_router.include_router(notifications.router)
 api_router.include_router(wechat_work_bot.router)
 api_router.include_router(bot_attachments.router)
+api_router.include_router(wiki.router)

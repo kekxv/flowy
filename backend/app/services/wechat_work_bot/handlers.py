@@ -28,10 +28,19 @@ logger = logging.getLogger("uvicorn")
 class CommandHandlers:
     """Handles all bot commands. Each handler returns a markdown string."""
 
-    def __init__(self, db: AsyncSession, bot_user: WeChatWorkBotUser | None = None, wechat_user_id: str = ""):
+    def __init__(
+        self,
+        db: AsyncSession,
+        bot_user: WeChatWorkBotUser | None = None,
+        wechat_user_id: str = "",
+        client: object | None = None,
+        frame: dict | None = None,
+    ):
         self.db = db
         self.bot_user = bot_user
         self.wechat_user_id = wechat_user_id
+        self.client = client
+        self.frame = frame
 
     # ─── General ──────────────────────────────────────────────
 
@@ -131,7 +140,7 @@ class CommandHandlers:
         chattype = quote.get("chattype", "single")
         chat_hint = "💬 群聊模式" if chattype == "group" else "💬 私聊模式"
 
-        return f"""##  Flowy 机器人指令
+        return rf"""##  Flowy 机器人指令
 > {chat_hint}
 
 ### 🔍 查询类
@@ -139,6 +148,7 @@ class CommandHandlers:
 | --- | --- |
 | `/list` `/列表` [status] | 问题列表 |
 | `/stats` `/统计` | 问题统计 |
+| `/wiki` `/知识库` [关键词] | 搜索知识库 |
 
 ### ✏️ 操作类
 | 指令 | 说明 |
@@ -150,6 +160,7 @@ class CommandHandlers:
 | `/assign` `/指派` <id> <用户名> | 指派问题 |
 | `/priority` `/优先级` <id> <级别> | 调整优先级 |
 | `/comment` `/评论` <id> [内容] | 评论问题 |
+| `/wiki add` `<标题> \| <内容>` | 快速添加知识库页面 |
 
 ### 🎯 里程碑
 | 指令 | 说明 |
@@ -243,11 +254,15 @@ class CommandHandlers:
             prefix = "★ " if is_mine else ""
             return f"| {st} | #{issue.id[:8]} | {prefix}{title} | {pt} | {duration} |"
 
-        # Group by status category: 待处理 / 处理中 / 已处理
+        # Group by status in desired order:
+        # 待处理 → 进行中 → 待审核 → 已解决 → 已关闭 → (终态)
         groups = [
-            ("🔴 待处理", ["open", "proposed"]),
-            ("🔵 处理中", ["in_progress", "accepted"]),
-            ("✅ 已处理", ["resolved", "closed", "cancelled", "rejected"]),
+            ("🔴 待处理", ["open"]),
+            ("🔵 进行中", ["in_progress"]),
+            ("🟡 待审核", ["proposed", "accepted"]),
+            ("✅ 已解决", ["resolved"]),
+            ("⬛ 已关闭", ["closed"]),
+            ("⚪ 已结束", ["cancelled", "rejected"]),
         ]
 
         header = "| 状态 | ID | 标题 | 优先级 | 耗时 |"
@@ -1395,3 +1410,194 @@ class CommandHandlers:
             f"角色: {role_label}\n\n"
             f"发送 `/help` 查看可用指令"
         )
+
+    # ─── Wiki / Knowledge Base ──────────────────────────────────
+
+    async def handle_wiki(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Handle /wiki command — search, list, or add wiki pages.
+
+        Usage:
+        - /wiki — list recent wiki pages
+        - /wiki add 标题 | 内容 — quick add a private wiki page
+        - /wiki 关键词 — search wiki
+        """
+        from app.services import wiki_service
+
+        if not self.bot_user or not self.bot_user.flowy_user_id:
+            return "⚠️ 请先使用 `/bind` 绑定 Flowy 账号"
+
+        user_id = self.bot_user.flowy_user_id
+
+        # No args: list recent pages
+        if not args:
+            import re as _re
+            pages = await wiki_service.get_recent_pages_for_bot(self.db, user_id, limit=10)
+            if not pages:
+                return "📚 暂无知识库页面\n\n使用 `/wiki add 标题 | 内容` 快速添加"
+            lines = ["📚 **最近的知识库页面**\n"]
+            for p in pages:
+                visibility = "🌐" if p.is_public else "🔒"
+                # Plain text preview
+                text = _re.sub(r'!\[[^\]]*\]\([^)]+\)', '', p.content or "")
+                text = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+                text = _re.sub(r'[*_#>`\-|]', '', text)
+                text = _re.sub(r'\n+', ' ', text).strip()
+                preview = (text[:80] + "...") if len(text) > 80 else text
+                lines.append(f"{visibility} **{p.title}**")
+                if preview:
+                    lines.append(f"  _{preview}_")
+                # Show attachments count
+                img_count = len(_re.findall(r'!\[[^\]]*\]\([^)]+\)', p.content or ""))
+                file_count = len(_re.findall(r'\[[^\]]+\]\(/api/v1/wiki/files/[^)]+\)', p.content or "")) - img_count
+                if img_count or file_count:
+                    parts = []
+                    if img_count:
+                        parts.append(f"🖼{img_count}图")
+                    if file_count:
+                        parts.append(f"📎{file_count}文件")
+                    lines.append(f"  _({'  '.join(parts)})_")
+            return "\n".join(lines)
+
+        # /wiki add 标题 | 内容
+        if args[0] == "add":
+            raw = " ".join(args[1:])
+            if "|" not in raw:
+                return "❌ 用法: `/wiki add 标题 | 内容`\n\n例: `/wiki add Docker常用命令 | docker ps -a 查看所有容器`"
+            parts = raw.split("|", 1)
+            title = parts[0].strip()
+            content = parts[1].strip() if len(parts) > 1 else ""
+            if not title:
+                return "❌ 标题不能为空"
+            page = await wiki_service.create_page(self.db, owner_id=user_id, title=title, content=content)
+            return f"✅ 知识库页面已创建\n\n**{page.title}**\n🔒 私密\n\n使用 `/wiki {title}` 搜索"
+
+        # /wiki 关键词 — search
+        keyword = " ".join(args)
+
+        # Get related user IDs: find issues this user is involved with
+        related_user_ids: list[str] = []
+        # Find issues where the user is an assignee
+        from app.models.issue import issue_assignees
+        result = await self.db.execute(
+            select(issue_assignees.c.issue_id).where(
+                issue_assignees.c.user_id == user_id
+            ).limit(20)
+        )
+        issue_ids = [row[0] for row in result.all()]
+        if issue_ids:
+            # Get all assignees of those issues
+            result = await self.db.execute(
+                select(issue_assignees.c.user_id).where(
+                    issue_assignees.c.issue_id.in_(issue_ids)
+                ).distinct()
+            )
+            related_user_ids = [row[0] for row in result.all() if row[0] != user_id]
+
+        search_result = await wiki_service.search_for_bot(
+            self.db, keyword, user_id, related_user_ids
+        )
+        related_pages = search_result["related"]
+        public_pages = search_result["public"]
+
+        if not related_pages and not public_pages:
+            return f"🔍 未找到与 \"{keyword}\" 相关的知识库页面"
+
+        import re
+
+        def _extract_text_preview(content: str, max_len: int = 150) -> str:
+            """Extract plain text preview from markdown, stripping images/files."""
+            if not content:
+                return ""
+            # Remove images: ![alt](url)
+            text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', content)
+            # Remove file links: [filename](/api/v1/wiki/files/...)
+            text = re.sub(r'\[([^\]]+)\]\(/api/v1/wiki/files/[^)]+\)', '', text)
+            # Remove other markdown: links, bold, italic, headers
+            text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+            text = re.sub(r'[*_#>`\-|]', '', text)
+            text = re.sub(r'\n+', ' ', text).strip()
+            return (text[:max_len] + "...") if len(text) > max_len else text
+
+        def _extract_images(content: str) -> list[str]:
+            """Extract image URLs from markdown content."""
+            if not content:
+                return []
+            return re.findall(r'!\[[^\]]*\]\(([^)]+)\)', content)
+
+        def _extract_files(content: str) -> list[tuple[str, str]]:
+            """Extract file links (name, url) from wiki content."""
+            if not content:
+                return []
+            # Match [filename](/api/v1/wiki/files/...) but not images
+            return re.findall(r'\[([^\]]+)\]\((/api/v1/wiki/files/[^)]+)\)', content)
+
+        def _format_page_detail(p, idx: int | None = None) -> list[str]:
+            """Format a wiki page with text preview + images + files."""
+            owner_name = p.owner.display_name or p.owner.username if p.owner else "未知"
+            prefix = f"{idx}. " if idx else "- "
+            result = [f"{prefix}**{p.title}** _({owner_name})_"]
+
+            text_preview = _extract_text_preview(p.content, 150)
+            if text_preview:
+                result.append(f"   _{text_preview}_")
+
+            images = _extract_images(p.content)
+            if images:
+                img_lines = []
+                for url in images[:3]:
+                    img_lines.append(f"![img]({url})")
+                result.append("   " + " ".join(img_lines))
+                if len(images) > 3:
+                    result.append(f"   _...还有 {len(images) - 3} 张图片_")
+
+            files = _extract_files(p.content)
+            # Filter out image urls from files list
+            files = [(name, url) for name, url in files if not any(name.lower().endswith(ext) for ext in ('.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp'))]
+            if files:
+                file_links = [f"[{name}]({url})" for name, url in files[:3]]
+                result.append(f"   📎 {' · '.join(file_links)}")
+                if len(files) > 3:
+                    result.append(f"   _...还有 {len(files) - 3} 个文件_")
+
+            return result
+
+        # Replace local wiki file paths with public URLs for inline display in WeChat Work markdown
+        from app.utils.settings import get_frontend_url
+        try:
+            public_url = await get_frontend_url(self.db)
+        except Exception:
+            public_url = ""
+
+        def _make_public_url(content: str) -> str:
+            """Replace /api/v1/wiki/files/xxx with public URL."""
+            if not public_url or not content:
+                return content
+            import re as _re
+            return _re.sub(
+                r'\(/api/v1/wiki/files/',
+                f'({public_url}/api/v1/wiki/files/',
+                content
+            )
+
+        lines = [f"🔍 **搜索: {keyword}**\n"]
+
+        if related_pages:
+            lines.append("**📎 关联人员知识库:**")
+            for p in related_pages[:5]:
+                lines.extend(_format_page_detail(p))
+            if len(related_pages) > 5:
+                lines.append(f"  _...还有 {len(related_pages) - 5} 条_")
+
+        if public_pages:
+            lines.append("")
+            lines.append("**🌐 公共知识库:** _(回复编号确认采用)_")
+            for i, p in enumerate(public_pages[:5], 1):
+                lines.extend(_format_page_detail(p, idx=i))
+            if len(public_pages) > 5:
+                lines.append(f"   _...还有 {len(public_pages) - 5} 条_")
+
+        response = "\n".join(lines)
+        # Convert local file paths to public URLs for inline image display
+        response = _make_public_url(response)
+
+        return response
