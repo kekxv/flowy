@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.user import User
 from app.models.wiki import WikiPage, wiki_collaborators_table
+from app.utils.tokenizer import tokenize
 
 logger = logging.getLogger("uvicorn")
 
@@ -309,31 +310,54 @@ def can_view(page: WikiPage, user_id: str) -> bool:
 # ─── Bot Search ──────────────────────────────────────────────
 
 
+# Minimum score threshold — pages below this are considered irrelevant noise
+# (e.g. matched only on a single digit or common character).
+_MIN_SCORE = 30
+
+
 def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     """Calculate relevance score for a wiki page against search tokens.
 
-    Scoring:
-    - Title exact match (all tokens): 100 per token
-    - Title contains token: 50 per token
-    - Tags contain token: 30 per token
-    - Content contains token: 10 per token
-    - Weight bonus: page.weight * 2
+    Scoring per token (short tokens with len <= 1 score at 1/5 weight):
+    - Title exact match (all tokens): 100
+    - Title contains token: 50
+    - Tags contain token: 30
+    - Content contains token: 10
+
+    Bonus:
+    - Match ratio: matched_tokens / total_tokens * 50  (encourages multi-token hits)
+    - Page weight: page.weight * 2
     """
     score = 0
+    matched = 0
     title_lower = page.title.lower()
     content_lower = (page.content or "").lower()
     tags_lower = (page.tags or "").lower()
 
     for token in tokens:
         token_lower = token.lower()
+        # Short tokens (single digit / single char) count at 1/5 weight —
+        # they are too common to be useful as sole matches.
+        weight = 1 if len(token) <= 1 else 5
+        hit = False
         if title_lower == token_lower:
-            score += 100
+            score += 100 * weight // 5
+            hit = True
         elif token_lower in title_lower:
-            score += 50
+            score += 50 * weight // 5
+            hit = True
         if token_lower in tags_lower:
-            score += 30
+            score += 30 * weight // 5
+            hit = True
         if token_lower in content_lower:
-            score += 10
+            score += 10 * weight // 5
+            hit = True
+        if hit:
+            matched += 1
+
+    # Match-ratio bonus: rewards pages that match a larger share of the query.
+    if tokens:
+        score += int(matched / len(tokens) * 50)
 
     # Weight bonus
     score += page.weight * 2
@@ -355,9 +379,8 @@ async def fuzzy_search(
     if not keyword or not keyword.strip():
         return []
 
-    # Split keyword into tokens (support Chinese and space-separated)
-    import re
-    tokens = [t.strip() for t in re.split(r'[\s,，、]+', keyword) if t.strip()]
+    # Segment keyword with jieba (filters stop words and punctuation)
+    tokens = tokenize(keyword)
     if not tokens:
         return []
 
@@ -400,11 +423,21 @@ async def fuzzy_search(
     )
     pages = list(result.scalars().all())
 
-    # Score and sort by relevance
+    # Score and sort by relevance, filter out low-quality matches
     scored = [(p, _relevance_score(p, tokens)) for p in pages]
     scored.sort(key=lambda x: x[1], reverse=True)
+    filtered = [(p, s) for p, s in scored if s >= _MIN_SCORE]
 
-    return [p for p, _score in scored[:limit]]
+    if not filtered:
+        return []
+
+    # If the runner-up is less than half the top score, the top result is a
+    # clear winner — return only it. Otherwise return the normal list so the
+    # user can pick from multiple candidates.
+    if len(filtered) >= 2 and filtered[1][1] < filtered[0][1] / 2:
+        return [filtered[0][0]]
+
+    return [p for p, _ in filtered[:limit]]
 
 
 async def search_for_bot(
@@ -415,16 +448,27 @@ async def search_for_bot(
 ) -> dict:
     """Search wiki for bot with priority: related users' wiki > public wiki.
 
+    Segments *keyword* with jieba and matches any token in title/content/tags.
     Returns dict with keys:
     - related: list of pages from related users
     - public: list of public pages
     """
-    search = f"%{keyword}%"
-    search_filter = or_(
-        WikiPage.title.ilike(search),
-        WikiPage.content.ilike(search),
-        WikiPage.tags.ilike(search),
-    )
+    tokens = tokenize(keyword)
+    if not tokens:
+        return {"related": [], "public": []}
+
+    # Build filter: any token matches any field
+    token_filters = []
+    for token in tokens:
+        pattern = f"%{token}%"
+        token_filters.append(
+            or_(
+                WikiPage.title.ilike(pattern),
+                WikiPage.content.ilike(pattern),
+                WikiPage.tags.ilike(pattern),
+            )
+        )
+    search_filter = or_(*token_filters)
 
     related_pages: list[WikiPage] = []
     public_pages: list[WikiPage] = []

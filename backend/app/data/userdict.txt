@@ -1,0 +1,17 @@
+# User-defined dictionary for jieba tokenizer
+#
+# Teach the segmenter project-specific terms (product names, abbreviations, etc.).
+# Each non-comment line defines one word. Format:
+#
+#   word  frequency  pos
+#
+# - word      : the term to add (required)
+# - frequency : optional integer (higher = more likely to appear as one token)
+# - pos       : optional part-of-speech tag (e.g. n=noun, v=verb, eng=English)
+#
+# Examples:
+#   Flowy 10 n
+#   k8s 10 eng
+#   工单 10 n
+#
+# Lines starting with '#' are ignored. Blank lines are ignored.

@@ -109,7 +109,8 @@ class TestFuzzySearch:
         # Exact title match
         await _create_wiki_page(db_session, user.id, "Docker", content="Some content", is_public=True)
         result = await wiki_service.fuzzy_search(db_session, "Docker", user.id)
-        assert len(result) >= 2
+        # Exact title match is far ahead → dominant result, only one returned.
+        assert len(result) == 1
         assert result[0].title == "Docker"
 
     @pytest.mark.asyncio
@@ -196,8 +197,8 @@ class TestFuzzySearch:
     async def test_weight_priority(self, db_session: AsyncSession):
         """Higher weight should rank higher when content relevance is similar."""
         user = await _create_user(db_session, id="u13", username="u13", email="u13@ex.com")
-        await _create_wiki_page(db_session, user.id, "Docker Low", content="docker", is_public=True, weight=1)
-        await _create_wiki_page(db_session, user.id, "Docker High", content="docker", is_public=True, weight=100)
+        await _create_wiki_page(db_session, user.id, "Docker Low", content="docker", is_public=True, weight=8)
+        await _create_wiki_page(db_session, user.id, "Docker High", content="docker", is_public=True, weight=10)
 
         result = await wiki_service.fuzzy_search(db_session, "docker", user.id)
         assert len(result) == 2
