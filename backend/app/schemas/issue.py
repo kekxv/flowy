@@ -128,6 +128,7 @@ class IssueFilter:
         reporter_id: str | None = None,
         label_id: str | None = None,
         q: str | None = None,
+        issue_type: str | None = None,
     ):
         self.statuses = status.split(",") if status else None
         self.priorities = priority.split(",") if priority else None
@@ -135,6 +136,7 @@ class IssueFilter:
         self.reporter_id = reporter_id
         self.label_id = label_id
         self.q = q
+        self.issue_type = issue_type
 
 
 class ExternalLinkCreate(BaseModel):

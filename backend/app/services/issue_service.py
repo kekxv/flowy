@@ -50,6 +50,9 @@ async def list_issues(
     if filters.label_id:
         query = query.where(Issue.labels.any(Label.id == filters.label_id))
         count_query = count_query.where(Issue.labels.any(Label.id == filters.label_id))
+    if filters.issue_type:
+        query = query.where(Issue.issue_type == filters.issue_type)
+        count_query = count_query.where(Issue.issue_type == filters.issue_type)
     if filters.q:
         search = f"%{filters.q}%"
         query = query.where(or_(Issue.title.ilike(search), Issue.description.ilike(search)))

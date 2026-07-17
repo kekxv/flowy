@@ -24,6 +24,7 @@ export default function IssueListPage() {
   const [issues, setIssues] = useState<IssueData[]>([]); const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1); const [status, setStatus] = useState(sp.get("status")||"all");
   const [priority, setPriority] = useState(sp.get("priority")||"all"); const [q, setQ] = useState(sp.get("q")||"");
+  const [issueType, setIssueType] = useState(sp.get("issue_type")||"all");
   const [debouncedQ, setDebouncedQ] = useState(q);
   useEffect(()=>{const t=setTimeout(()=>setDebouncedQ(q),350);return()=>clearTimeout(t);},[q]);
   const [labels, setLabels] = useState<Array<{id:string;name:string;color:string}>>([]);
@@ -96,9 +97,10 @@ export default function IssueListPage() {
 
   const fetch = () => { setLoading(true); const p: Record<string,string> = {page:String(page),per_page:"20"};
     if (status!=="all") p.status=status; if (priority!=="all") p.priority=priority; if (debouncedQ) p.q=debouncedQ; if (labelId) p.label_id=labelId;
+    if (issueType!=="all") p.issue_type=issueType;
     if (sp.get("reporter")==="me"&&user) p.reporter_id=user.id;
     listIssues(p).then(r=>{setIssues(r.data);setTotal(r.meta.total);setLoading(false);}); };
-  useEffect(fetch,[page,status,priority,debouncedQ,labelId]);
+  useEffect(fetch,[page,status,priority,debouncedQ,labelId,issueType]);
 
   const doPopup = async (id:string, field:string, value:string) => {
     try {
@@ -152,6 +154,17 @@ export default function IssueListPage() {
           <input placeholder={t("common.search")} value={q} onChange={e=>{setQ(e.target.value);setPage(1);}} className="w-full rounded-lg border-0 bg-transparent py-1.5 pl-8 pr-2 text-[13px] outline-none"/>
         </div>
 
+        {/* Type row */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0 mr-1">{t("common.type","Type")}</span>
+          {[{key:"all",label:t("common.all","All")},{key:"bug",label:t("issues.type.bug","Bug")},{key:"feature",label:t("issues.type.feature","Feature")}].map(tp=>
+            <button key={tp.key} onClick={()=>{setIssueType(issueType===tp.key?"all":tp.key);setPage(1);}}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
+                issueType===tp.key?(tp.key==="bug"?"bg-amber-50 text-amber-600":tp.key==="feature"?"bg-violet-50 text-violet-600":"bg-[var(--primary)]/10 text-[var(--primary)]"):""
+              } ${issueType!=="all"&&issueType!==tp.key?"opacity-40 hover:opacity-80":"hover:ring-2 hover:ring-offset-1"}`}>{tp.label}</button>
+          )}
+        </div>
+
         {/* Status row */}
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0 mr-1">{t("common.status")}</span>
@@ -203,7 +216,7 @@ export default function IssueListPage() {
           ))}
         </div>}
 
-      {total>20 && <div className="flex items-center justify-between">
+      {total>0 && <div className="flex items-center justify-between">
         <span className="text-[12px] text-[var(--text-muted)]">{(page-1)*20+1}–{Math.min(page*20,total)} of {total}</span>
         <div className="flex gap-1">
           <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page<=1} className="btn btn-outline btn-sm disabled:opacity-30">Prev</button>

@@ -18,7 +18,7 @@ interface MarkdownContentProps {
  * - `/bot-attachments/...`     → `bot-attachments/...`
  * - other URLs                 → unchanged
  */
-export function defaultUrlTransform(url: string): string {
+function defaultUrlTransform(url: string): string {
   if (url.startsWith("attachment:")) {
     return `api/v1/bot-attachments/${url.replace("attachment:", "")}`;
   }

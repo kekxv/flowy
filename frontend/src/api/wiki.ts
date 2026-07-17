@@ -1,4 +1,5 @@
 import api from "./client";
+import type { PaginatedResponse } from "../types";
 
 export interface WikiPageData {
   id: string;
@@ -31,7 +32,7 @@ export interface WikiUploadResult {
   markdown: string;
 }
 
-export async function listWikiPages(params: { q?: string; tab?: string; limit?: number; offset?: number } = {}): Promise<WikiPageData[]> {
+export async function listWikiPages(params: { q?: string; tab?: string; page?: number; per_page?: number } = {}): Promise<PaginatedResponse<WikiPageData>> {
   const res = await api.get("/wiki", { params });
   return res.data;
 }

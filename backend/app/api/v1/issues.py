@@ -69,6 +69,7 @@ async def list_issues(
     reporter_id: str | None = Query(default=None),
     label_id: str | None = Query(default=None),
     q: str | None = Query(default=None),
+    issue_type: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     sort: str = Query(default="status_priority"),
@@ -83,6 +84,7 @@ async def list_issues(
         reporter_id=reporter_id,
         label_id=label_id,
         q=q,
+        issue_type=issue_type,
     )
     issues, total = await issue_service.list_issues(db, pagination, filters)
     data = []

@@ -14,16 +14,20 @@ export default function WikiListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PER_PAGE = 20;
 
   const fetchPages = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listWikiPages({ q: search || undefined, tab: activeTab });
-      setPages(data);
+      const res = await listWikiPages({ q: search || undefined, tab: activeTab, page, per_page: PER_PAGE });
+      setPages(res.data);
+      setTotal(res.meta.total);
     } finally {
       setLoading(false);
     }
-  }, [search, activeTab]);
+  }, [search, activeTab, page]);
 
   useEffect(() => {
     const timer = setTimeout(fetchPages, search ? 300 : 0);
@@ -78,7 +82,7 @@ export default function WikiListPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder={t("wiki.search_placeholder", "Search wiki...")}
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(79,110,247,.12)]"
           />
@@ -87,7 +91,7 @@ export default function WikiListPage() {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { setActiveTab(tab.key); setPage(1); }}
               className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-[var(--primary)]/10 text-[var(--primary)]"
@@ -175,6 +179,22 @@ export default function WikiListPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] text-[var(--text-muted)]">
+            {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, total)} of {total}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="btn btn-outline btn-sm disabled:opacity-30">
+              Prev
+            </button>
+            <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / PER_PAGE)} className="btn btn-outline btn-sm disabled:opacity-30">
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

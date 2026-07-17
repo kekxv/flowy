@@ -114,7 +114,7 @@ async def get_visible_pages(
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
-    query = query.order_by(WikiPage.weight.desc(), WikiPage.updated_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(WikiPage.id.desc()).offset(offset).limit(limit)
 
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0

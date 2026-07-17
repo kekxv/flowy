@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.schemas.common import PaginationParams, paginated_response
 from app.schemas.wiki import (
     WikiCollaboratorAdd,
     WikiCollaboratorResponse,
@@ -49,20 +50,22 @@ def _page_to_response(page) -> WikiPageResponse:
     )
 
 
-@router.get("", response_model=list[WikiPageResponse])
+@router.get("")
 async def list_wiki_pages(
     q: str | None = Query(default=None, description="Search query"),
     tab: str = Query(default="all", description="Tab filter: all|mine|collab|public"),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """List wiki pages visible to the current user."""
-    pages, _total = await wiki_service.get_visible_pages(
-        db, user.id, q=q, tab=tab, limit=limit, offset=offset
+    pagination = PaginationParams(page=page, per_page=per_page)
+    pages, total = await wiki_service.get_visible_pages(
+        db, user.id, q=q, tab=tab, limit=pagination.per_page, offset=pagination.offset
     )
-    return [_page_to_response(p) for p in pages]
+    data = [_page_to_response(p) for p in pages]
+    return paginated_response(data, total, pagination)
 
 
 @router.post("", response_model=WikiPageResponse, status_code=status.HTTP_201_CREATED)
