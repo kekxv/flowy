@@ -57,13 +57,13 @@ export default function UserProfilePage() {
     if (params.get("oauth") === "ok") {
       oauthHandled.current = true;
       sessionStorage.removeItem("oauth_state");
-      window.history.replaceState({}, "", "/#/profile");
+      window.history.replaceState({}, "", "./#/profile");
       setSuccess(t("settings.connect_ok","Account connected successfully!"));
       fetch();
     } else if (params.get("oauth") === "error") {
       oauthHandled.current = true;
       setError(params.get("msg") || "OAuth failed");
-      window.history.replaceState({}, "", "/#/profile");
+      window.history.replaceState({}, "", "./#/profile");
     }
   }, []);
 

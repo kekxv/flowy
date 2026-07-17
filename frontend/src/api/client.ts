@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const api = axios.create({ baseURL: "/api/v1" });
+const api = axios.create({ baseURL: "api/v1" });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
@@ -18,7 +18,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem("refreshToken");
         if (!refreshToken) throw new Error("No refresh token");
-        const { data } = await axios.post("/api/v1/auth/refresh", {
+        const { data } = await axios.post("api/v1/auth/refresh", {
           refresh_token: refreshToken,
         });
         localStorage.setItem("accessToken", data.access_token);
@@ -27,7 +27,7 @@ api.interceptors.response.use(
         return api(error.config);
       } catch {
         localStorage.clear();
-        window.location.href = "/#/login";
+        window.location.href = "./#/login";
       }
     }
     return Promise.reject(error);
