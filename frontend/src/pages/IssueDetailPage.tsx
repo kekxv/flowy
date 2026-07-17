@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Edit3, Plus, X, Check, Play, Square, ChevronDown, ExternalLink, Link2, Globe, Code2, Search, Unlink, RefreshCw, AlertCircle, GitPullRequest, CheckCircle2, UserPlus } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import MarkdownContent from "../components/MarkdownContent";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listExternalLinks, linkExternalIssue, unlinkExternalIssue, refreshExternalLink, createExternalIssue, listConnections, listConnectionRepos, searchExternalIssues, type ExternalLink as ExtLink, type ConnectionData, type ExternalRepo, type ExternalIssueResult } from "../api/connections";
@@ -209,7 +209,7 @@ export default function IssueDetailPage() {
           <div>
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.description")}</h3>
             <div className="rounded-lg bg-[var(--bg)] p-4 text-[13px] leading-relaxed text-[var(--text-secondary)] prose prose-sm max-w-none">
-              <ReactMarkdown urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{issue.description||"—"}</ReactMarkdown></div>
+              <MarkdownContent urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{issue.description||"—"}</MarkdownContent></div>
           </div>
         </div>
       </div>
@@ -543,7 +543,7 @@ function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any)
             {(hidden?["valid",c.status]:["invalid","outdated","duplicate","resolved"]).map((s:string)=><button key={s} onClick={async()=>{await api.patch(`/issues/${issueId}/comments/${c.id}/status`,{status:s});setSs(false);onRefresh?.();}}
               className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{STAT_LBLS[s]||s}</button>)}</div>}</div>}
       </div>
-      <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><ReactMarkdown urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{c.body}</ReactMarkdown></div>
+      <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><MarkdownContent urlTransform={(url: string) => url.startsWith('attachment:') ? `/api/v1/bot-attachments/${url.replace('attachment:', '')}` : url}>{c.body}</MarkdownContent></div>
       {uniqueAttachments.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(uniqueAttachments as string[]).map((filename: string) => {

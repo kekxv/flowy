@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Calendar, Flag, CheckCircle2, AlertCircle, Edit3, Rocket } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import MarkdownContent from "../components/MarkdownContent";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import Loader from "../components/Loader";
@@ -89,7 +89,7 @@ export default function MilestoneDetailPage() {
                     {milestone.status==="published"?"🚀 ":""}{t(`milestone.status.${milestone.status}`,milestone.status)}
                   </span>
                 </div>
-                {milestone.description && <div className="mt-1.5 text-sm text-[var(--text-muted)] prose prose-sm max-w-none"><ReactMarkdown>{milestone.description}</ReactMarkdown></div>}
+                {milestone.description && <div className="mt-1.5 text-sm text-[var(--text-muted)] prose prose-sm max-w-none"><MarkdownContent>{milestone.description}</MarkdownContent></div>}
                 <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[var(--text-muted)]">
                   <span className="flex items-center gap-1"><Calendar size={12}/>{t("common.created_at")}: {new Date(milestone.created_at).toLocaleDateString()}</span>
                   {milestone.due_date && (

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
+import MarkdownContent from "../components/MarkdownContent";
 import {
   ArrowLeft,
   Edit3,
@@ -384,7 +384,7 @@ export default function WikiDetailPage() {
                 {preview ? (
                   <div className="prose prose-sm max-w-none min-h-[400px] p-4 text-[14px] leading-relaxed text-[var(--text-secondary)] bg-[var(--bg-card)]">
                     {content ? (
-                      <ReactMarkdown>{content}</ReactMarkdown>
+                      <MarkdownContent>{content}</MarkdownContent>
                     ) : (
                       <p className="text-[var(--text-muted)] italic">{t("wiki.no_content_preview", "No content to preview")}</p>
                     )}
@@ -454,7 +454,7 @@ export default function WikiDetailPage() {
           </div>
         ) : (
           <div className="prose prose-sm max-w-none text-[14px] leading-relaxed text-[var(--text-secondary)]">
-            <ReactMarkdown>{page.content || t("wiki.empty_content", "No content")}</ReactMarkdown>
+            <MarkdownContent>{page.content || t("wiki.empty_content", "No content")}</MarkdownContent>
           </div>
         )}
       </div>

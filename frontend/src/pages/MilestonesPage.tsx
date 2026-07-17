@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, Clock, Flag, CheckCircle2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import MarkdownContent from "../components/MarkdownContent";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import Loader from "../components/Loader";
@@ -115,7 +115,7 @@ export default function MilestonesPage() {
                         {m.status==="published"?"🚀 ":""}{t(`milestone.status.${m.status}`,m.status)}
                       </span>
                     </div>
-                    {m.description && <div className="mt-1 text-[13px] text-[var(--text-muted)] line-clamp-2 prose prose-sm max-w-none"><ReactMarkdown>{m.description}</ReactMarkdown></div>}
+                    {m.description && <div className="mt-1 text-[13px] text-[var(--text-muted)] line-clamp-2 prose prose-sm max-w-none"><MarkdownContent>{m.description}</MarkdownContent></div>}
                   </div>
                   {canEdit(m) && <button onClick={e=>{e.preventDefault();toggleStatus(m);}}
                     className="shrink-0 rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors opacity-0 group-hover:opacity-100">

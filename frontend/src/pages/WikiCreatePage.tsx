@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Globe, Lock, Image, Paperclip, Eye, Edit3 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import MarkdownContent from "../components/MarkdownContent";
 import { createWikiPage, uploadWikiFile } from "../api/wiki";
 
 export default function WikiCreatePage() {
@@ -186,7 +186,7 @@ export default function WikiCreatePage() {
             {preview ? (
               <div className="prose prose-sm max-w-none min-h-[360px] p-4 text-[14px] leading-relaxed text-[var(--text-secondary)] bg-[var(--bg-card)]">
                 {content ? (
-                  <ReactMarkdown>{content}</ReactMarkdown>
+                  <MarkdownContent>{content}</MarkdownContent>
                 ) : (
                   <p className="text-[var(--text-muted)] italic">{t("wiki.no_content_preview", "No content to preview")}</p>
                 )}
