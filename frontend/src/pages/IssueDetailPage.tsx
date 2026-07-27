@@ -74,7 +74,7 @@ export default function IssueDetailPage() {
   const openLinkModal=async()=>{setLinkMode("browse");setLinkConnId("");setLinkRepo("");setLinkQuery("");setLinkSearchResults([]);setCreateTitle("");setCreateBody("");setLinkRepos([]);
     try{const c=await listConnections();setConns(c);if(c.length>0){const first=c[0];if(first)loadRepos(first.id);}}catch{};setModal("link");};
   const loadRepos=async(cid:string)=>{setLinkConnId(cid);setLinkRepo("");setLinkQuery("");setLinkSearchResults([]);setLinkRepos([]);try{const r=await listConnectionRepos(cid);setLinkRepos(r);}catch{}};
-  const selectRepo=async(repo:string)=>{setLinkRepo(repo);setLinkSearchResults([]);setLinkMode("browse");if(!repo)return;setLinkSearching(true);try{const r=await searchExternalIssues(linkConnId,repo,linkQuery);setLinkSearchResults(r);}catch{}finally{setLinkSearching(false);}};
+  const selectRepo=async(repo:string)=>{setLinkRepo(repo);setLinkSearchResults([]);setLinkMode("browse");setLinkQuery("");if(!repo)return;setLinkSearching(true);try{const r=await searchExternalIssues(linkConnId,repo,"");setLinkSearchResults(r);}catch{}finally{setLinkSearching(false);}};
   const searchIssues=async()=>{if(!linkRepo)return;setLinkSearching(true);try{const r=await searchExternalIssues(linkConnId,linkRepo,linkQuery);setLinkSearchResults(r);}catch{}finally{setLinkSearching(false);}};
   const [linkMode,setLinkMode]=useState<"browse"|"create">("browse");
   const [createTitle,setCreateTitle]=useState("");

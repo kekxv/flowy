@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -31,6 +32,9 @@ from app.utils.settings import get_frontend_url
 logger = logging.getLogger("uvicorn")
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+
+# Lock to prevent concurrent timer start/stop race conditions
+_timer_lock = asyncio.Lock()
 
 
 async def _build_assignees(db: AsyncSession, issue_id: str) -> list[AssigneeResponse]:
@@ -488,37 +492,38 @@ async def start_timer(
     user: User = Depends(get_current_user),
 ):
     await _check_issue_permission(issue_id, user, db)
-    # Check no other timer is running for this user
-    existing = await db.execute(
-        select(TimeEntry).where(
-            TimeEntry.user_id == user.id,
-            TimeEntry.is_running == True,  # noqa: E712
+    async with _timer_lock:
+        # Check no other timer is running for this user
+        existing = await db.execute(
+            select(TimeEntry).where(
+                TimeEntry.user_id == user.id,
+                TimeEntry.is_running == True,  # noqa: E712
+            )
         )
-    )
-    for running in existing.scalars().all():
-        running.is_running = False
-        running.stopped_at = datetime.now().isoformat()
+        for running in existing.scalars().all():
+            running.is_running = False
+            running.stopped_at = datetime.now().isoformat()
 
-    entry = TimeEntry(
-        id=str(uuid.uuid4()),
-        user_id=user.id,
-        issue_id=issue_id,
-        started_at=datetime.now().isoformat(),
-        is_running=True,
-    )
-    db.add(entry)
-    db.add(
-        IssueAssigneeLog(
+        entry = TimeEntry(
             id=str(uuid.uuid4()),
-            issue_id=issue_id,
             user_id=user.id,
-            role="",
-            action="timer_started",
-            changed_by=user.id,
+            issue_id=issue_id,
+            started_at=datetime.now().isoformat(),
+            is_running=True,
         )
-    )
-    await db.commit()
-    await db.refresh(entry)
+        db.add(entry)
+        db.add(
+            IssueAssigneeLog(
+                id=str(uuid.uuid4()),
+                issue_id=issue_id,
+                user_id=user.id,
+                role="",
+                action="timer_started",
+                changed_by=user.id,
+            )
+        )
+        await db.commit()
+        await db.refresh(entry)
     # Dispatch notification
     try:
         issue = await db.get(Issue, issue_id)
@@ -554,34 +559,35 @@ async def stop_timer(
     user: User = Depends(get_current_user),
 ):
     await _check_issue_permission(issue_id, user, db)
-    result = await db.execute(
-        select(TimeEntry).where(
-            TimeEntry.user_id == user.id,
-            TimeEntry.issue_id == issue_id,
-            TimeEntry.is_running == True,  # noqa: E712
+    async with _timer_lock:
+        result = await db.execute(
+            select(TimeEntry).where(
+                TimeEntry.user_id == user.id,
+                TimeEntry.issue_id == issue_id,
+                TimeEntry.is_running == True,  # noqa: E712
+            )
         )
-    )
-    entry = result.scalar_one_or_none()
-    if not entry:
-        raise HTTPException(status_code=404, detail="No running timer for this issue")
+        entry = result.scalar_one_or_none()
+        if not entry:
+            raise HTTPException(status_code=404, detail="No running timer for this issue")
 
-    now = datetime.now()
-    elapsed = (now - datetime.fromisoformat(entry.started_at)).total_seconds() * 1000
-    entry.is_running = False
-    entry.stopped_at = now.isoformat()
-    entry.duration_ms += int(elapsed)
-    db.add(
-        IssueAssigneeLog(
-            id=str(uuid.uuid4()),
-            issue_id=issue_id,
-            user_id=user.id,
-            role=f"{int(elapsed / 60000)}m",
-            action="timer_stopped",
-            changed_by=user.id,
+        now = datetime.now()
+        elapsed = (now - datetime.fromisoformat(entry.started_at)).total_seconds() * 1000
+        entry.is_running = False
+        entry.stopped_at = now.isoformat()
+        entry.duration_ms += int(elapsed)
+        db.add(
+            IssueAssigneeLog(
+                id=str(uuid.uuid4()),
+                issue_id=issue_id,
+                user_id=user.id,
+                role=f"{int(elapsed / 60000)}m",
+                action="timer_stopped",
+                changed_by=user.id,
+            )
         )
-    )
-    await db.commit()
-    await db.refresh(entry)
+        await db.commit()
+        await db.refresh(entry)
     # Dispatch notification
     try:
         issue = await db.get(Issue, issue_id)

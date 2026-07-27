@@ -263,13 +263,12 @@ async def update_issue(
             )
 
     if data.label_ids is not None:
-        old_label_ids = {l.id for l in (issue.labels or [])}
+        old_labels = list(issue.labels or [])
+        old_label_ids = {l.id for l in old_labels}
         new_label_ids = set(data.label_ids)
         if old_label_ids != new_label_ids:
-            new_labels = (
-                (await db.execute(select(Label).where(Label.id.in_(new_label_ids)))).scalars().all()
-            )
-            old_labels = [l for l in (issue.labels or []) if l.id in old_label_ids]
+            result = await db.execute(select(Label).where(Label.id.in_(list(new_label_ids))))
+            new_labels = list(result.scalars().all())
             added_labels = [l for l in new_labels if l.id not in old_label_ids]
             removed_labels = [l for l in old_labels if l.id not in new_label_ids]
             for l in added_labels:
@@ -294,20 +293,16 @@ async def update_issue(
                         changed_by=changed_by,
                     )
                 )
-        result = await db.execute(select(Label).where(Label.id.in_(data.label_ids)))
-        issue.labels = list(result.scalars().all())
+            issue.labels = new_labels
 
     if data.milestone_ids is not None:
-        old_m = {m.id for m in (issue.milestones or [])}
+        old_milestones = list(issue.milestones or [])
+        old_ms = {m.id for m in old_milestones}
         new_ms = set(data.milestone_ids)
-        if old_m != new_ms:
-            new_milestones = (
-                (await db.execute(select(Milestone).where(Milestone.id.in_(new_ms))))
-                .scalars()
-                .all()
-            )
-            old_milestones = [m for m in (issue.milestones or []) if m.id in old_m]
-            added_ms = [m for m in new_milestones if m.id not in old_m]
+        if old_ms != new_ms:
+            result = await db.execute(select(Milestone).where(Milestone.id.in_(list(new_ms))))
+            new_milestones = list(result.scalars().all())
+            added_ms = [m for m in new_milestones if m.id not in old_ms]
             removed_ms = [m for m in old_milestones if m.id not in new_ms]
             for m in added_ms:
                 db.add(
@@ -331,8 +326,7 @@ async def update_issue(
                         changed_by=changed_by,
                     )
                 )
-        result = await db.execute(select(Milestone).where(Milestone.id.in_(data.milestone_ids)))
-        issue.milestones = list(result.scalars().all())
+            issue.milestones = new_milestones
 
     await db.commit()
     await db.refresh(issue)
