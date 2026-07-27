@@ -153,11 +153,18 @@ async def list_users(
 ):
     query = select(WeChatWorkBotUser).order_by(WeChatWorkBotUser.created_at.desc())
     result = await db.execute(query)
-    users = result.scalars().all()
+    users = list(result.scalars().all())
+
+    # Batch-load linked Flowy users to avoid N+1
+    flowy_user_ids = {u.flowy_user_id for u in users if u.flowy_user_id}
+    flowy_users_map: dict[str, User] = {}
+    if flowy_user_ids:
+        flowy_result = await db.execute(select(User).where(User.id.in_(list(flowy_user_ids))))
+        flowy_users_map = {u.id: u for u in flowy_result.scalars().all()}
 
     responses = []
     for u in users:
-        flowy_user = await db.get(User, u.flowy_user_id)
+        flowy_user = flowy_users_map.get(u.flowy_user_id) if u.flowy_user_id else None
         responses.append(
             BotUserResponse(
                 id=u.id,

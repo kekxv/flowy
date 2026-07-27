@@ -63,3 +63,14 @@ class PasswordResetRequest(BaseModel):
 
 class AuthStatusResponse(BaseModel):
     has_users: bool
+
+
+class ProjectRolesUpdate(BaseModel):
+    roles: list[str] = Field(default_factory=list)
+
+
+class AdminUserUpdate(BaseModel):
+    role: str | None = Field(default=None, pattern=r"^(admin|member)$")
+    is_active: bool | None = None
+    display_name: str | None = Field(default=None, max_length=128)
+    nickname: str | None = Field(default=None, max_length=128)

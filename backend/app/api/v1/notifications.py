@@ -13,6 +13,12 @@ from app.models.notification import (
     NotificationRule,
 )
 from app.models.user import User
+from app.schemas.notifications import (
+    NotificationChannelCreate,
+    NotificationChannelUpdate,
+    NotificationRuleCreate,
+    NotificationRuleUpdate,
+)
 from app.services.notifications import CHANNEL_REGISTRY, get_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -68,15 +74,11 @@ async def list_channels(
 
 @router.post("/channels", status_code=status.HTTP_201_CREATED)
 async def create_channel(
-    data: dict,
+    data: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    required = {"name", "channel_type", "config"}
-    if not required.issubset(data.keys()):
-        raise HTTPException(status_code=422, detail="Missing fields: name, channel_type, config")
-
-    if data["channel_type"] not in CHANNEL_REGISTRY:
+    if data.channel_type not in CHANNEL_REGISTRY:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown channel_type. Available: {', '.join(CHANNEL_REGISTRY.keys())}",
@@ -84,9 +86,9 @@ async def create_channel(
 
     channel = NotificationChannel(
         id=str(uuid.uuid4()),
-        name=data["name"],
-        channel_type=data["channel_type"],
-        config=json.dumps(data["config"]),
+        name=data.name,
+        channel_type=data.channel_type,
+        config=json.dumps(data.config),
         created_by=user.id,
     )
     db.add(channel)
@@ -121,7 +123,7 @@ async def test_channel(
 @router.put("/channels/{channel_id}")
 async def update_channel(
     channel_id: str,
-    data: dict,
+    data: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -129,12 +131,12 @@ async def update_channel(
     if not channel or channel.created_by != user.id:
         raise HTTPException(status_code=404, detail="Channel not found")
 
-    if "name" in data:
-        channel.name = data["name"]
-    if "config" in data:
-        channel.config = json.dumps(data["config"])
-    if "is_active" in data:
-        channel.is_active = data["is_active"]
+    if data.name is not None:
+        channel.name = data.name
+    if data.config is not None:
+        channel.config = json.dumps(data.config)
+    if data.is_active is not None:
+        channel.is_active = data.is_active
     await db.commit()
     await db.refresh(channel)
     return {
@@ -186,16 +188,12 @@ async def list_rules(
 
 @router.post("/rules", status_code=status.HTTP_201_CREATED)
 async def create_rule(
-    data: dict,
+    data: NotificationRuleCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    required = {"channel_id", "event_type"}
-    if not required.issubset(data.keys()):
-        raise HTTPException(status_code=422, detail="Missing fields: channel_id, event_type")
-
     # Support comma-separated multi-event
-    events = [e.strip() for e in data["event_type"].split(",") if e.strip()]
+    events = [e.strip() for e in data.event_type.split(",") if e.strip()]
     valid_events = {e["key"] for e in EVENT_TYPES}
     for ev in events:
         if ev not in valid_events:
@@ -203,10 +201,10 @@ async def create_rule(
 
     rule = NotificationRule(
         id=str(uuid.uuid4()),
-        channel_id=data["channel_id"],
+        channel_id=data.channel_id,
         event_type=",".join(events),
-        name=data.get("name", ""),
-        filters=json.dumps(data.get("filters", {})),
+        name=data.name,
+        filters=json.dumps(data.filters),
         created_by=user.id,
     )
     db.add(rule)
@@ -225,7 +223,7 @@ async def create_rule(
 @router.put("/rules/{rule_id}")
 async def update_rule(
     rule_id: str,
-    data: dict,
+    data: NotificationRuleUpdate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -233,19 +231,19 @@ async def update_rule(
     if not rule or rule.created_by != user.id:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    if "is_active" in data:
-        rule.is_active = data["is_active"]
-    if "name" in data:
-        rule.name = data["name"]
-    if "event_type" in data:
-        events = [e.strip() for e in data["event_type"].split(",") if e.strip()]
+    if data.is_active is not None:
+        rule.is_active = data.is_active
+    if data.name is not None:
+        rule.name = data.name
+    if data.event_type is not None:
+        events = [e.strip() for e in data.event_type.split(",") if e.strip()]
         valid_events = {e["key"] for e in EVENT_TYPES}
         for ev in events:
             if ev not in valid_events:
                 raise HTTPException(status_code=422, detail=f"Invalid event_type: {ev}")
         rule.event_type = ",".join(events)
-    if "filters" in data:
-        rule.filters = json.dumps(data["filters"])
+    if data.filters is not None:
+        rule.filters = json.dumps(data.filters)
     await db.commit()
     await db.refresh(rule)
     return {

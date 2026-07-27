@@ -2,7 +2,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dispatcher import dispatch
@@ -11,6 +11,7 @@ from app.dependencies import get_current_user
 from app.models.issue import Issue, issue_milestones_table
 from app.models.tracking import Milestone
 from app.models.user import User
+from app.schemas.issue import MilestoneCreate, MilestoneUpdate
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
 
@@ -31,20 +32,32 @@ async def list_milestones(
     result = await db.execute(query.order_by(Milestone.created_at.desc()))
     milestones = list(result.scalars().all())
 
+    # Batch-fetch issue counts per milestone in a single aggregate query
+    stats_map: dict[str, tuple[int, int]] = {}
+    if milestones:
+        milestone_ids = [m.id for m in milestones]
+        stats_query = (
+            select(
+                issue_milestones_table.c.milestone_id,
+                func.count().label("total"),
+                func.sum(
+                    case(
+                        (Issue.status.in_(["closed", "resolved"]), 1),
+                        else_=0,
+                    )
+                ).label("closed"),
+            )
+            .join(Issue, Issue.id == issue_milestones_table.c.issue_id)
+            .where(issue_milestones_table.c.milestone_id.in_(milestone_ids))
+            .group_by(issue_milestones_table.c.milestone_id)
+        )
+        stats_result = await db.execute(stats_query)
+        for row in stats_result.all():
+            stats_map[row.milestone_id] = (row.total, int(row.closed or 0))
+
     data = []
     for m in milestones:
-        total_r = await db.execute(
-            select(func.count()).where(issue_milestones_table.c.milestone_id == m.id)
-        )
-        closed_r = await db.execute(
-            select(func.count()).where(
-                issue_milestones_table.c.milestone_id == m.id,
-                Issue.id == issue_milestones_table.c.issue_id,
-                Issue.status.in_(["closed", "resolved"]),
-            )
-        )
-        total = total_r.scalar() or 0
-        closed = closed_r.scalar() or 0
+        total, closed = stats_map.get(m.id, (0, 0))
         progress = round((closed / total) * 100) if total > 0 else 0
 
         data.append(
@@ -67,15 +80,15 @@ async def list_milestones(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_milestone(
-    data: dict,
+    data: MilestoneCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     milestone = Milestone(
         id=str(uuid.uuid4()),
-        name=data.get("name", ""),
-        description=data.get("description", ""),
-        due_date=data.get("due_date"),
+        name=data.name,
+        description=data.description,
+        due_date=data.due_date,
         owner_id=user.id,
     )
     db.add(milestone)
@@ -117,7 +130,7 @@ async def create_milestone(
 @router.put("/{milestone_id}")
 async def update_milestone(
     milestone_id: str,
-    data: dict,
+    data: MilestoneUpdate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -127,20 +140,25 @@ async def update_milestone(
     # Permission: admin, owner, or creator can modify
     if user.role != "admin" and m.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Only the milestone owner can modify it")
-    if "owner_id" in data and user.role != "admin":
+    if data.owner_id is not None and user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can change the owner")
     old_status = m.status
-    for f in ("name", "description", "due_date", "status", "owner_id"):
-        if f in data:
-            if f == "status" and data[f] not in ("open", "closed", "published"):
-                raise HTTPException(status_code=422, detail="Invalid status")
-            setattr(m, f, data[f])
+    if data.name is not None:
+        m.name = data.name
+    if data.description is not None:
+        m.description = data.description
+    if data.due_date is not None:
+        m.due_date = data.due_date
+    if data.status is not None:
+        m.status = data.status
+    if data.owner_id is not None:
+        m.owner_id = data.owner_id
     await db.commit()
     await db.refresh(m)
 
     # Dispatch notification on status change
     try:
-        new_status = data.get("status")
+        new_status = data.status
         if new_status and new_status != old_status:
             event_map = {
                 "published": "milestone.published",

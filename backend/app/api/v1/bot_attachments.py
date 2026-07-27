@@ -27,11 +27,21 @@ def _ensure_dir():
     os.makedirs(_get_attachments_dir(), exist_ok=True)
 
 
+def _safe_filepath(filename: str) -> str:
+    """Resolve *filename* inside the attachments dir, blocking path traversal."""
+    attachments_dir = _get_attachments_dir()
+    real_dir = os.path.realpath(attachments_dir)
+    filepath = os.path.realpath(os.path.join(attachments_dir, filename))
+    if not filepath.startswith(real_dir + os.sep):
+        raise HTTPException(400, "Invalid filename")
+    return filepath
+
+
 @router.get("/{filename}")
 async def download_attachment(filename: str):
     """Download a bot attachment file (public - for img tags)."""
     _ensure_dir()
-    filepath = os.path.join(_get_attachments_dir(), filename)
+    filepath = _safe_filepath(filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "File not found")
     return FileResponse(filepath, filename=filename)
@@ -47,7 +57,7 @@ async def delete_attachment(
     if not await _can_delete_attachment(filename, _user, db):
         raise HTTPException(403, "Cannot delete this attachment")
     _ensure_dir()
-    filepath = os.path.join(_get_attachments_dir(), filename)
+    filepath = _safe_filepath(filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "File not found")
     os.remove(filepath)

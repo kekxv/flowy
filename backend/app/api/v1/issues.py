@@ -17,6 +17,9 @@ from app.models.user import User
 from app.schemas.common import PaginationParams, paginated_response
 from app.schemas.issue import (
     AssigneeResponse,
+    CommentBodyCreate,
+    CommentBodyUpdate,
+    CommentStatusUpdate,
     IssueCreate,
     IssueFilter,
     IssueUpdate,
@@ -87,6 +90,37 @@ async def list_issues(
         issue_type=issue_type,
     )
     issues, total = await issue_service.list_issues(db, pagination, filters)
+
+    # Batch-load assignees for all issues at once (avoids N+1 queries)
+    assignees_map: dict[str, list[AssigneeResponse]] = {i.id: [] for i in issues}
+    if issues:
+        issue_ids = [i.id for i in issues]
+        rows_result = await db.execute(
+            select(
+                issue_assignees.c.issue_id,
+                issue_assignees.c.user_id,
+                issue_assignees.c.role,
+            ).where(issue_assignees.c.issue_id.in_(issue_ids))
+        )
+        assignee_rows = rows_result.all()
+        all_user_ids = {r.user_id for r in assignee_rows if r.user_id}
+        users_map: dict[str, User] = {}
+        if all_user_ids:
+            users_result = await db.execute(select(User).where(User.id.in_(list(all_user_ids))))
+            users_map = {u.id: u for u in users_result.scalars().all()}
+        for row in assignee_rows:
+            u = users_map.get(row.user_id)
+            assignees_map[row.issue_id].append(
+                AssigneeResponse(
+                    id=u.id if u else row.user_id,
+                    username=u.username if u else "",
+                    email=u.email if u else "",
+                    display_name=u.display_name if u else "",
+                    role=row.role or "member",
+                    avatar_url=u.avatar_url if u else None,
+                )
+            )
+
     data = []
     for i in issues:
         d = {
@@ -112,7 +146,7 @@ async def list_issues(
             "created_at": i.created_at,
             "updated_at": i.updated_at,
             "closed_at": i.closed_at,
-            "assignees": [a.model_dump() for a in await _build_assignees(db, i.id)],
+            "assignees": [a.model_dump() for a in assignees_map.get(i.id, [])],
         }
         data.append(d)
     return paginated_response(data, total, pagination)
@@ -287,24 +321,21 @@ async def list_comments(
 @router.post("/{issue_id}/comments", status_code=status.HTTP_201_CREATED)
 async def add_comment(
     issue_id: str,
-    data: dict,
+    data: CommentBodyCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     from app.models.issue import Comment
 
-    if not data.get("body"):
-        raise HTTPException(status_code=422, detail="body is required")
     issue = await issue_service.get_issue(db, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    parent_id = data.get("parent_id")
     comment = Comment(
         id=str(uuid.uuid4()),
         issue_id=issue_id,
         author_id=user.id,
-        body=data["body"],
-        parent_id=parent_id,
+        body=data.body,
+        parent_id=data.parent_id,
     )
     db.add(comment)
     await db.commit()
@@ -317,7 +348,7 @@ async def add_comment(
             NotificationEvent(
                 event_type="issue.commented",
                 title=f"Comment on #{issue.id[:8]}: {issue.title}",
-                summary=data["body"][:200],
+                summary=data.body[:200],
                 detail_url=f"{frontend_url}/issues/{issue_id}",
                 actor_name=user.display_name or user.username,
                 resource_type="comment",
@@ -334,7 +365,7 @@ async def add_comment(
 async def edit_comment(
     issue_id: str,
     comment_id: str,
-    data: dict,
+    data: CommentBodyUpdate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -346,8 +377,7 @@ async def edit_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
     if comment.author_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail="Cannot edit this comment")
-    if "body" in data:
-        comment.body = data["body"]
+    comment.body = data.body
     await db.commit()
     await db.refresh(comment)
     return _comment_dict(comment)
@@ -357,7 +387,7 @@ async def edit_comment(
 async def set_comment_status(
     issue_id: str,
     comment_id: str,
-    data: dict,
+    data: CommentStatusUpdate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -381,14 +411,7 @@ async def set_comment_status(
     if not comment or comment.issue_id != issue_id:
         raise HTTPException(status_code=404, detail="Comment not found")
 
-    valid_statuses = ["valid", "invalid", "outdated", "duplicate", "resolved"]
-    new_status = data.get("status", "valid")
-    if new_status not in valid_statuses:
-        raise HTTPException(
-            status_code=422, detail=f"Invalid status. Must be one of: {valid_statuses}"
-        )
-
-    comment.status = new_status
+    comment.status = data.status
     comment.status_changed_by = user.id
     await db.commit()
     await db.refresh(comment)
@@ -413,10 +436,11 @@ async def delete_comment(
     # Clean up attachment files from disk
     if comment.body:
         attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
+        real_dir = os.path.realpath(attachments_dir)
         filenames = set(re.findall(r'attachment:([a-f0-9]+\.\w+)', comment.body))
         for fn in filenames:
-            fp = os.path.join(attachments_dir, fn)
-            if os.path.exists(fp):
+            fp = os.path.realpath(os.path.join(attachments_dir, fn))
+            if fp.startswith(real_dir + os.sep) and os.path.exists(fp):
                 os.remove(fp)
     await db.delete(comment)
     await db.commit()

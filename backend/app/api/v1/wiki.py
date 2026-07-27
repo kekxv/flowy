@@ -260,7 +260,10 @@ async def upload_wiki_file(
 async def get_wiki_file(filename: str):
     """Download a wiki attachment file (public for markdown rendering)."""
     attachments_dir = _get_wiki_attachments_dir()
-    filepath = os.path.join(attachments_dir, filename)
+    real_dir = os.path.realpath(attachments_dir)
+    filepath = os.path.realpath(os.path.join(attachments_dir, filename))
+    if not filepath.startswith(real_dir + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid filename")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(filepath, filename=filename)

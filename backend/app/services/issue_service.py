@@ -28,11 +28,7 @@ async def list_issues(
     pagination: PaginationParams,
     filters: IssueFilter,
 ) -> tuple[list[Issue], int]:
-    query = select(Issue).options(
-        selectinload(Issue.assignees),
-        selectinload(Issue.labels),
-        selectinload(Issue.milestones),
-    )
+    query = select(Issue)
     count_query = select(func.count(Issue.id))
 
     if filters.statuses:

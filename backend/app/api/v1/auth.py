@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.auth import (
     AuthStatusResponse,
     PasswordChangeRequest,
+    ProjectRolesUpdate,
     RefreshTokenRequest,
     TokenResponse,
     UserLoginRequest,
@@ -123,18 +124,17 @@ async def get_my_project_roles(
 
 @router.put("/me/project-roles")
 async def set_my_project_roles(
-    data: dict,
+    data: ProjectRolesUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    roles = data.get("roles", [])
     # Delete existing
     await db.execute(delete(UserProjectRole).where(UserProjectRole.user_id == user.id))
     # Insert new
-    for r in roles:
+    for r in data.roles:
         db.add(UserProjectRole(user_id=user.id, role=r))
     await db.commit()
-    return {"roles": roles}
+    return {"roles": data.roles}
 
 
 @router.put("/me", response_model=UserResponse)

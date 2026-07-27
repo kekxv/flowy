@@ -23,6 +23,7 @@ from app.schemas.external import (
     ExternalIssueSearchResult,
     ExternalRepoResponse,
     LinkExternalIssueRequest,
+    OAuthInitRequest,
     PATConnectionRequest,
 )
 from app.services import connection_service
@@ -62,15 +63,15 @@ async def list_connections(
 
 @router.post("/oauth/init")
 async def oauth_init(
-    data: dict,
+    data: OAuthInitRequest,
     req: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Generate OAuth authorization URL."""
-    provider = data.get("provider", "github")
-    instance_url = data.get("instance_url", "").rstrip("/")
-    frontend_url = data.get("frontend_url", "").rstrip("/")
+    provider = data.provider
+    instance_url = data.instance_url.rstrip("/")
+    frontend_url = data.frontend_url.rstrip("/")
     cfg = OAUTH_CONFIGS.get(provider)
     # Fallback to DB-stored OAuth settings
     db_settings = {}
@@ -279,8 +280,19 @@ async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
                                 ).isoformat()
                             await db.commit()
                             return new_token
+                # Refresh failed — token is expired, don't silently use it
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"OAuth token expired and refresh failed for {conn.provider}",
+                )
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to dispatch notification: {e}")
+            logger.warning("Failed to refresh OAuth token for %s: %s", conn.provider, e)
+            raise HTTPException(
+                status_code=400,
+                detail=f"OAuth token refresh error: {e}",
+            ) from e
 
     return token
 
@@ -603,9 +615,7 @@ async def refresh_external_link(
             link.status = ri.status
             link.external_url = ri.url
     except Exception as e:
-        logger.warning(f"Failed to dispatch notification: {e}")
-
-    from datetime import datetime
+        logger.warning("Failed to refresh external link %s: %s", link.id, e)
 
     link.last_synced_at = datetime.now().isoformat()
     await db.commit()

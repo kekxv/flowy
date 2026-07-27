@@ -8,8 +8,9 @@ class PATConnectionRequest(BaseModel):
 
 
 class OAuthInitRequest(BaseModel):
-    provider: str = Field(pattern=r"^(github|gitea)$")
-    redirect_uri: str = Field(default="", max_length=512)
+    provider: str = Field(default="github", pattern=r"^(github|gitea)$")
+    instance_url: str = Field(default="", max_length=512)
+    frontend_url: str = Field(default="", max_length=512)
 
 
 class ExternalConnectionResponse(BaseModel):

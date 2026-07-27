@@ -6,14 +6,6 @@ from contextlib import asynccontextmanager
 
 from uvicorn.logging import DefaultFormatter
 
-# Monkey-patch json.dumps to output Unicode as-is (not escaped)
-# but respect explicit ensure_ascii if provided
-_original_dumps = json.dumps
-def _json_dumps_unicode(obj, **kwargs):
-    kwargs.setdefault('ensure_ascii', False)
-    return _original_dumps(obj, **kwargs)
-json.dumps = _json_dumps_unicode
-
 # Unified colored log format — all app loggers use "uvicorn"
 _LOG_FORMAT = "%(levelprefix)s %(asctime)s %(message)s"
 _log_handler = logging.StreamHandler()
@@ -39,8 +31,16 @@ from sqlalchemy import func, select
 # Ensure all models are loaded for SQLAlchemy mapper configuration
 import app.models  # noqa: E402, F401
 from app.api.v1.router import api_router
+from app.config import settings
 from app.database import Base, async_session, engine
 from app.services.sync_service import sync_service
+
+
+class UnicodeJSONResponse(JSONResponse):
+    """JSONResponse that outputs Unicode characters as-is (not escaped)."""
+
+    def render(self, content) -> bytes:
+        return json.dumps(content, ensure_ascii=False).encode("utf-8")
 
 
 @asynccontextmanager
@@ -113,11 +113,16 @@ async def lifespan(_app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Flowy", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Flowy",
+        version="0.1.0",
+        lifespan=lifespan,
+        default_response_class=UnicodeJSONResponse,
+    )
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -147,6 +152,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=500,
             content={

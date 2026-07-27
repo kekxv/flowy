@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     sync_interval_minutes: int = 5
 
     frontend_url: str = "http://localhost:5173"
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # OAuth (optional)
     github_client_id: str = ""

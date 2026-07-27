@@ -10,23 +10,40 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Global refresh lock — prevents concurrent refresh requests
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = localStorage.getItem("refreshToken");
+      if (!refreshToken) throw new Error("No refresh token");
+      const { data } = await axios.post("api/v1/auth/refresh", {
+        refresh_token: refreshToken,
+      });
+      localStorage.setItem("accessToken", data.access_token);
+      localStorage.setItem("refreshToken", data.refresh_token);
+      return data.access_token;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401 && !error.config._retry) {
       error.config._retry = true;
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) throw new Error("No refresh token");
-        const { data } = await axios.post("api/v1/auth/refresh", {
-          refresh_token: refreshToken,
-        });
-        localStorage.setItem("accessToken", data.access_token);
-        localStorage.setItem("refreshToken", data.refresh_token);
-        error.config.headers.Authorization = `Bearer ${data.access_token}`;
+        const newToken = await refreshAccessToken();
+        error.config.headers.Authorization = `Bearer ${newToken}`;
         return api(error.config);
       } catch {
-        localStorage.clear();
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
         window.location.href = "./#/login";
       }
     }

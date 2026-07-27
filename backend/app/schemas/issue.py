@@ -139,10 +139,39 @@ class IssueFilter:
         self.issue_type = issue_type
 
 
+class CommentBodyCreate(BaseModel):
+    body: str = Field(min_length=1)
+    parent_id: str | None = None
+
+
+class CommentBodyUpdate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class CommentStatusUpdate(BaseModel):
+    status: str = Field(pattern=r"^(valid|invalid|outdated|duplicate|resolved)$")
+
+
 class ExternalLinkCreate(BaseModel):
     connection_id: str
     external_repo: str
     external_id: str
     external_url: str
     title: str | None = None
+    status: str | None = None
+    link_type: str | None = None
+
+
+class MilestoneCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(default="", max_length=2000)
+    due_date: str | None = None
+
+
+class MilestoneUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=256)
+    description: str | None = None
+    due_date: str | None = None
+    status: str | None = Field(default=None, pattern=r"^(open|closed|published)$")
+    owner_id: str | None = None
     status: str | None = None
