@@ -59,8 +59,8 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("dashboard.title")}</h1>
-          <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{data.stats.total_issues} issues · {data.stats.open_issues} active · {closedRate}% closed</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("dashboard.title")}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{data.stats.total_issues} issues · {data.stats.open_issues} active · {closedRate}% closed</p>
         </div>
         <div className="flex items-center gap-2">
           {closedRate > 0 && (
@@ -73,18 +73,22 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats - compact row */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { k:"total_issues", path:"/issues", icon:BarChart3, c:"text-[var(--primary)] bg-[var(--primary)]/6" },
-          { k:"open_issues", path:"/issues?status=open,in_progress", icon:AlertCircle, c:"text-amber-600 bg-amber-50" },
-          { k:"closed_issues", path:"/issues?status=closed,resolved", icon:CheckCircle2, c:"text-emerald-600 bg-emerald-50" },
-          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, c:"text-violet-600 bg-violet-50" },
+          { k:"total_issues", path:"/issues", icon:BarChart3, gradient:"from-[#4f6ef7] to-[#8b5cf6]", bg:"bg-[#4f6ef7]/8" },
+          { k:"open_issues", path:"/issues?status=open,in_progress", icon:AlertCircle, gradient:"from-amber-400 to-orange-500", bg:"bg-amber-50" },
+          { k:"closed_issues", path:"/issues?status=closed,resolved", icon:CheckCircle2, gradient:"from-emerald-400 to-teal-500", bg:"bg-emerald-50" },
+          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, gradient:"from-violet-400 to-purple-500", bg:"bg-violet-50" },
         ].map(s => (
-          <Link key={s.k} to={s.path} className="group flex items-center gap-3 card rounded-xl px-4 py-2.5 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.c}`}><s.icon size={18} /></div>
-            <div>
-              <div className="text-lg font-bold tracking-tight">{(data.stats as any)[s.k]||0}</div>
-              <div className="text-[10px] text-[var(--text-muted)] group-hover:text-[var(--primary)] transition-colors">{t(`dashboard.${s.k}`)}</div>
+          <Link key={s.k} to={s.path} className="group relative flex items-center gap-3 card rounded-xl px-4 py-3 hover-lift overflow-hidden">
+            {/* Subtle gradient accent */}
+            <div className={`absolute -right-4 -top-4 h-16 w-16 rounded-full bg-gradient-to-br ${s.gradient} opacity-[.07] transition-opacity group-hover:opacity-[.12]`} />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${s.gradient} text-white shadow-sm`}>
+              <s.icon size={18} />
+            </div>
+            <div className="relative">
+              <div className="text-xl font-bold tracking-tight">{(data.stats as any)[s.k]||0}</div>
+              <div className="text-[10px] font-medium text-[var(--text-muted)] group-hover:text-[var(--primary)] transition-colors">{t(`dashboard.${s.k}`)}</div>
             </div>
           </Link>
         ))}
@@ -214,8 +218,8 @@ export default function DashboardPage() {
                       </div>
                       <span className="font-mono text-[11px] font-semibold text-violet-600">{m.progress}%</span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-muted)]">
-                      <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-500 transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
+                      <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-[#4f6ef7] transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
                       <span>{m.closed}/{m.total} {t("dashboard.done","done")}</span>

@@ -86,7 +86,7 @@ export default function MilestonesPage() {
       <div className="flex items-center gap-1">
         {(["all","open","closed","published"] as const).map(f=>(
           <button key={f} onClick={()=>setFilter(f)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${filter===f?"bg-[var(--primary)] text-white":"text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"}`}>
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${filter===f?"bg-gradient-to-r from-[#4f6ef7] to-[#8b5cf6] text-white shadow-sm":"text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"}`}>
             {f==="all"?t("common.all","All"):t(`milestone.status.${f}`,f)}
           </button>
         ))}
@@ -104,7 +104,7 @@ export default function MilestonesPage() {
             const soon = left !== null && left >= 0 && left <= 3;
             return (
               <Link key={m.id} to={`/milestones/${m.id}`}
-                className={`card rounded-xl p-5 hover:shadow-[var(--shadow-md)] transition-all group ${
+                className={`card rounded-xl p-5 hover-lift transition-all group ${
                   m.status==="closed"?"opacity-60":""}`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

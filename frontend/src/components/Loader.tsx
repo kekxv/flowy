@@ -3,19 +3,41 @@ interface LoaderProps {
   size?: "sm" | "md" | "lg"
 }
 
-const sizeMap = { sm: "h-4 w-4 border-2", md: "h-8 w-8 border-4", lg: "h-12 w-12 border-[3px]" }
+const sizeMap = {
+  sm: "h-4 w-4 border-2",
+  md: "h-8 w-8 border-[3px]",
+  lg: "h-12 w-12 border-[3px]",
+}
+
+function Spinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  return (
+    <div className={`${sizeMap[size]} relative`}>
+      {/* Background ring */}
+      <div className="absolute inset-0 rounded-full opacity-10" style={{ border: "inherit", borderColor: "var(--primary)" }} />
+      {/* Spinning arc */}
+      <div
+        className="absolute inset-0 animate-spin rounded-full"
+        style={{
+          borderColor: "var(--primary)",
+          borderRightColor: "transparent",
+          borderBottomColor: "transparent",
+        }}
+      />
+    </div>
+  )
+}
 
 export default function Loader({ fullScreen = false, size = "md" }: LoaderProps) {
   if (fullScreen) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className={`${sizeMap[size]} animate-spin rounded-full border-blue-600 border-t-transparent`} />
+        <Spinner size={size} />
       </div>
     )
   }
   return (
-    <div className="flex items-center justify-center pt-16">
-      <div className={`${sizeMap[size]} animate-spin rounded-full border-blue-600 border-t-transparent`} />
+    <div className="flex items-center justify-center py-16">
+      <Spinner size={size} />
     </div>
   )
 }
