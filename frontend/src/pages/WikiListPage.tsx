@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Plus, BookOpen, Search, Globe, Lock, Clock, X } from "lucide-react";
+import { Plus, BookOpen, Search, Lock, X } from "lucide-react";
 import { listWikiPages, type WikiPageData } from "../api/wiki";
 import Loader from "../components/Loader";
 
@@ -113,88 +113,60 @@ export default function WikiListPage() {
         </div>
       </div>
 
-      {/* Page List */}
+      {/* Page List — Notion-style borderless */}
       {pages.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 rounded-xl text-[var(--text-muted)]">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bg-muted)]">
-            <BookOpen size={32} className="text-[var(--text-muted)]/50" />
-          </div>
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">{t("wiki.no_pages", "No wiki pages found")}</p>
-          <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-            {search ? "Try a different search term" : "Start by creating your first page"}
-          </p>
+        <div className="card flex flex-col items-center justify-center py-16 rounded-[8px] text-[var(--text-muted)]">
+          <BookOpen size={28} className="mb-2 opacity-20" strokeWidth={1.5} />
+          <p className="text-[13px]">{t("wiki.no_pages", "No wiki pages found")}</p>
           {activeTab === "all" && !search && (
-            <button onClick={() => navigate("/wiki/new")} className="btn btn-primary btn-sm mt-5">
-              <Plus size={14} />
-              {t("wiki.create_first", "Create your first page")}
+            <button onClick={() => navigate("/wiki/new")} className="btn btn-outline btn-sm mt-4">
+              <Plus size={14} />{t("wiki.create_first", "Create your first page")}
             </button>
           )}
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="divide-y divide-[var(--border-light)]">
           {pages.map((page) => (
             <div
               key={page.id}
               onClick={() => navigate(`/wiki/${page.id}`)}
-              className="card rounded-xl p-4 cursor-pointer  group"
+              className="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-[#f9fafb] group"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/8 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
-                  <BookOpen size={18} />
+              <BookOpen size={16} strokeWidth={1.8} className="mt-0.5 text-[var(--text-faint)] shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[14px] font-semibold truncate text-[var(--text)] group-hover:text-[var(--primary)] transition-colors">
+                    {page.title}
+                  </h3>
+                  {!page.is_public && (
+                    <Lock size={11} className="text-[var(--text-faint)] shrink-0" />
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[14px] font-semibold truncate group-hover:text-[var(--primary)] transition-colors">
-                      {page.title}
-                    </h3>
-                    {page.is_public ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 border border-emerald-200/50 shrink-0">
-                        <Globe size={9} />
-                        {t("wiki.public", "Public")}
+                <p className="mt-0.5 text-[12px] text-[var(--text-muted)] line-clamp-1">
+                  {getPreview(page.content)}
+                </p>
+                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-faint)]">
+                  <span>{page.owner_display_name || page.owner_name}</span>
+                  <span>·</span>
+                  <span>{formatDate(page.updated_at)}</span>
+                  {page.weight > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-amber-500">★ {page.weight}</span>
+                    </>
+                  )}
+                  {page.tags && (
+                    <>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        {page.tags.split(",").filter(t => t.trim()).slice(0, 3).map((tag) => (
+                          <span key={tag} className="rounded-[4px] bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
+                            {tag.trim()}
+                          </span>
+                        ))}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] border shrink-0">
-                        <Lock size={9} />
-                        {t("wiki.private", "Private")}
-                      </span>
-                    )}
-                    {page.weight > 0 && (
-                      <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 border border-amber-200/50">
-                        ★ {page.weight}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1.5 text-[12px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
-                    {getPreview(page.content)}
-                  </p>
-                  <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[8px] font-bold text-[var(--primary)]">
-                        {(page.owner_display_name || page.owner_name).charAt(0).toUpperCase()}
-                      </span>
-                      {page.owner_display_name || page.owner_name}
-                    </span>
-                    <span className="text-[var(--border)]">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock size={10} className="text-[var(--text-muted)]/60" />
-                      {formatDate(page.updated_at)}
-                    </span>
-                    {page.tags && (
-                      <>
-                        <span className="text-[var(--border)]">·</span>
-                        <span className="flex items-center gap-1 flex-wrap">
-                          {page.tags.split(",").filter(t => t.trim()).slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-full bg-[var(--primary)]/8 px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]"
-                            >
-                              {tag.trim()}
-                            </span>
-                          ))}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

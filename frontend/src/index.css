@@ -2,33 +2,49 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  --bg: #ffffff;
+  /* Backgrounds */
+  --bg: #f9fafb;
   --bg-card: #ffffff;
-  --bg-hover: #f8f9fa;
-  --bg-muted: #f4f5f7;
-  --bg-sidebar: #fafbfc;
-  --text: #1a1a2e;
-  --text-secondary: #525866;
-  --text-muted: #9ca3af;
-  --border: #e8eaed;
-  --border-light: #f0f1f3;
-  --primary: #0d9488;
-  --primary-hover: #0f766e;
-  --primary-light: #f0fdfa;
-  --radius: 10px;
+  --bg-hover: #f3f4f6;
+  --bg-muted: #f9fafb;
+  --bg-sidebar: #ffffff;
+
+  /* Text */
+  --text: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+
+  /* Borders */
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+
+  /* Primary */
+  --primary: #0f766e;
+  --primary-hover: #0d6560;
+  --primary-light: #ccfbf1;
+  --primary-subtle: #f0fdfa;
+
+  /* Radius */
+  --radius: 8px;
   --radius-sm: 6px;
-  --radius-lg: 14px;
+  --radius-lg: 10px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0,0,0,.03);
+  --shadow-sm: 0 1px 3px 0 rgba(0,0,0,.04), 0 1px 2px -1px rgba(0,0,0,.03);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -2px rgba(0,0,0,.03);
+
   --transition: 150ms cubic-bezier(.4,0,.2,1);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -42,35 +58,37 @@ body {
 
 /* ─── Buttons ─── */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: none; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; border: none; border-radius: var(--radius-sm);
   padding: 7px 14px; font-size: 13px; font-weight: 500;
   cursor: pointer; transition: all var(--transition);
-  line-height: 1.4; font-family: inherit;
+  line-height: 1.4; font-family: inherit; white-space: nowrap;
 }
 .btn-primary {
   background: var(--primary); color: #fff;
+  box-shadow: var(--shadow-xs);
 }
-.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:hover { background: var(--primary-hover); box-shadow: var(--shadow-sm); }
+.btn-primary:active { transform: scale(.98); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-.btn-ghost { background: transparent; color: var(--text-secondary); }
-.btn-ghost:hover { background: var(--bg-muted); color: var(--text); }
+.btn-ghost { background: transparent; color: var(--text-muted); }
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
 
 .btn-outline {
-  background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
 }
-.btn-outline:hover {
-  border-color: var(--primary); color: var(--primary); background: var(--primary-light);
-}
+.btn-outline:hover { border-color: #d1d5db; background: var(--bg-hover); }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .btn-xs { padding: 2px 8px; font-size: 11px; border-radius: 4px; }
 
-/* ─── Card — flat, border-only ─── */
+/* ─── Card — border + ultra-light shadow ─── */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: border-color var(--transition);
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 .card:hover { border-color: #d1d5db; }
 
@@ -79,64 +97,72 @@ body {
   width: 100%; border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 7px 11px; font-size: 13px;
-  color: var(--text); background: var(--bg);
+  color: var(--text); background: var(--bg-card);
   transition: all var(--transition);
   outline: none; font-family: inherit;
 }
 .input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(13,148,136,.1);
+  box-shadow: 0 0 0 3px rgba(15,118,110,.08);
 }
-.input::placeholder { color: var(--text-muted); }
+.input::placeholder { color: var(--text-faint); }
 
 /* ─── Select ─── */
 .select {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 7px 30px 7px 11px; font-size: 13px;
-  color: var(--text); background: var(--bg);
+  color: var(--text); background: var(--bg-card);
   outline: none; font-family: inherit; cursor: pointer;
   transition: all var(--transition);
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center;
 }
-.select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(13,148,136,.1);
-}
+.select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,118,110,.08); }
 
-/* ─── Status badges ─── */
+/* ─── Status badges — muted system ─── */
 .status-open, .status-in_progress, .status-resolved, .status-closed, .status-cancelled,
 .status-proposed, .status-accepted, .status-rejected {
   display: inline-flex; align-items: center; gap: 4px;
-  border-radius: 4px; padding: 1px 8px;
-  font-size: 11px; font-weight: 500; line-height: 20px;
+  border-radius: var(--radius-sm); padding: 1px 8px;
+  font-size: 12px; font-weight: 500; line-height: 20px;
 }
-.status-open { background: #dbeafe; color: #1e40af; }
-.status-in_progress { background: #fef3c7; color: #92400e; }
-.status-resolved { background: #ccfbf1; color: #115e59; }
+.status-open { background: #fef3c7; color: #92400e; }
+.status-in_progress { background: #e0f2fe; color: #075985; }
+.status-resolved { background: #d1fae5; color: #065f46; }
 .status-closed { background: #f3f4f6; color: #6b7280; }
 .status-cancelled { background: #fee2e2; color: #991b1b; }
 .status-proposed { background: #e0e7ff; color: #3730a3; }
-.status-accepted { background: #ccfbf1; color: #115e59; }
+.status-accepted { background: #d1fae5; color: #065f46; }
 .status-rejected { background: #fce7f3; color: #9d174d; }
 
-/* ─── Priority ─── */
+/* ─── Priority — muted ─── */
 .priority-critical { background: #fee2e2; color: #991b1b; }
 .priority-high { background: #ffedd5; color: #9a3412; }
 .priority-medium { background: #f3f4f6; color: #4b5563; }
-.priority-low { background: #dbeafe; color: #1e40af; }
+.priority-low { background: #e0f2fe; color: #075985; }
 .priority-trivial { background: #f9fafb; color: #9ca3af; }
+
+/* ─── Role badges — muted ─── */
+.role-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  border-radius: var(--radius-sm); padding: 1px 7px;
+  font-size: 11px; font-weight: 500;
+}
+.role-project_lead { background: #f0fdfa; color: #0f766e; }
+.role-backend_dev { background: #e0f2fe; color: #075985; }
+.role-frontend_dev { background: #cffafe; color: #0e7490; }
+.role-tester { background: #d1fae5; color: #065f46; }
+.role-ui_designer { background: #fce7f3; color: #9d174d; }
+.role-clerk { background: #ffedd5; color: #9a3412; }
+.role-devops { background: #e0e7ff; color: #3730a3; }
+.role-member { background: #f3f4f6; color: #6b7280; }
 
 /* ─── Animations ─── */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(.97); }
@@ -151,33 +177,19 @@ body {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-muted) 25%, var(--bg-hover) 50%, var(--bg-muted) 75%);
+  background: linear-gradient(90deg, #f3f4f6 25%, #f9fafb 50%, #f3f4f6 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-sm);
 }
-.page-enter { animation: fadeInUp .2s ease-out; }
-
-/* ─── Role badges ─── */
-.role-badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  border-radius: 4px; padding: 1px 7px;
-  font-size: 11px; font-weight: 500;
-}
-.role-project_lead { background: #f0fdfa; color: #0f766e; }
-.role-backend_dev { background: #dbeafe; color: #1d4ed8; }
-.role-frontend_dev { background: #cffafe; color: #0e7490; }
-.role-tester { background: #dcfce7; color: #15803d; }
-.role-ui_designer { background: #fce7f3; color: #be185d; }
-.role-clerk { background: #fff7ed; color: #c2410c; }
-.role-devops { background: #ede9fe; color: #6d28d9; }
-.role-member { background: #f3f4f6; color: #6b7280; }
+.page-enter { animation: fadeInUp .18s ease-out; }
 
 /* ─── Markdown ─── */
+.prose { font-size: 14px; line-height: 1.7; color: var(--text-secondary); }
 .prose code {
-  background: #f1f5f9; color: #0f766e;
+  background: #f1f5f9; color: var(--primary);
   padding: 2px 5px; border-radius: 3px;
-  font-size: 0.875em; font-weight: 500;
+  font-size: 0.85em; font-weight: 500;
 }
 .prose code::before, .prose code::after { content: none; }
 .prose pre {
@@ -187,13 +199,13 @@ body {
   padding: 14px 16px; overflow-x: auto;
   font-size: 0.8125em; line-height: 1.7;
 }
-.prose pre code {
-  background: transparent; color: inherit;
-  padding: 0; font-size: 1em; font-weight: 400;
-}
+.prose pre code { background: transparent; color: inherit; padding: 0; font-size: 1em; }
 
 /* ─── Selection ─── */
-::selection { background: rgba(13,148,136,.15); }
+::selection { background: rgba(15,118,110,.12); }
 
 /* ─── Focus visible ─── */
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+
+/* ─── Mono text utility ─── */
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
