@@ -194,8 +194,9 @@ export default function IssueListPage() {
               const assignees = (issue as any).assignees || [];
               const milestoneIds = (issue as any).milestone_ids || [];
               return (
-                <div key={issue.id} className="group border-l-[3px]" style={{ borderLeftColor: issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb" }}>
-                  <Link to={`/issues/${issue.id}`} className="flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[#f9fafb]">
+                <Link to={`/issues/${issue.id}`} key={issue.id} className="group block border-l-[3px] transition-colors hover:bg-[#f9fafb]" style={{ borderLeftColor: issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb" }}>
+                  {/* Title row */}
+                  <div className="flex items-center gap-2 px-4 pt-2.5">
                     {/* Type badge */}
                     <span className={`shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold ${isFeature ? "bg-violet-50 text-violet-600" : "bg-amber-50 text-amber-600"}`}>
                       {isFeature ? "需求" : "问题"}
@@ -228,7 +229,7 @@ export default function IssueListPage() {
                       <UserPlus size={13} />
                     </button>
                     <ChevronRight size={14} className="hidden sm:block shrink-0 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all" />
-                  </Link>
+                  </div>
                   {/* Meta row */}
                   <div className="flex items-center gap-2 px-4 pb-2.5 pl-[52px] flex-wrap text-[11px] text-[var(--text-faint)]">
                     <span className="mono">#{issue.id.slice(0, 8)}</span>
@@ -257,7 +258,7 @@ export default function IssueListPage() {
                       </span>
                     )}
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
