@@ -80,7 +80,10 @@ async def oauth_init(
         db_settings[s.key] = s.value
     cid = db_settings.get(f"{provider}_client_id") or cfg["client_id"]
     csec = db_settings.get(f"{provider}_client_secret") or cfg["client_secret"]
-    inst = (db_settings.get(f"{provider}_instance_url") or instance_url).strip().rstrip("/")
+    try:
+        inst = await connection_service.resolve_instance_url(db, provider, instance_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     cfg = {**cfg, "client_id": cid, "client_secret": csec, "instance_url": inst}
     if not cfg["client_id"]:
         raise HTTPException(status_code=400, detail=f"OAuth not configured for {provider}")
@@ -226,6 +229,10 @@ async def _exchange_and_save_oauth(
 
 async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
     """Get a valid access token, refreshing if expired."""
+    try:
+        await connection_service.resolve_instance_url(db, conn.provider, conn.instance_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     token = decrypt_token(conn.oauth_token or conn.pat_token or "")
 
     # Check expiry and refresh if needed
@@ -557,6 +564,9 @@ async def link_external_issue(
     user: User = Depends(get_current_user),
 ):
     await _check_issue_perm(issue_id, user, db)
+    conn = await db.get(ExternalConnection, data.connection_id)
+    if not conn or conn.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Connection not found")
     link = ExternalIssue(
         id=str(uuid.uuid4()),
         issue_id=issue_id,
@@ -598,7 +608,7 @@ async def refresh_external_link(
     if not link or link.issue_id != issue_id:
         raise HTTPException(status_code=404, detail="Link not found")
     conn = await db.get(ExternalConnection, link.connection_id)
-    if not conn:
+    if not conn or conn.user_id != user.id:
         raise HTTPException(status_code=404, detail="Connection not found")
 
     if not conn.pat_token and not conn.oauth_token:

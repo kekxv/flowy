@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.models.roles import PROJECT_ROLES
 
 
 class UserRegisterRequest(BaseModel):
@@ -68,6 +70,16 @@ class AuthStatusResponse(BaseModel):
 
 class ProjectRolesUpdate(BaseModel):
     roles: list[str] = Field(default_factory=list)
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, roles: list[str]) -> list[str]:
+        invalid = set(roles) - set(PROJECT_ROLES)
+        if invalid:
+            raise ValueError(f"Unknown project roles: {', '.join(sorted(invalid))}")
+        if len(roles) != len(set(roles)):
+            raise ValueError("Project roles must not contain duplicates")
+        return roles
 
 
 class AdminUserUpdate(BaseModel):

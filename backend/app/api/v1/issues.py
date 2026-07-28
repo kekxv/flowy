@@ -178,17 +178,6 @@ async def get_issue(
     return _issue_detail(issue, await _build_assignees(db, issue.id))
 
 
-def _is_assignee_only(data: IssueUpdate) -> bool:
-    """Check if the update only changes assignees and/or milestones (no restricted fields)."""
-    return (
-        data.title is None
-        and data.description is None
-        and data.status is None
-        and data.priority is None
-        and data.label_ids is None
-    )
-
-
 @router.put("/{issue_id}")
 async def update_issue(
     issue_id: str,
@@ -210,13 +199,6 @@ async def update_issue(
 
     # Admin, project_lead, and feature owner can do anything
     if not is_admin and not is_lead and not is_feature_owner:
-        # Allow assignee/milestone-only changes for everyone (claim/release/link milestone)
-        if (data.assignees is not None or data.milestone_ids is not None) and _is_assignee_only(
-            data
-        ):
-            safe = IssueUpdate(assignees=data.assignees, milestone_ids=data.milestone_ids)
-            issue = await issue_service.update_issue(db, issue, safe, changed_by=user.id)
-            return _issue_detail(issue, await _build_assignees(db, issue.id))
         # Reporter can change status to resolved/cancelled
         if is_reporter and data.status is not None and data.status in ("resolved", "cancelled"):
             safe_data = IssueUpdate(status=data.status)

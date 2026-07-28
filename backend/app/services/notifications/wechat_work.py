@@ -1,5 +1,6 @@
 import httpx
 
+from app.core.url_security import validate_http_url
 from app.services.notifications.base import NotificationChannel, NotificationEvent
 
 
@@ -31,6 +32,7 @@ class WeChatWorkChannel(NotificationChannel):
         if not url:
             return False
         try:
+            await validate_http_url(url, allow_private=True)
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
                     url, json={"msgtype": "text", "text": {"content": "Flowy 通知测试"}}
@@ -41,6 +43,7 @@ class WeChatWorkChannel(NotificationChannel):
 
     async def send(self, event: NotificationEvent, config: dict) -> bool:
         url = config["webhook_url"]
+        await validate_http_url(url, allow_private=True)
         mentioned = config.get("mentioned_list", [])
         mentioned_text = ""
         if mentioned:

@@ -92,7 +92,10 @@ class IssueDetailResponse(IssueResponse):
 
 class AssigneeInput(BaseModel):
     user_id: str
-    role: str = "member"
+    role: str = Field(
+        default="member",
+        pattern=r"^(project_lead|backend|backend_dev|frontend_dev|tester|ui_designer|devops|clerk|member)$",
+    )
 
 
 class IssueCreate(BaseModel):

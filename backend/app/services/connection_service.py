@@ -1,11 +1,46 @@
 import uuid
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import decrypt_token, encrypt_token
+from app.core.url_security import validate_http_url
 from app.models.external import ExternalConnection
+from app.models.settings import AppSetting
 from app.services.external import get_client
+
+
+def _canonical_instance(url: str) -> tuple[str, str, int, str]:
+    parsed = urlsplit(url.rstrip("/"))
+    scheme = parsed.scheme.lower()
+    port = parsed.port or (443 if scheme == "https" else 80)
+    return scheme, (parsed.hostname or "").rstrip(".").lower(), port, parsed.path.rstrip("/")
+
+
+async def resolve_instance_url(db: AsyncSession, provider: str, requested_url: str) -> str:
+    """Resolve a user request to a server-approved external-provider instance."""
+    requested = requested_url.strip().rstrip("/")
+    if provider == "github":
+        if requested:
+            raise ValueError("GitHub does not support a custom instance URL")
+        return ""
+    if provider != "gitea":
+        raise ValueError(f"Unsupported provider: {provider}")
+
+    configured_setting = await db.get(AppSetting, "gitea_instance_url")
+    configured = (
+        configured_setting.value.strip().rstrip("/") if configured_setting else ""
+    )
+    if configured:
+        await validate_http_url(configured, allow_private=True)
+        if requested and _canonical_instance(requested) != _canonical_instance(configured):
+            raise ValueError("Gitea instance must match the administrator-configured URL")
+        return configured
+
+    if requested and _canonical_instance(requested) != _canonical_instance("https://gitea.com"):
+        raise ValueError("Custom Gitea instances must be configured by an administrator")
+    return ""
 
 
 async def create_pat_connection(
@@ -15,6 +50,7 @@ async def create_pat_connection(
     token: str,
     instance_url: str = "",
 ) -> ExternalConnection:
+    instance_url = await resolve_instance_url(db, provider, instance_url)
     client = get_client(provider, token, instance_url)
     username = await client.get_current_username()
 
@@ -40,6 +76,7 @@ async def test_connection(db: AsyncSession, connection_id: str) -> bool:
     encrypted = conn.pat_token or conn.oauth_token
     if not encrypted:
         return False
+    await resolve_instance_url(db, conn.provider, conn.instance_url)
     token = decrypt_token(encrypted)
     client = get_client(conn.provider, token, conn.instance_url)
     return await client.test_connection()

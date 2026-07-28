@@ -1,3 +1,4 @@
+from cryptography.fernet import Fernet
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
 
@@ -45,6 +46,29 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return _parse_cors(self.cors_origins)
+
+    def validate_security_secrets(self) -> None:
+        """Reject secrets that would make production tokens forgeable or unreadable."""
+        weak_values = {
+            "",
+            "change-me-to-random-secret",
+            "change-me-to-another-secret",
+            "dev-secret-change-in-production",
+            "dev-jwt-secret-change-in-production",
+        }
+        for field_name in ("jwt_secret", "app_secret_key"):
+            value = getattr(self, field_name)
+            if value in weak_values or len(value) < 32:
+                raise ValueError(f"{field_name.upper()} must be a non-default secret of 32+ characters")
+        if not self.encryption_key:
+            raise ValueError("ENCRYPTION_KEY must be configured and persisted")
+        key = self.encryption_key
+        if len(key) % 4:
+            key += "=" * (4 - len(key) % 4)
+        try:
+            Fernet(key.encode())
+        except Exception as exc:
+            raise ValueError("ENCRYPTION_KEY must be a valid Fernet key") from exc
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

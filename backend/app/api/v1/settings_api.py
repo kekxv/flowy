@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_admin
+from app.dependencies import require_admin
 from app.models.settings import AppSetting
 from app.models.user import User
 
@@ -12,10 +12,17 @@ router = APIRouter(prefix="/system/settings", tags=["system_settings"])
 
 @router.get("")
 async def get_settings(
-    req: Request, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user)
+    req: Request, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)
 ):
     result = await db.execute(select(AppSetting))
-    data = {s.key: s.value for s in result.scalars().all()}
+    safe_keys = {
+        "frontend_url",
+        "github_client_id",
+        "gitea_client_id",
+        "gitea_instance_url",
+        "registration_enabled",
+    }
+    data = {s.key: s.value for s in result.scalars().all() if s.key in safe_keys}
     origin = req.headers.get("origin", str(req.base_url).rstrip("/"))
     data["_oauth_callback_url"] = origin + "/api/v1/external/connections/oauth/callback"
     return data

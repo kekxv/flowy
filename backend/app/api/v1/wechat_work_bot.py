@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import decrypt_token, encrypt_token
+from app.core.url_security import url_belongs_to_source, validate_http_url
 from app.database import get_db
 from app.dependencies import require_admin
 from app.models.user import User
@@ -41,6 +42,8 @@ from app.services.wechat_work_bot import bot_service
 from app.services.wechat_work_bot.bind_token import generate_bind_token as _gen_token
 
 router = APIRouter(prefix="/wechat-work-bot", tags=["wechat-work-bot"])
+
+MAX_INTRANET_FILE_BYTES = 50 * 1024 * 1024
 
 
 # ─── Config ───────────────────────────────────────────────────
@@ -428,6 +431,10 @@ async def create_intranet_source(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_admin),
 ):
+    try:
+        await validate_http_url(body.url, allow_private=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     now = datetime.now().isoformat()
     source = IntranetSource(
         id=str(uuid.uuid4()),
@@ -466,6 +473,10 @@ async def update_intranet_source(
     if body.name is not None:
         source.name = body.name
     if body.url is not None:
+        try:
+            await validate_http_url(body.url, allow_private=True)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         source.url = body.url
     if body.source_type is not None:
         source.source_type = body.source_type
@@ -544,19 +555,44 @@ async def download_intranet_file(
     if not source:
         raise HTTPException(404, "文件源不存在或已被删除")
 
-    # Security: verify file_url belongs to the configured source
-    if not file_url.startswith(source.url.rstrip("/") + "/") and file_url != source.url:
-        # Also allow if file_url starts with source.url exactly
-        source_base = source.url.rstrip("/")
-        if not file_url.startswith(source_base + "/"):
-            raise HTTPException(403, "文件地址不在配置的源范围内")
+    # Security: validate the destination and require canonical same-source containment.
+    try:
+        await validate_http_url(source.url, allow_private=True)
+        await validate_http_url(file_url, allow_private=True)
+    except ValueError as exc:
+        raise HTTPException(403, f"文件地址不安全: {exc}") from exc
+    if not url_belongs_to_source(file_url, source.url):
+        raise HTTPException(403, "文件地址不在配置的源范围内")
 
     # Fetch file from intranet
     import httpx
+
+    content = bytearray()
+    content_type = "application/octet-stream"
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(file_url)
+        async with (
+            httpx.AsyncClient(timeout=30, follow_redirects=False) as client,
+            client.stream("GET", file_url) as resp,
+        ):
+            if 300 <= resp.status_code < 400:
+                raise HTTPException(502, "内网文件重定向已被拒绝")
             resp.raise_for_status()
+            content_type = resp.headers.get(
+                "content-type", "application/octet-stream"
+            )
+            declared_length = resp.headers.get("content-length")
+            if declared_length:
+                try:
+                    if int(declared_length) > MAX_INTRANET_FILE_BYTES:
+                        raise HTTPException(413, "内网文件超过下载大小限制")
+                except ValueError:
+                    pass
+            async for chunk in resp.aiter_bytes():
+                content.extend(chunk)
+                if len(content) > MAX_INTRANET_FILE_BYTES:
+                    raise HTTPException(413, "内网文件超过下载大小限制")
+    except HTTPException:
+        raise
     except httpx.HTTPStatusError as e:
         raise HTTPException(502, f"内网文件获取失败: HTTP {e.response.status_code}")
     except Exception as e:
@@ -566,15 +602,13 @@ async def download_intranet_file(
     filename = file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
 
     # Build response with streaming
-    content_type = resp.headers.get("content-type", "application/octet-stream")
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
-        "Content-Length": str(len(resp.content)),
+        "Content-Length": str(len(content)),
     }
 
     return StreamingResponse(
-        iter([resp.content]),
+        iter([bytes(content)]),
         media_type=content_type,
         headers=headers,
     )
-

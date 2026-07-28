@@ -864,7 +864,7 @@ class CommandHandlers:
                         os.makedirs(attachments_dir, exist_ok=True)
                         # Generate unique filename
                         ext = filename_hint.rsplit(".", 1)[-1] if filename_hint and "." in filename_hint else "bin"
-                        local_filename = f"{uuid.uuid4().hex[:12]}.{ext}"
+                        local_filename = f"{uuid.uuid4().hex}.{ext}"
                         local_path = os.path.join(attachments_dir, local_filename)
                         with open(local_path, "wb") as f:
                             f.write(data)

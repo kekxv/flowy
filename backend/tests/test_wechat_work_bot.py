@@ -531,6 +531,43 @@ class TestBotComment:
         result = await handlers.handle_comment(["数据库连接超时", "已排查到慢查询"], {})
         assert "已评论" in result
 
+    @pytest.mark.asyncio
+    async def test_attachment_uses_full_uuid_capability_name(
+        self, db_session: AsyncSession, tmp_path, monkeypatch
+    ):
+        from app.models.issue import Comment
+
+        user = User(
+            **_make_user_kwargs(id="user-cm4", username="commenter4", email="cm4@ex.com")
+        )
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "Attachment test", user.id)
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+        monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+
+        class FakeWebSocketClient:
+            async def download_file(self, _url, _aes_key):
+                return b"image-data", "photo.png"
+
+        class FakeBotClient:
+            _ws_client = FakeWebSocketClient()
+
+        frame = {
+            "body": {
+                "msgtype": "image",
+                "image": {"url": "https://wechat.example/media", "aeskey": "key"},
+            },
+            "_bot_client": FakeBotClient(),
+        }
+
+        result = await handlers.handle_comment([_id(issue), "see image"], {}, frame)
+
+        assert "已评论" in result
+        comment = (await db_session.execute(select(Comment))).scalars().one()
+        filename = comment.body.split("attachment:", 1)[1].split(")", 1)[0]
+        assert len(filename.removesuffix(".png")) == 32
+
 
 # ── TestBotMilestone ──────────────────────────────────────────────────────────
 

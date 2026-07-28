@@ -1,5 +1,6 @@
 import httpx
 
+from app.core.url_security import validate_http_url
 from app.services.notifications.base import NotificationChannel, NotificationEvent
 
 
@@ -30,6 +31,7 @@ class WebhookChannel(NotificationChannel):
         if not url:
             return False
         try:
+            await validate_http_url(url, allow_private=True)
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(url, json={"test": True})
                 return resp.status_code < 500
@@ -38,6 +40,7 @@ class WebhookChannel(NotificationChannel):
 
     async def send(self, event: NotificationEvent, config: dict) -> bool:
         url = config["url"]
+        await validate_http_url(url, allow_private=True)
         payload = {
             "event": event.event_type,
             "title": event.title,

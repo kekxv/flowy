@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from jose import jwt
+import jwt
 
 from app.config import settings
 

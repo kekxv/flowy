@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.url_security import validate_http_url
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models.notification import (
     NotificationChannel,
     NotificationLog,
@@ -47,13 +48,24 @@ EVENT_TYPES = [
 ]
 
 
+async def _validate_destination_config(channel_type: str, config: dict) -> None:
+    url_key = "url" if channel_type == "webhook" else "webhook_url"
+    url = config.get(url_key)
+    if not isinstance(url, str) or not url:
+        raise HTTPException(status_code=422, detail=f"Missing notification {url_key}")
+    try:
+        await validate_http_url(url, allow_private=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 # Channels
 
 
 @router.get("/channels")
 async def list_channels(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     result = await db.execute(
         select(NotificationChannel).where(NotificationChannel.created_by == user.id)
@@ -76,13 +88,15 @@ async def list_channels(
 async def create_channel(
     data: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     if data.channel_type not in CHANNEL_REGISTRY:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown channel_type. Available: {', '.join(CHANNEL_REGISTRY.keys())}",
         )
+
+    await _validate_destination_config(data.channel_type, data.config)
 
     channel = NotificationChannel(
         id=str(uuid.uuid4()),
@@ -107,7 +121,7 @@ async def create_channel(
 async def test_channel(
     channel_id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     channel = await db.get(NotificationChannel, channel_id)
     if not channel or channel.created_by != user.id:
@@ -125,12 +139,14 @@ async def update_channel(
     channel_id: str,
     data: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     channel = await db.get(NotificationChannel, channel_id)
     if not channel or channel.created_by != user.id:
         raise HTTPException(status_code=404, detail="Channel not found")
 
+    if data.config is not None:
+        await _validate_destination_config(channel.channel_type, data.config)
     if data.name is not None:
         channel.name = data.name
     if data.config is not None:
@@ -152,7 +168,7 @@ async def update_channel(
 async def delete_channel(
     channel_id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     channel = await db.get(NotificationChannel, channel_id)
     if not channel or channel.created_by != user.id:
@@ -192,6 +208,10 @@ async def create_rule(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    channel = await db.get(NotificationChannel, data.channel_id)
+    if not channel or channel.created_by != user.id:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
     # Support comma-separated multi-event
     events = [e.strip() for e in data.event_type.split(",") if e.strip()]
     valid_events = {e["key"] for e in EVENT_TYPES}
@@ -280,8 +300,17 @@ async def list_logs(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = select(NotificationLog)
-    count_q = select(func.count(NotificationLog.id))
+    owner_filter = NotificationChannel.created_by == user.id
+    query = (
+        select(NotificationLog)
+        .join(NotificationChannel, NotificationChannel.id == NotificationLog.channel_id)
+        .where(owner_filter)
+    )
+    count_q = (
+        select(func.count(NotificationLog.id))
+        .join(NotificationChannel, NotificationChannel.id == NotificationLog.channel_id)
+        .where(owner_filter)
+    )
 
     if channel_id:
         query = query.where(NotificationLog.channel_id == channel_id)

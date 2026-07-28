@@ -20,7 +20,7 @@ async def trigger_sync(
     conn = await db.get(ExternalConnection, connection_id)
     if not conn or conn.user_id != user.id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    await sync_service.sync_all()
+    await sync_service.sync_connection(connection_id)
     return {"status": "completed", "message": "Sync triggered"}
 
 

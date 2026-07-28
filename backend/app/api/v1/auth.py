@@ -1,11 +1,13 @@
+import asyncio
+
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
-from jose import JWTError, jwt
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models.settings import AppSetting
 from app.models.tracking import UserProjectRole
 from app.models.user import User
@@ -28,42 +30,42 @@ from app.services.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+_registration_lock = asyncio.Lock()
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
-    # Check if registration is allowed
-    count_result = await db.execute(select(func.count(User.id)))
-    user_count = count_result.scalar() or 0
-    if user_count == 0:
-        pass  # First user always allowed
-    else:
-        setting = await db.get(AppSetting, "registration_enabled")
-        if not setting or setting.value != "true":
-            raise HTTPException(
-                status_code=403,
-                detail="Registration is closed. Please contact an administrator to create your account.",
-            )
+    # Serialize bootstrap registration within this process so only the first
+    # account can receive the administrator role.
+    async with _registration_lock:
+        count_result = await db.execute(select(func.count(User.id)))
+        user_count = count_result.scalar() or 0
+        if user_count > 0:
+            setting = await db.get(AppSetting, "registration_enabled")
+            if not setting or setting.value != "true":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Registration is closed. Please contact an administrator to create your account.",
+                )
 
-    existing = await db.execute(
-        select(User).where((User.username == data.username) | (User.email == data.email))
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Username or email already exists")
+        existing = await db.execute(
+            select(User).where((User.username == data.username) | (User.email == data.email))
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Username or email already exists")
 
-    # First user is always admin
-    user = User(
-        username=data.username,
-        email=data.email,
-        password_hash=hash_password(data.password),
-        display_name=data.display_name or data.username,
-        role="admin",
-    )
+        user = User(
+            username=data.username,
+            email=data.email,
+            password_hash=hash_password(data.password),
+            display_name=data.display_name or data.username,
+            role="admin" if user_count == 0 else "member",
+        )
 
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -96,7 +98,7 @@ async def refresh_token(data: RefreshTokenRequest, db: AsyncSession = Depends(ge
         )
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     user = await db.get(User, payload["sub"])
@@ -130,7 +132,7 @@ async def get_my_project_roles(
 @router.put("/me/project-roles")
 async def set_my_project_roles(
     data: ProjectRolesUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     # Delete existing

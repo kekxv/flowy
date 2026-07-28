@@ -13,7 +13,7 @@ BIND_TOKEN_TTL = 600  # 10 minutes
 
 def _sign(payload: str) -> str:
     key = (settings.app_secret_key or "flowy-default").encode()
-    return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()
 
 
 def generate_bind_token(flowy_user_id: str, role: str) -> str:
@@ -42,7 +42,7 @@ def verify_bind_token(token: str) -> dict | None:
             return None
 
         payload_str, sig = raw.rsplit(".", 1)
-        if _sign(payload_str) != sig:
+        if not hmac.compare_digest(_sign(payload_str), sig):
             return None
 
         payload = json.loads(payload_str)

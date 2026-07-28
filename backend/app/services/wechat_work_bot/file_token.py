@@ -11,7 +11,7 @@ from app.config import settings
 
 def _sign(payload: str) -> str:
     key = (settings.app_secret_key or "flowy-default").encode()
-    return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()
 
 
 def generate_file_token(source_id: str, file_url: str, ttl_seconds: int = 3600) -> str:
@@ -39,7 +39,7 @@ def verify_file_token(token: str) -> dict | None:
             return None
 
         payload_str, sig = raw.rsplit(".", 1)
-        if _sign(payload_str) != sig:
+        if not hmac.compare_digest(_sign(payload_str), sig):
             return None
 
         payload = json.loads(payload_str)

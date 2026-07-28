@@ -113,7 +113,7 @@ async def update_wiki_page(
     page = await wiki_service.get_page_for_user(db, page_id, user.id)
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
-    if not wiki_service.can_edit(page, user.id):
+    if not await wiki_service.can_edit(db, page, user.id):
         raise HTTPException(status_code=403, detail="No permission to edit this wiki page")
 
     page = await wiki_service.update_page(
@@ -238,7 +238,7 @@ async def upload_wiki_file(
         )
 
     # Generate unique filename
-    local_filename = f"{uuid.uuid4().hex[:12]}{ext}"
+    local_filename = f"{uuid.uuid4().hex}{ext}"
     attachments_dir = _get_wiki_attachments_dir()
     os.makedirs(attachments_dir, exist_ok=True)
     local_path = os.path.join(attachments_dir, local_filename)

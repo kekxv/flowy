@@ -8,6 +8,8 @@ from urllib.parse import unquote, urljoin
 
 import httpx
 
+from app.core.url_security import url_belongs_to_source, validate_http_url
+
 logger = logging.getLogger("uvicorn")
 
 
@@ -16,16 +18,20 @@ async def parse_source(url: str, source_type: str) -> list[dict]:
 
     Returns list of {"name": str, "url": str} dicts.
     """
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+    await validate_http_url(url, allow_private=True)
+    async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
         resp = await client.get(url)
+        if 300 <= getattr(resp, "status_code", 200) < 400:
+            raise ValueError("Intranet source redirects are not allowed")
         resp.raise_for_status()
 
     if source_type == "json":
-        return _parse_json(resp.text, url)
+        files = _parse_json(resp.text, url)
     elif source_type == "nginx":
-        return _parse_nginx(resp.text, url)
+        files = _parse_nginx(resp.text, url)
     else:
         raise ValueError(f"Unknown source type: {source_type}")
+    return [item for item in files if url_belongs_to_source(item.get("url", ""), url)]
 
 
 def _parse_json(body: str, base_url: str) -> list[dict]:

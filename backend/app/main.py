@@ -46,6 +46,7 @@ class UnicodeJSONResponse(JSONResponse):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Starting application lifespan...")
+    settings.validate_security_secrets()
 
     # Auto-apply migrations using alembic (run in thread to avoid blocking async loop)
     import asyncio

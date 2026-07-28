@@ -12,6 +12,7 @@ from app.database import async_session
 from app.models.external import ExternalConnection, ExternalIssue
 from app.models.issue import Issue
 from app.models.tracking import IssueAssigneeLog
+from app.services.connection_service import resolve_instance_url
 from app.services.external import get_client
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
@@ -48,8 +49,18 @@ class SyncService:
 
     async def sync_all(self):
         """Sync all external issue links."""
+        await self._sync_links()
+
+    async def sync_connection(self, connection_id: str):
+        """Sync only links belonging to one explicitly authorized connection."""
+        await self._sync_links(connection_id)
+
+    async def _sync_links(self, connection_id: str | None = None):
         async with async_session() as db:
-            links = await db.execute(select(ExternalIssue))
+            query = select(ExternalIssue)
+            if connection_id is not None:
+                query = query.where(ExternalIssue.connection_id == connection_id)
+            links = await db.execute(query)
             links = list(links.scalars().all())
             if not links:
                 return
@@ -63,6 +74,7 @@ class SyncService:
                     encrypted = conn.pat_token or conn.oauth_token
                     if not encrypted:
                         continue
+                    await resolve_instance_url(db, conn.provider, conn.instance_url)
 
                     # Only sync if last sync was more than 1 minute ago
                     if link.last_synced_at:

@@ -288,19 +288,25 @@ def _can_view(page: WikiPage, user_id: str) -> bool:
     return any(c.id == user_id for c in page.collaborators)
 
 
-def _can_edit(page: WikiPage, user_id: str) -> bool:
-    """Check if user can edit the page."""
+async def _can_edit(db: AsyncSession, page: WikiPage, user_id: str) -> bool:
+    """Check if user owns the page or has explicit editor permission."""
     if page.owner_id == user_id:
         return True
-    return any(c.id == user_id for c in page.collaborators)
+    result = await db.execute(
+        select(wiki_collaborators_table.c.permission).where(
+            wiki_collaborators_table.c.wiki_id == page.id,
+            wiki_collaborators_table.c.user_id == user_id,
+        )
+    )
+    return result.scalar_one_or_none() == "editor"
 
 
 def is_owner(page: WikiPage, user_id: str) -> bool:
     return page.owner_id == user_id
 
 
-def can_edit(page: WikiPage, user_id: str) -> bool:
-    return _can_edit(page, user_id)
+async def can_edit(db: AsyncSession, page: WikiPage, user_id: str) -> bool:
+    return await _can_edit(db, page, user_id)
 
 
 def can_view(page: WikiPage, user_id: str) -> bool:
