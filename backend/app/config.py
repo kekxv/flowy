@@ -1,7 +1,23 @@
-import json
-
-from pydantic import field_validator
+from pydantic import computed_field
 from pydantic_settings import BaseSettings
+
+
+def _parse_cors(raw: str) -> list[str]:
+    """Parse CORS origins from a string (JSON array or comma-separated)."""
+    raw = raw.strip()
+    if not raw:
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # Try JSON array first
+    if raw.startswith("["):
+        import json
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(s).strip() for s in parsed if str(s).strip()]
+        except (json.JSONDecodeError, ValueError):
+            pass
+    # Comma-separated
+    return [s.strip() for s in raw.split(",") if s.strip()]
 
 
 class Settings(BaseSettings):
@@ -16,7 +32,8 @@ class Settings(BaseSettings):
     sync_interval_minutes: int = 5
 
     frontend_url: str = "http://localhost:5173"
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # Read as raw string to avoid pydantic-settings json.loads on list[str]
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # OAuth (optional)
     github_client_id: str = ""
@@ -24,23 +41,10 @@ class Settings(BaseSettings):
     gitea_client_id: str = ""
     gitea_client_secret: str = ""
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            v = v.strip()
-            if not v:
-                return ["http://localhost:5173", "http://127.0.0.1:5173"]
-            # Try JSON array first: ["http://..."]
-            try:
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return parsed
-            except (json.JSONDecodeError, ValueError):
-                pass
-            # Fall back to comma-separated: http://...,http://...
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return _parse_cors(self.cors_origins)
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
