@@ -58,7 +58,7 @@ export default function MilestonesPage() {
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("milestone.title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("milestone.title")}</h1>
           <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{milestones.length} milestones · {milestones.filter(m=>m.status==="open").length} active</p>
         </div>
         <button onClick={()=>setShowForm(!showForm)} className="btn btn-primary"><Plus size={15}/>{t("milestone.new_milestone")}</button>

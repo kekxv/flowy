@@ -44,7 +44,7 @@ export default function IssueCreatePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5 page-enter">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("issues.new_issue")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("issues.new_issue")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("issues.create_desc","Create a new issue in the project.")}</p>
       </div>
 

@@ -8,6 +8,7 @@ import { listIssues, type IssueData } from "../api/issues";
 import { ALL_ROLES, STAT, PRIS } from "../constants";
 import Loader from "../components/Loader";
 import { timeAgo } from "../utils/time";
+
 const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", proposed:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", accepted:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400", rejected:"border-l-red-400" })[s]||"";
 
 type StatusGroup = {key: string; label: string; emoji: string; color: string; statuses: string[]};
@@ -25,8 +26,7 @@ export default function IssueListPage() {
   const [page, setPage] = useState(1); const [status, setStatus] = useState(sp.get("status")||"all");
   const [priority, setPriority] = useState(sp.get("priority")||"all"); const [q, setQ] = useState(sp.get("q")||"");
   const [issueType, setIssueType] = useState(sp.get("issue_type")||"all");
-  const [debouncedQ, setDebouncedQ] = useState(q);
-  useEffect(()=>{const t=setTimeout(()=>setDebouncedQ(q),350);return()=>clearTimeout(t);},[q]);
+  const [searchQ, setSearchQ] = useState(sp.get("q")||"");
   const [labels, setLabels] = useState<Array<{id:string;name:string;color:string}>>([]);
   const [milestones, setMilestones] = useState<Array<{id:string;name:string;status:string}>>([]);
   const [labelId, setLabelId] = useState(sp.get("label_id")||"");
@@ -96,11 +96,11 @@ export default function IssueListPage() {
   useEffect(()=>{const poll=()=>api.get("/dashboard").then(r=>{const ids:Set<string>=new Set((r.data.active_timers||[]).map((t:any)=>t.issue_id as string));setActiveTimerIds(ids);});poll();const i=setInterval(poll,15000);return()=>clearInterval(i);},[]);
 
   const fetch = () => { setLoading(true); const p: Record<string,string> = {page:String(page),per_page:"20"};
-    if (status!=="all") p.status=status; if (priority!=="all") p.priority=priority; if (debouncedQ) p.q=debouncedQ; if (labelId) p.label_id=labelId;
+    if (status!=="all") p.status=status; if (priority!=="all") p.priority=priority; if (q) p.q=q; if (labelId) p.label_id=labelId;
     if (issueType!=="all") p.issue_type=issueType;
     if (sp.get("reporter")==="me"&&user) p.reporter_id=user.id;
     listIssues(p).then(r=>{setIssues(r.data);setTotal(r.meta.total);setLoading(false);}); };
-  useEffect(fetch,[page,status,priority,debouncedQ,labelId,issueType]);
+  useEffect(fetch,[page,status,priority,q,labelId,issueType]);
 
   const doPopup = async (id:string, field:string, value:string) => {
     try {
@@ -143,7 +143,7 @@ export default function IssueListPage() {
     <div className="mx-auto max-w-5xl space-y-4 page-enter">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h1 className="text-2xl font-bold tracking-tight">{t("issues.title")}</h1>{total>0&&<p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{total} issues</p>}</div>
+        <div><h1 className="text-2xl font-bold tracking-tight text-gradient">{t("issues.title")}</h1>{total>0&&<p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{total} issues</p>}</div>
         <Link to="/issues/new" className="btn btn-primary"><Plus size={15}/>{t("issues.new_issue")}</Link>
       </div>
 
@@ -151,7 +151,19 @@ export default function IssueListPage() {
         {/* Search row */}
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
-          <input placeholder={t("common.search")} value={q} onChange={e=>{setQ(e.target.value);setPage(1);}} className="w-full rounded-lg border-0 bg-transparent py-1.5 pl-8 pr-2 text-[13px] outline-none"/>
+          <input
+            placeholder={t("common.search") + "…  ⏎"}
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { setQ(searchQ); setPage(1); } }}
+            className="w-full rounded-lg border-0 bg-transparent py-1.5 pl-8 pr-8 text-[13px] outline-none"
+          />
+          {searchQ && (
+            <button onClick={() => { setSearchQ(""); setQ(""); setPage(1); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         {/* Type row */}

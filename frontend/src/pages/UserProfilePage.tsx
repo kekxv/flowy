@@ -82,12 +82,12 @@ export default function UserProfilePage() {
       {/* User info */}
       <div className="card rounded-xl p-5">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--primary)]/10 text-xl font-bold text-[var(--primary)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xl font-bold text-white shadow-[0_4px_12px_rgba(79,110,247,.25)]">
             {(user?.display_name||user?.username||"?").slice(0,2).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-lg font-bold">{user?.display_name||user?.username}</h1>
-            <p className="text-[13px] text-[var(--text-muted)]">@{user?.username} · {user?.email} · <span className="rounded bg-[var(--bg-muted)] px-1 py-0.5 text-[11px]">{user?.role}</span></p>
+            <h1 className="text-lg font-bold text-gradient">{user?.display_name||user?.username}</h1>
+            <p className="text-[13px] text-[var(--text-muted)]">@{user?.username} · {user?.email} · <span className="rounded bg-[var(--bg-muted)] px-1.5 py-0.5 text-[11px] font-medium">{user?.role}</span></p>
           </div>
         </div>
       </div>

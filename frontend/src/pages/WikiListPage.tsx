@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Plus, BookOpen, Search, Globe, Lock, Clock, User } from "lucide-react";
+import { Plus, BookOpen, Search, Globe, Lock, Clock, User, X } from "lucide-react";
 import { listWikiPages, type WikiPageData } from "../api/wiki";
 import Loader from "../components/Loader";
 
@@ -12,11 +12,13 @@ export default function WikiListPage() {
   const navigate = useNavigate();
   const [pages, setPages] = useState<WikiPageData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const PER_PAGE = 20;
+  const didMount = useRef(false);
 
   const fetchPages = useCallback(async () => {
     setLoading(true);
@@ -30,9 +32,9 @@ export default function WikiListPage() {
   }, [search, activeTab, page]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchPages, search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [fetchPages, search]);
+    if (didMount.current) fetchPages();
+    else { didMount.current = true; fetchPages(); }
+  }, [fetchPages]);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "all", label: t("wiki.tab_all", "All") },
@@ -64,9 +66,9 @@ export default function WikiListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("wiki.title", "Knowledge Base")}</h1>
-          <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-            {pages.length} {t("wiki.pages_count", "pages")}
+          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("wiki.title", "Knowledge Base")}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+            {total > 0 ? total : pages.length} {t("wiki.pages_count", "pages")}
           </p>
         </div>
         <button onClick={() => navigate("/wiki/new")} className="btn btn-primary">
@@ -81,20 +83,27 @@ export default function WikiListPage() {
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder={t("wiki.search_placeholder", "Search wiki...")}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(79,110,247,.12)]"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { setSearch(searchInput); setPage(1); } }}
+            placeholder={t("wiki.search_placeholder", "Search wiki…  ⏎")}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pl-8 pr-8 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(79,110,247,.12)]"
           />
+          {searchInput && (
+            <button onClick={() => { setSearchInput(""); setSearch(""); setPage(1); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
+              <X size={14} />
+            </button>
+          )}
         </div>
         <div className="flex gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setPage(1); }}
-              className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-all ${
                 activeTab === tab.key
-                  ? "bg-[var(--primary)]/10 text-[var(--primary)]"
+                  ? "bg-gradient-to-r from-[#4f6ef7] to-[#8b5cf6] text-white shadow-sm"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               }`}
             >
@@ -122,10 +131,10 @@ export default function WikiListPage() {
             <div
               key={page.id}
               onClick={() => navigate(`/wiki/${page.id}`)}
-              className="card rounded-xl p-4 cursor-pointer hover:border-[var(--primary)]/30 transition-all group"
+              className="card rounded-xl p-4 cursor-pointer hover-lift group"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/8 text-[var(--primary)]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#4f6ef7]/10 to-[#8b5cf6]/10 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                   <BookOpen size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
