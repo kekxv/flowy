@@ -79,7 +79,7 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 page-enter">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("admin.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("admin.title")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("admin.system_stats")}</p>
       </div>
 
@@ -249,7 +249,7 @@ export default function AdminPage() {
       {/* Project role edit — bottom sheet */}
       {roleEditUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setRoleEditUser(null)}>
-          <div className="card w-80 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
               <button onClick={() => setRoleEditUser(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -274,7 +274,7 @@ export default function AdminPage() {
       {/* Add user modal */}
       {addUserOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setAddUserOpen(false)}>
-          <div className="card w-96 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-96 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">添加用户</h3>
               <button onClick={() => setAddUserOpen(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -317,7 +317,7 @@ export default function AdminPage() {
       {/* User edit modal */}
       {userEditUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setUserEditUser(null)}>
-          <div className="card w-80 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">编辑用户</h3>
               <button onClick={() => setUserEditUser(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

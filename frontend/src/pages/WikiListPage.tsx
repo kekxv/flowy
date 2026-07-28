@@ -66,7 +66,7 @@ export default function WikiListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("wiki.title", "Knowledge Base")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("wiki.title", "Knowledge Base")}</h1>
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">
             {total > 0 ? total : pages.length} {t("wiki.pages_count", "pages")}
           </p>
@@ -103,7 +103,7 @@ export default function WikiListPage() {
               onClick={() => { setActiveTab(tab.key); setPage(1); }}
               className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-all ${
                 activeTab === tab.key
-                  ? "bg-gradient-to-r from-[#0d9488] to-[#0891b2] text-white shadow-sm"
+                  ? "bg-[var(--primary)] text-white shadow-sm"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               }`}
             >
@@ -136,10 +136,10 @@ export default function WikiListPage() {
             <div
               key={page.id}
               onClick={() => navigate(`/wiki/${page.id}`)}
-              className="card rounded-xl p-4 cursor-pointer hover-lift group"
+              className="card rounded-xl p-4 cursor-pointer  group"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0d9488]/10 to-[#0891b2]/10 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/8 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                   <BookOpen size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -169,7 +169,7 @@ export default function WikiListPage() {
                   </p>
                   <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-[#0d9488]/12 to-[#0891b2]/12 text-[8px] font-bold text-[var(--primary)]">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[8px] font-bold text-[var(--primary)]">
                         {(page.owner_display_name || page.owner_name).charAt(0).toUpperCase()}
                       </span>
                       {page.owner_display_name || page.owner_name}
@@ -186,7 +186,7 @@ export default function WikiListPage() {
                           {page.tags.split(",").filter(t => t.trim()).slice(0, 3).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full bg-gradient-to-r from-[#0d9488]/6 to-[#0891b2]/6 px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]"
+                              className="rounded-full bg-[var(--primary)]/8 px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]"
                             >
                               {tag.trim()}
                             </span>

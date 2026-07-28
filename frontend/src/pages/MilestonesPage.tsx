@@ -58,7 +58,7 @@ export default function MilestonesPage() {
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("milestone.title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("milestone.title")}</h1>
           <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{milestones.length} milestones · {milestones.filter(m=>m.status==="open").length} active</p>
         </div>
         <button onClick={()=>setShowForm(!showForm)} className="btn btn-primary"><Plus size={15}/>{t("milestone.new_milestone")}</button>
@@ -86,7 +86,7 @@ export default function MilestonesPage() {
       <div className="flex items-center gap-1">
         {(["all","open","closed","published"] as const).map(f=>(
           <button key={f} onClick={()=>setFilter(f)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${filter===f?"bg-gradient-to-r from-[#0d9488] to-[#0891b2] text-white shadow-sm":"text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"}`}>
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${filter===f?"bg-[var(--primary)] text-white shadow-sm":"text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"}`}>
             {f==="all"?t("common.all","All"):t(`milestone.status.${f}`,f)}
           </button>
         ))}
@@ -104,7 +104,7 @@ export default function MilestonesPage() {
             const soon = left !== null && left >= 0 && left <= 3;
             return (
               <Link key={m.id} to={`/milestones/${m.id}`}
-                className={`card rounded-xl p-5 hover-lift transition-all group ${
+                className={`card rounded-xl p-5  transition-all group ${
                   m.status==="closed"?"opacity-60":""}`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

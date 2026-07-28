@@ -59,7 +59,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("dashboard.title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("dashboard.title")}</h1>
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">{data.stats.total_issues} issues · {data.stats.open_issues} active · {closedRate}% closed</p>
         </div>
         <div className="flex items-center gap-2">
@@ -72,23 +72,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats - compact row */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { k:"total_issues", path:"/issues", icon:BarChart3, gradient:"from-[#0d9488] to-[#0891b2]", bg:"bg-[#0d9488]/8" },
-          { k:"open_issues", path:"/issues?status=open,in_progress", icon:AlertCircle, gradient:"from-amber-400 to-orange-500", bg:"bg-amber-50" },
-          { k:"closed_issues", path:"/issues?status=closed,resolved", icon:CheckCircle2, gradient:"from-emerald-400 to-teal-500", bg:"bg-emerald-50" },
-          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, gradient:"from-[#0d9488] to-[#0891b2]", bg:"bg-teal-50" },
+          { k:"total_issues", path:"/issues", icon:BarChart3, color:"text-[var(--primary)] bg-[var(--primary)]/8" },
+          { k:"open_issues", path:"/issues?status=open,in_progress", icon:AlertCircle, color:"text-amber-600 bg-amber-50" },
+          { k:"closed_issues", path:"/issues?status=closed,resolved", icon:CheckCircle2, color:"text-emerald-600 bg-emerald-50" },
+          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, color:"text-teal-600 bg-teal-50" },
         ].map(s => (
-          <Link key={s.k} to={s.path} className="group relative flex items-center gap-3 card rounded-xl px-4 py-3 hover-lift overflow-hidden">
-            {/* Subtle gradient accent */}
-            <div className={`absolute -right-4 -top-4 h-16 w-16 rounded-full bg-gradient-to-br ${s.gradient} opacity-[.07] transition-opacity group-hover:opacity-[.12]`} />
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${s.gradient} text-white shadow-sm`}>
-              <s.icon size={18} />
-            </div>
-            <div className="relative">
-              <div className="text-xl font-bold tracking-tight">{(data.stats as any)[s.k]||0}</div>
-              <div className="text-[10px] font-medium text-[var(--text-muted)] group-hover:text-[var(--primary)] transition-colors">{t(`dashboard.${s.k}`)}</div>
+          <Link key={s.k} to={s.path} className="group flex items-center gap-3 card rounded-lg px-4 py-3 transition-colors hover:border-[var(--border)]">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.color}`}><s.icon size={17} /></div>
+            <div>
+              <div className="text-lg font-semibold tracking-tight">{(data.stats as any)[s.k]||0}</div>
+              <div className="text-[11px] text-[var(--text-muted)]">{t(`dashboard.${s.k}`)}</div>
             </div>
           </Link>
         ))}
@@ -219,7 +215,7 @@ export default function DashboardPage() {
                       <span className="font-mono text-[11px] font-semibold text-violet-600">{m.progress}%</span>
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#0d9488] to-[#0d9488] transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
+                      <div className="h-full rounded-full bg-[var(--primary)] transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
                       <span>{m.closed}/{m.total} {t("dashboard.done","done")}</span>
@@ -236,7 +232,7 @@ export default function DashboardPage() {
       {/* Claim role modal */}
       {claimId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setClaimId(null); setClaimRoles([]); }}>
-          <div className="card w-72 rounded-xl p-5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-72 rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("roles.title")}</h3>
               <button onClick={() => { setClaimId(null); setClaimRoles([]); }} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

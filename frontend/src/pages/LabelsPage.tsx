@@ -40,7 +40,7 @@ export default function LabelsPage() {
     <div className="mx-auto max-w-3xl space-y-5 page-enter">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("common.labels")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("common.labels")}</h1>
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">{labels.length} labels</p>
         </div>
         {isAdmin && <button onClick={()=>{reset();setShowForm(true);}} className="btn btn-primary"><Plus size={15}/>{t("common.create")}</button>}
@@ -73,7 +73,7 @@ export default function LabelsPage() {
       ):(
         <div className="card rounded-xl overflow-hidden divide-y divide-[var(--border-light)]">
           {labels.map(l=>(
-            <div key={l.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-hover)] transition-all group hover-lift">
+            <div key={l.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-hover)] transition-all group ">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{backgroundColor:l.color+"14",borderColor:l.color+"30"}}>
                 <span className="h-4 w-4 rounded-full" style={{backgroundColor:l.color}}/>
               </div>

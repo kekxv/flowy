@@ -143,7 +143,7 @@ export default function IssueListPage() {
     <div className="mx-auto max-w-5xl space-y-4 page-enter">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h1 className="text-2xl font-bold tracking-tight text-gradient">{t("issues.title")}</h1>{total>0&&<p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{total} issues</p>}</div>
+        <div><h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("issues.title")}</h1>{total>0&&<p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{total} issues</p>}</div>
         <Link to="/issues/new" className="btn btn-primary"><Plus size={15}/>{t("issues.new_issue")}</Link>
       </div>
 
@@ -286,7 +286,7 @@ export default function IssueListPage() {
       {/* Claim role modal */}
       {claimId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setClaimId(null); setClaimRoles([]); }}>
-          <div className="card w-72 rounded-xl p-5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-72 rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("roles.title")}</h3>
               <button onClick={() => { setClaimId(null); setClaimRoles([]); }} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

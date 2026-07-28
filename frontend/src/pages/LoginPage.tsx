@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Globe, ArrowRight, Sparkles } from "lucide-react";
+import { Globe, ArrowRight } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { getAuthStatus } from "../api/auth";
 
@@ -34,193 +34,119 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f6f6]">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute -top-1/3 -right-1/4 h-[700px] w-[700px] rounded-full opacity-40 blur-[120px]"
-          style={{
-            background: "linear-gradient(135deg, #0d9488, #0891b2, #ec4899)",
-            animation: "gradientShift 12s ease-in-out infinite",
-            backgroundSize: "200% 200%",
-          }}
-        />
-        <div
-          className="absolute -bottom-1/3 -left-1/4 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px]"
-          style={{
-            background: "linear-gradient(135deg, #06b6d4, #0d9488, #0891b2)",
-            animation: "gradientShift 15s ease-in-out infinite reverse",
-            backgroundSize: "200% 200%",
-          }}
-        />
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full opacity-15 blur-[80px]"
-          style={{
-            background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-            animation: "gradientShift 10s ease-in-out infinite",
-            backgroundSize: "200% 200%",
-          }}
-        />
-        {/* Dot grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[.3]"
-          style={{
-            backgroundImage: "radial-gradient(circle, rgba(13,148,136,.15) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
-      </div>
-
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] p-4">
       {/* Language toggle */}
       <button
         onClick={() => i18n.changeLanguage(i18n.language === "zh" ? "en" : "zh")}
-        className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-xl border border-white/60 bg-white/70 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] backdrop-blur-sm hover:bg-white/90 transition-all shadow-sm"
+        className="absolute right-5 top-5 flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors"
       >
-        <Globe size={14} />
+        <Globe size={13} />
         {i18n.language === "zh" ? "EN" : "中文"}
       </button>
 
-      {/* Login card */}
-      <div
-        className="relative w-full max-w-[380px] mx-4 rounded-2xl bg-white/80 backdrop-blur-xl p-8 shadow-[0_20px_60px_rgba(0,0,0,.08),0_1px_3px_rgba(0,0,0,.04)] border border-white/80 animate-[scaleIn_.4s_cubic-bezier(.16,1,.3,1)]"
-      >
+      <div className="w-full max-w-[340px] animate-[fadeInUp_.25s_ease-out]">
         {/* Logo */}
-        <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-xl font-bold text-white shadow-[0_6px_20px_rgba(13,148,136,.35)]"
-            style={{ animation: "float 4s ease-in-out infinite" }}
-          >
-            F
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--text)]">
-            {mode === "login" ? t("auth.sign_in_title") : t("auth.sign_up_title")}
-          </h1>
-          <p className="mt-1.5 text-[13px] text-[var(--text-muted)]">
-            {mode === "login" ? t("auth.welcome_back", "Welcome back to Flowy") : t("auth.create_subtitle", "Create your account to get started")}
-          </p>
+        <div className="mb-8 flex items-center justify-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-sm font-bold text-white">F</div>
+          <span className="text-lg font-semibold tracking-tight">Flowy</span>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-4 py-2.5 text-[13px] text-red-600 animate-[fadeInUp_.2s_ease-out]">
-            <span className="text-red-400 text-base">!</span>
-            {error}
-          </div>
-        )}
+        {/* Card */}
+        <div className="rounded-xl border border-[var(--border)] bg-white p-6">
+          <h1 className="mb-1 text-[17px] font-semibold">
+            {mode === "login" ? t("auth.sign_in_title") : t("auth.sign_up_title")}
+          </h1>
+          <p className="mb-5 text-[13px] text-[var(--text-muted)]">
+            {mode === "login" ? "Welcome back" : "Create your account"}
+          </p>
 
-        {/* Form */}
-        <form onSubmit={handle} className="space-y-4">
-          <div>
-            <label className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t("auth.username_or_email")}
-            </label>
-            <input
-              required
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="input mt-1.5 h-10"
-              placeholder="admin"
-              autoComplete="username"
-            />
-          </div>
-
-          {mode === "register" && registrationOpen && (
-            <>
-              <div>
-                <label className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                  {t("auth.email")}
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="input mt-1.5 h-10"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                  {t("auth.display_name")}
-                </label>
-                <input
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  className="input mt-1.5 h-10"
-                  placeholder={t("auth.display_name")}
-                />
-              </div>
-            </>
+          {error && (
+            <div className="mb-4 rounded-md bg-red-50 border border-red-100 px-3 py-2 text-[13px] text-red-600">
+              {error}
+            </div>
           )}
 
-          <div>
-            <label className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t("auth.password")}
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              minLength={6}
-              className="input mt-1.5 h-10"
-              placeholder="••••••••"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-            />
-          </div>
+          <form onSubmit={handle} className="space-y-3">
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
+                {t("auth.username_or_email")}
+              </label>
+              <input
+                required value={username} onChange={e => setUsername(e.target.value)}
+                className="input" placeholder="admin" autoComplete="username"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="btn btn-primary w-full justify-center h-10.5 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed group"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                {t("common.loading")}
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                {mode === "login" ? t("auth.sign_in") : t("auth.create_account")}
-                <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-              </span>
+            {mode === "register" && registrationOpen && (
+              <>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
+                    {t("auth.email")}
+                  </label>
+                  <input
+                    type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    className="input" placeholder="you@example.com" autoComplete="email"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
+                    {t("auth.display_name")}
+                  </label>
+                  <input
+                    value={displayName} onChange={e => setDisplayName(e.target.value)}
+                    className="input" placeholder={t("auth.display_name")}
+                  />
+                </div>
+              </>
             )}
-          </button>
-        </form>
 
-        {/* Footer */}
-        <div className="mt-5 pt-5 border-t border-[var(--border-light)] text-center">
-          {mode === "login" ? (
-            registrationOpen ? (
-              <p className="text-[13px] text-[var(--text-muted)]">
-                {t("auth.no_account")}{" "}
-                <button
-                  onClick={() => { clearError(); setMode("register"); }}
-                  className="font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
-                >
-                  {t("auth.sign_up")}
-                </button>
-              </p>
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
+                {t("auth.password")}
+              </label>
+              <input
+                type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                minLength={6} className="input" placeholder="••••••••"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+              />
+            </div>
+
+            <button
+              type="submit" disabled={isLoading}
+              className="btn btn-primary w-full justify-center py-2 disabled:opacity-50 group"
+            >
+              {isLoading ? (
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <>
+                  {mode === "login" ? t("auth.sign_in") : t("auth.create_account")}
+                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-4 border-t border-[var(--border-light)] pt-4 text-center text-[13px] text-[var(--text-muted)]">
+            {mode === "login" ? (
+              registrationOpen ? (
+                <>
+                  {t("auth.no_account")}{" "}
+                  <button onClick={() => { clearError(); setMode("register"); }} className="font-medium text-[var(--primary)] hover:underline">
+                    {t("auth.sign_up")}
+                  </button>
+                </>
+              ) : (
+                <span>{t("auth.no_account")} 请联系管理员创建账号</span>
+              )
             ) : (
-              <p className="text-[13px] text-[var(--text-muted)]">
-                {t("auth.no_account")}{" "}
-                <span className="flex items-center justify-center gap-1 mt-1 text-[12px] text-[var(--text-muted)]">
-                  <Sparkles size={12} className="text-amber-400" />
-                  请联系管理员创建账号
-                </span>
-              </p>
-            )
-          ) : (
-            <p className="text-[13px] text-[var(--text-muted)]">
-              {t("auth.has_account")}{" "}
-              <button
-                onClick={() => { clearError(); setMode("login"); }}
-                className="font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
-              >
-                {t("auth.sign_in")}
-              </button>
-            </p>
-          )}
+              <>
+                {t("auth.has_account")}{" "}
+                <button onClick={() => { clearError(); setMode("login"); }} className="font-medium text-[var(--primary)] hover:underline">
+                  {t("auth.sign_in")}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

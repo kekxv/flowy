@@ -99,7 +99,7 @@ export default function NotificationsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 page-enter">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("notifications.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("notifications.title")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("notifications.desc","Manage notification channels and rules.")}</p>
       </div>
 
@@ -201,7 +201,7 @@ export default function NotificationsPage() {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setModal(null); setEditRuleId(null); }}>
-          <div className="card w-[420px] max-h-[85vh] overflow-y-auto rounded-xl p-5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-[420px] max-h-[85vh] overflow-y-auto rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold">
                 {modal === "channel" ? t("notifications.add_channel") : editRuleId ? t("common.edit")+" "+t("notifications.rules") : t("notifications.add_rule")}

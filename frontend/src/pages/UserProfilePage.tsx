@@ -82,11 +82,11 @@ export default function UserProfilePage() {
       {/* User info */}
       <div className="card rounded-xl p-5">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-xl font-bold text-white shadow-[0_4px_12px_rgba(13,148,136,.25)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--primary)] text-xl font-bold text-white ">
             {(user?.display_name||user?.username||"?").slice(0,2).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gradient">{user?.display_name||user?.username}</h1>
+            <h1 className="text-lg font-bold text-[var(--text)]">{user?.display_name||user?.username}</h1>
             <p className="text-[13px] text-[var(--text-muted)]">@{user?.username} · {user?.email} · <span className="rounded bg-[var(--bg-muted)] px-1.5 py-0.5 text-[11px] font-medium">{user?.role}</span></p>
           </div>
         </div>
@@ -267,7 +267,7 @@ function ProjectRolesSection({ t }: { t: any }) {
 
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setEdit(false)}>
-          <div className="card w-80 rounded-xl overflow-hidden shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
               <button onClick={() => setEdit(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

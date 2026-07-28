@@ -82,7 +82,7 @@ export default function WikiCreatePage() {
           <ArrowLeft size={16} />
           {t("common.back", "Back")}
         </button>
-        <h1 className="text-xl font-bold tracking-tight flex-1 text-gradient">
+        <h1 className="text-xl font-bold tracking-tight flex-1 text-[var(--text)]">
           {t("wiki.new_page", "New Wiki Page")}
         </h1>
         <button onClick={handleSave} disabled={saving || !title.trim()} className="btn btn-primary">

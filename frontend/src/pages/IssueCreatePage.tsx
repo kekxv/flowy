@@ -44,7 +44,7 @@ export default function IssueCreatePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5 page-enter">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gradient">{t("issues.new_issue")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("issues.new_issue")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("issues.create_desc","Create a new issue in the project.")}</p>
       </div>
 
@@ -96,7 +96,7 @@ export default function IssueCreatePage() {
                 <Plus size={10}/> {t("roles.role")} <ChevronDown size={8}/>
               </button>
               {roleOpen && (
-                <div className="absolute left-0 top-full z-10 mt-1 w-48 card rounded-xl py-1.5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.12s_ease-out]">
+                <div className="absolute left-0 top-full z-10 mt-1 w-48 card rounded-xl py-1.5  animate-[fadeInUp_.12s_ease-out]">
                   <div className="px-2 pb-1 mb-1 border-b border-[var(--border-light)]">
                     <div className="flex flex-wrap gap-1">
                       {ALL_ROLES.map(r => (

@@ -226,7 +226,7 @@ export default function WikiDetailPage() {
             />
           ) : (
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight truncate text-gradient">{page.title}</h1>
+              <h1 className="text-xl font-bold tracking-tight truncate text-[var(--text)]">{page.title}</h1>
               {page.is_public ? (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 border border-emerald-200/60">
                   <Globe size={10} />
@@ -279,7 +279,7 @@ export default function WikiDetailPage() {
       {/* Meta info */}
       <div className="flex items-center gap-4 text-[12px] text-[var(--text-muted)] px-1">
         <span className="inline-flex items-center gap-1.5">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#0d9488]/15 to-[#0891b2]/15 text-[9px] font-bold text-[var(--primary)]">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[9px] font-bold text-[var(--primary)]">
             {(page.owner_display_name || page.owner_name).charAt(0).toUpperCase()}
           </span>
           {page.owner_display_name || page.owner_name}
@@ -293,7 +293,7 @@ export default function WikiDetailPage() {
             {page.tags.split(",").filter(t => t.trim()).map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-gradient-to-r from-[#0d9488]/8 to-[#0891b2]/8 px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]"
+                className="rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]"
               >
                 {tag.trim()}
               </span>
@@ -484,7 +484,7 @@ export default function WikiDetailPage() {
             <div className="mb-4 space-y-1.5">
               {collaborators.map((c) => (
                 <div key={c.user_id} className="flex items-center gap-3 rounded-xl bg-[var(--bg)]/60 p-2.5 transition-colors hover:bg-[var(--bg-hover)]">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#0d9488]/15 to-[#0891b2]/15 text-[11px] font-bold text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[11px] font-bold text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     {(c.display_name || c.username).slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">

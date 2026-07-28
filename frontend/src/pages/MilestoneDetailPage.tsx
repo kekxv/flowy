@@ -68,7 +68,7 @@ export default function MilestoneDetailPage() {
 
       {/* Header card */}
       <div className="card rounded-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-[#0891b2]/5 to-purple-500/5 px-6 py-5 border-b border-[var(--border-light)]">
+        <div className="px-6 py-5 border-b border-[var(--border-light)]">
           {edit ? (
             <div className="space-y-3">
               <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.name")}</label><input value={ef.name} onChange={e=>setEf({...ef,name:e.target.value})} className="input font-bold text-lg"/></div>

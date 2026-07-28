@@ -150,7 +150,7 @@ export default function IssueDetailPage() {
                 ) : (
                   <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
                 )}
-                {canFullEdit && es && <div className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--border)] bg-white py-1.5 shadow-[var(--shadow-lg)] ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{STAT.map(s=>
+                {canFullEdit && es && <div className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--border)] bg-white py-1.5  ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{STAT.map(s=>
                   <button key={s} onClick={()=>{qu("status",s);setEs(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${s===issue.status?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
                     <span className={`status-${s}`} style={{fontSize:11}}>{t(`issues.status.${s}`)}</span>
                     {s===issue.status&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
@@ -164,7 +164,7 @@ export default function IssueDetailPage() {
                 ) : (
                   <span className={`priority-${issue.priority} rounded-md px-2 py-0.5 text-[11px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
                 )}
-                {canFullEdit && ep && <div className="absolute right-0 top-full z-10 mt-2 w-34 rounded-xl border border-[var(--border)] bg-white py-1.5 shadow-[var(--shadow-lg)] ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{PRIS.map(p=>
+                {canFullEdit && ep && <div className="absolute right-0 top-full z-10 mt-2 w-34 rounded-xl border border-[var(--border)] bg-white py-1.5  ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{PRIS.map(p=>
                   <button key={p} onClick={()=>{qu("priority",p);setEp(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${p===issue.priority?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
                     <span className={`priority-${p} w-1.5 h-1.5 rounded-full`} style={{display:"inline-block"}}/>
                     {t(`issues.priority.${p}`)}
@@ -340,7 +340,7 @@ export default function IssueDetailPage() {
       {/* Claim role modal */}
       {claimOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setClaimOpen(false); setClaimRoles([]); }}>
-          <div className="card w-72 rounded-xl p-5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="card w-72 rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
               <button onClick={() => { setClaimOpen(false); setClaimRoles([]); }} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -500,7 +500,7 @@ export default function IssueDetailPage() {
 
 function Modal({children,onClose,title,wide}:{children:React.ReactNode;onClose:()=>void;title:string;wide?:boolean}){
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-    <div className={`card rounded-xl p-5 shadow-[var(--shadow-lg)] animate-[fadeInUp_.2s_ease-out] ${wide?"w-[480px]":"w-80"}`} onClick={e=>e.stopPropagation()}>
+    <div className={`card rounded-xl p-5  animate-[fadeInUp_.2s_ease-out] ${wide?"w-[480px]":"w-80"}`} onClick={e=>e.stopPropagation()}>
       <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold">{title}</h3><button onClick={onClose} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button></div>
       {children}</div></div>;}
 
@@ -539,7 +539,7 @@ function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any)
         </div>
         {canEdit && <div className="relative">
           <button onClick={()=>setSs(!ss)} className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors">{hidden?STAT_LBLS[c.status]:"···"}</button>
-          {ss&&<div className="absolute right-0 top-full z-10 mt-1.5 w-28 card rounded-lg py-1 shadow-[var(--shadow-lg)] animate-[fadeInUp_.15s_ease-out]">
+          {ss&&<div className="absolute right-0 top-full z-10 mt-1.5 w-28 card rounded-lg py-1  animate-[fadeInUp_.15s_ease-out]">
             {(hidden?["valid",c.status]:["invalid","outdated","duplicate","resolved"]).map((s:string)=><button key={s} onClick={async()=>{await api.patch(`/issues/${issueId}/comments/${c.id}/status`,{status:s});setSs(false);onRefresh?.();}}
               className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{STAT_LBLS[s]||s}</button>)}</div>}</div>}
       </div>
