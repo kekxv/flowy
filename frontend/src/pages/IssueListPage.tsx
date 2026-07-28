@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Search, X, UserPlus, Flag, Filter, ChevronDown } from "lucide-react";
+import { Search, X, UserPlus, Flag, Filter, ChevronDown, ChevronRight } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listIssues, type IssueData } from "../api/issues";
@@ -61,6 +61,7 @@ export default function IssueListPage() {
   const [activeTimerIds, setActiveTimerIds] = useState<Set<string>>(new Set<string>());
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState<string | null>(null);
+  const [msPopup, setMsPopup] = useState<{ issue: IssueData } | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
   const [myRoles, setMyRoles] = useState<string[]>([]);
@@ -86,6 +87,15 @@ export default function IssueListPage() {
       }
       await api.put(`/issues/${claimId}`, { assignees: current });
       setClaimId(null); setClaimRoles([]); fetch();
+    } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error", "Failed")); }
+  };
+  const toggleMilestone = async (issueId: string, mid: string) => {
+    try {
+      const r = await api.get(`/issues/${issueId}`);
+      const current: string[] = r.data.milestone_ids || [];
+      const next = current.includes(mid) ? current.filter((x: string) => x !== mid) : [...current, mid];
+      await api.put(`/issues/${issueId}`, { milestone_ids: next });
+      fetch();
     } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error", "Failed")); }
   };
 
@@ -166,69 +176,75 @@ export default function IssueListPage() {
             <p className="text-[13px]">{t("issues.no_issues")}</p>
           </div>
         ) : (
-          <div className="card overflow-hidden rounded-[8px]">
-            <div className="divide-y divide-[var(--border-light)]">
-              {issues.map((issue) => (
-                <div key={issue.id} className="group transition-colors hover:bg-[#f9fafb]">
-                  <Link to={`/issues/${issue.id}`} className="flex items-center gap-2.5 px-3.5 py-2.5" style={{ minHeight: 46 }}>
-                    {/* Status */}
-                    <span className={`status-${issue.status} text-[11px] shrink-0 hidden sm:inline-flex`}>{t(`issues.status.${issue.status}`)}</span>
-
-                    {/* Type + ID */}
-                    <div className="flex items-center gap-1.5 shrink-0 w-[90px]">
-                      <span className={`rounded-[4px] px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type === "feature" ? "bg-violet-50 text-violet-600" : "bg-amber-50 text-amber-600"}`}>
-                        {t(`issues.type.${(issue as any).issue_type || "bug"}`)}
-                      </span>
-                      <span className="mono text-[11px] text-[var(--text-faint)]">#{issue.id.slice(0, 6)}</span>
-                    </div>
-
-                    {/* Title + meta */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        {activeTimerIds.has(issue.id) && <span className="flex h-1.5 w-1.5 shrink-0"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>}
-                        <span className="truncate text-[13px] font-medium text-[var(--text)]">{issue.title}</span>
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap text-[11px]">
-                        <span className="text-[var(--text-faint)]">{issue.reporter?.display_name || issue.reporter?.username}</span>
-                        <span className="text-[var(--text-faint)]">·</span>
-                        <span className="text-[var(--text-faint)]">{timeAgo(issue.created_at)}</span>
-                        {issue.labels?.slice(0, 2).map((l: any) => (
-                          <span key={l.id} className="rounded-[4px] border px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: l.color + "0a", color: l.color, borderColor: l.color + "20" }}>{l.name}</span>
-                        ))}
-                        {(issue as any).milestone_ids?.length > 0 && (issue as any).milestone_ids.map((mid: string) => {
-                          const m = milestones.find(x => x.id === mid);
-                          return m ? <span key={mid} className="flex items-center gap-0.5 rounded-[4px] bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"><Flag size={8} />{m.name}</span> : null;
-                        })}
-                      </div>
-                    </div>
-
+          <div className="card overflow-hidden rounded-[8px] divide-y divide-[var(--border-light)]">
+            {issues.map((issue) => {
+              const isFeature = (issue as any).issue_type === "feature";
+              const assignees = (issue as any).assignees || [];
+              const milestoneIds = (issue as any).milestone_ids || [];
+              return (
+                <div key={issue.id} className="group border-l-[3px]" style={{ borderLeftColor: issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb" }}>
+                  <Link to={`/issues/${issue.id}`} className="flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[#f9fafb]">
+                    {/* Type badge */}
+                    <span className={`shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold ${isFeature ? "bg-violet-50 text-violet-600" : "bg-amber-50 text-amber-600"}`}>
+                      {isFeature ? "需求" : "问题"}
+                    </span>
+                    {/* Title */}
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors">{issue.title}</span>
+                    {/* Milestone flag */}
+                    {milestoneIds.length > 0 && (
+                      <button onClick={e => { e.stopPropagation(); e.preventDefault(); setMsPopup({ issue }); }}
+                        className={`flex items-center gap-0.5 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0 ${milestoneIds.length > 0 ? "bg-violet-50 text-violet-600" : "text-[var(--text-faint)] hover:text-violet-500"}`}>
+                        <Flag size={10} />{milestoneIds.length}
+                      </button>
+                    )}
                     {/* Priority */}
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); doPopup(issue.id, "priority", PRIS[(PRIS.indexOf(issue.priority as any) + 1) % PRIS.length] as string); }}
-                      className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0 hidden sm:inline-flex`}>
+                      className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0`}>
                       {t(`issues.priority.${issue.priority}`)}
                     </button>
-
-                    {/* Assignees */}
-                    <div className="flex items-center shrink-0 hidden md:flex">
-                      {(issue as any).assignees?.slice(0, 2).map((a: any) => (
-                        <span key={`${a.id}-${a.role}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f3f4f6] text-[10px] font-semibold text-[#6b7280] ring-2 ring-white -ml-1 first:ml-0" title={`${a.display_name || a.username} (${a.role})`}>
-                          {(a.display_name || a.username).slice(0, 1).toUpperCase()}
-                        </span>
-                      ))}
-                      {(issue as any).assignees?.length > 2 && (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f3f4f6] text-[9px] font-semibold text-[#6b7280] ring-2 ring-white -ml-1">+{(issue as any).assignees.length - 2}</span>
-                      )}
-                    </div>
-
-                    {/* Claim button */}
+                    {/* Status */}
+                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); doPopup(issue.id, "status", STAT[(STAT.indexOf(issue.status as any) + 1) % STAT.length] as string); }}
+                      className={`status-${issue.status} text-[11px] cursor-pointer transition-transform hover:scale-105 shrink-0 hidden sm:inline-flex`}>
+                      {t(`issues.status.${issue.status}`)}
+                    </button>
+                    {/* Claim */}
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); openClaim(issue.id); }}
                       className="shrink-0 rounded p-1 text-[var(--text-faint)] hover:bg-[var(--primary-subtle)] hover:text-[var(--primary)] transition-all opacity-0 group-hover:opacity-100 hidden sm:flex">
                       <UserPlus size={13} />
                     </button>
+                    <ChevronRight size={14} className="hidden sm:block shrink-0 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all" />
                   </Link>
+                  {/* Meta row */}
+                  <div className="flex items-center gap-2 px-4 pb-2.5 pl-[52px] flex-wrap text-[11px] text-[var(--text-faint)]">
+                    <span className="mono">#{issue.id.slice(0, 8)}</span>
+                    <span>{issue.reporter?.display_name || issue.reporter?.username}</span>
+                    <span>{timeAgo(issue.created_at)}</span>
+                    {assignees.length > 0 && (
+                      <>
+                        <span className="text-[var(--border)]">·</span>
+                        {assignees.slice(0, 3).map((a: any) => (
+                          <span key={`${a.id}-${a.role}`} className="rounded-[4px] bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a.display_name || a.username}</span>
+                        ))}
+                        {assignees.length > 3 && <span className="text-[var(--text-faint)]">+{assignees.length - 3}</span>}
+                      </>
+                    )}
+                    {issue.labels?.slice(0, 2).map((l: any) => (
+                      <span key={l.id} className="rounded-[4px] border px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: l.color + "0a", color: l.color, borderColor: l.color + "25" }}>{l.name}</span>
+                    ))}
+                    {milestoneIds.map((mid: string) => {
+                      const m = milestones.find(x => x.id === mid);
+                      return m ? <span key={mid} className="rounded-[4px] bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600"><Flag size={8} className="inline -mt-0.5 mr-0.5" />{m.name}</span> : null;
+                    })}
+                    {activeTimerIds.has(issue.id) && (
+                      <span className="flex items-center gap-1 text-red-500">
+                        <span className="flex h-1.5 w-1.5"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
+                        计时中
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
 
@@ -260,6 +276,37 @@ export default function IssueListPage() {
               ))}
             </div>
             <button onClick={doClaim} disabled={claimRoles.length === 0} className="btn btn-primary btn-sm w-full">{t("common.confirm")}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone popup */}
+      {msPopup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/20 sm:items-center" onClick={() => setMsPopup(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-[var(--shadow-md)] animate-[fadeInUp_.15s_ease-out] sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold flex items-center gap-1.5"><Flag size={14} className="text-violet-500" />{t("issues.milestones", "里程碑")}</h3>
+              <button onClick={() => setMsPopup(null)} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={14} /></button>
+            </div>
+            <p className="mb-3 text-[11px] text-[var(--text-muted)] truncate">#{msPopup.issue.id.slice(0, 8)} {msPopup.issue.title}</p>
+            {milestones.length === 0
+              ? <p className="py-4 text-center text-[12px] text-[var(--text-muted)]">暂无里程碑</p>
+              : <div className="space-y-1 max-h-60 overflow-y-auto">
+                {milestones.map(m => {
+                  const linked = (msPopup.issue as any).milestone_ids?.includes(m.id);
+                  return (
+                    <button key={m.id} onClick={async () => { await toggleMilestone(msPopup!.issue.id, m.id); setMsPopup(null); }}
+                      className={`flex w-full items-center justify-between rounded-[8px] px-3 py-2.5 text-left text-[13px] transition-all hover:bg-[var(--bg-hover)] active:scale-[.98] ${linked ? "bg-violet-50" : ""}`}>
+                      <span className="flex items-center gap-2">
+                        <span className="text-[10px]">{m.status === "open" ? "🟢" : m.status === "published" ? "🔵" : "⚫"}</span>
+                        <span className={linked ? "font-medium text-violet-700" : "text-[var(--text-secondary)]"}>{m.name}</span>
+                      </span>
+                      {linked && <span className="text-violet-500 text-[11px] font-medium">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            }
           </div>
         </div>
       )}
