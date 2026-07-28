@@ -17,7 +17,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getAuthStatus().then(s => setRegistrationOpen(!s.has_users)).catch(() => setRegistrationOpen(false));
+    getAuthStatus().then(s => setRegistrationOpen(!s.has_users || s.registration_enabled)).catch(() => setRegistrationOpen(false));
   }, []);
 
   useEffect(() => {

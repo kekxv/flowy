@@ -19,8 +19,8 @@ export async function login(data: {
   return res.data;
 }
 
-export async function getAuthStatus(): Promise<{ has_users: boolean }> {
-  const res = await api.get<{ has_users: boolean }>("/auth/status");
+export async function getAuthStatus(): Promise<{ has_users: boolean; registration_enabled: boolean }> {
+  const res = await api.get<{ has_users: boolean; registration_enabled: boolean }>("/auth/status");
   return res.data;
 }
 

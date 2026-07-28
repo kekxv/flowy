@@ -63,6 +63,7 @@ class PasswordResetRequest(BaseModel):
 
 class AuthStatusResponse(BaseModel):
     has_users: bool
+    registration_enabled: bool = False
 
 
 class ProjectRolesUpdate(BaseModel):

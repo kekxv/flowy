@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.models.settings import AppSetting
 from app.models.tracking import UserProjectRole
 from app.models.user import User
 from app.schemas.auth import (
@@ -31,14 +32,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
-    # Only allow registration when the system has no users yet
+    # Check if registration is allowed
     count_result = await db.execute(select(func.count(User.id)))
     user_count = count_result.scalar() or 0
-    if user_count > 0:
-        raise HTTPException(
-            status_code=403,
-            detail="Registration is closed. Please contact an administrator to create your account.",
-        )
+    if user_count == 0:
+        pass  # First user always allowed
+    else:
+        setting = await db.get(AppSetting, "registration_enabled")
+        if not setting or setting.value != "true":
+            raise HTTPException(
+                status_code=403,
+                detail="Registration is closed. Please contact an administrator to create your account.",
+            )
 
     existing = await db.execute(
         select(User).where((User.username == data.username) | (User.email == data.email))
@@ -168,4 +173,6 @@ async def change_password(
 async def auth_status(db: AsyncSession = Depends(get_db)):
     count_result = await db.execute(select(func.count(User.id)))
     user_count = count_result.scalar() or 0
-    return AuthStatusResponse(has_users=user_count > 0)
+    setting = await db.get(AppSetting, "registration_enabled")
+    reg_enabled = setting is not None and setting.value == "true"
+    return AuthStatusResponse(has_users=user_count > 0, registration_enabled=reg_enabled)

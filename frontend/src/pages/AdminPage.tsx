@@ -104,6 +104,33 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Registration Settings */}
+      <div className="card rounded-xl overflow-hidden">
+        <div className="border-b border-[var(--border-light)] px-5 py-3.5 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <Settings2 size={14}/>General {t("settings.config","Configuration")}
+          </h2>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[13px] font-medium text-[var(--text)]">{t("admin.registration","Registration")}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("admin.registration_hint","Allow new users to create accounts")}</div>
+            </div>
+            <button
+              onClick={async () => {
+                const current = oauthConfig["registration_enabled"] === "true";
+                const next = !current;
+                setOauthConfig({...oauthConfig, registration_enabled: next ? "true" : "false"});
+                await api.put("/system/settings", {registration_enabled: next ? "true" : "false"});
+              }}
+              className={`relative w-11 h-6 rounded-full transition-colors ${oauthConfig["registration_enabled"] === "true" ? "bg-[var(--primary)]" : "bg-[var(--border)]"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${oauthConfig["registration_enabled"] === "true" ? "translate-x-5" : "translate-x-0"}`}/>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* OAuth Configuration */}
       <div className="card rounded-xl overflow-hidden">
         <button onClick={() => setOauthExpanded(!oauthExpanded)}

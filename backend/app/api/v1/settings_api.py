@@ -34,6 +34,7 @@ async def save_settings(
         "gitea_client_id",
         "gitea_client_secret",
         "gitea_instance_url",
+        "registration_enabled",
     }
     for key, value in data.items():
         if key not in allowed:
