@@ -87,7 +87,7 @@ export default function WikiListPage() {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { setSearch(searchInput); setPage(1); } }}
             placeholder={t("wiki.search_placeholder", "Search wiki…")}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] py-2.5 pl-9 pr-9 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:bg-[var(--bg-card)] focus:shadow-[0_0_0_3px_rgba(13,148,136,.08)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] py-2.5 pl-9 pr-9 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:bg-[var(--bg-card)] focus:shadow-[0_0_0_3px_rgba(37,99,235,.08)]"
           />
           {searchInput && (
             <button onClick={() => { setSearchInput(""); setSearch(""); setPage(1); }}
