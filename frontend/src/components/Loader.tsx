@@ -11,19 +11,7 @@ const sizeMap = {
 
 function Spinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   return (
-    <div className={`${sizeMap[size]} relative`}>
-      {/* Background ring */}
-      <div className="absolute inset-0 rounded-full opacity-10" style={{ border: "inherit", borderColor: "var(--primary)" }} />
-      {/* Spinning arc */}
-      <div
-        className="absolute inset-0 animate-spin rounded-full"
-        style={{
-          borderColor: "var(--primary)",
-          borderRightColor: "transparent",
-          borderBottomColor: "transparent",
-        }}
-      />
-    </div>
+    <div className={`${sizeMap[size]} animate-spin rounded-full border-[var(--primary)] border-r-transparent border-b-transparent`} />
   )
 }
 
