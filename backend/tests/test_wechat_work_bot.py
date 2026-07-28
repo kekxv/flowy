@@ -1105,6 +1105,75 @@ class TestIntranetParser:
         assert result[0]["name"] == "file.txt"
 
 
+class TestParseTime:
+    def test_iso_format(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_time
+
+        assert _parse_time("2024-01-15 10:30:00") is not None
+        assert _parse_time("2024-01-15 10:30") is not None
+        assert _parse_time("2024-01-15T10:30:00") is not None
+        assert _parse_time("2024-01-15") is not None
+
+    def test_nginx_format(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_time
+
+        result = _parse_time("15-Jan-2024 10:30:00")
+        assert result is not None
+        assert "2024-01-15" in result
+
+    def test_unix_timestamp(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_time
+
+        assert _parse_time(1700000000) is not None
+        assert _parse_time("1700000000") is not None
+        assert _parse_time(1700000000.123) is not None
+
+    def test_none_and_invalid(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_time
+
+        assert _parse_time(None) is None
+        assert _parse_time("") is None
+        assert _parse_time("invalid-date") is None
+        assert _parse_time([]) is None
+
+
+class TestNginxTimeExtraction:
+    def test_table_format_with_time(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = """
+        <table>
+        <tr><td><a href="file1.pdf">file1.pdf</a></td><td>2024-01-15 10:30</td></tr>
+        <tr><td><a href="file2.pdf">file2.pdf</a></td><td>2024-06-20 14:00</td></tr>
+        </table>
+        """
+        result = _parse_nginx(html, "http://x/")
+        assert result[0]["mtime"] is not None
+        assert result[1]["mtime"] is not None
+        assert result[0]["name"] == "file2.pdf"  # newer first
+
+    def test_pre_format_with_time(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = """
+        <pre>
+        <a href="old.txt">old.txt</a>    15-Jan-2024 10:30:00 GMT
+        <a href="new.txt">new.txt</a>    20-Dec-2024 14:00:00 GMT
+        </pre>
+        """
+        result = _parse_nginx(html, "http://x/")
+        assert len(result) == 2
+        assert result[0]["name"] == "new.txt"
+        assert result[0]["mtime"] is not None
+
+    def test_no_time_available(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = '<a href="file.txt">file.txt</a>'
+        result = _parse_nginx(html, "http://x/")
+        assert result[0]["mtime"] is None
+
+
 # ── TestFileToken ───────────────────────────────────────────────
 
 class TestFileToken:
@@ -1161,6 +1230,7 @@ class TestBotFileCommand:
     @pytest.mark.asyncio
     async def test_file_regex_match(self, db_session: AsyncSession):
         from unittest.mock import patch
+
         from app.models.wechat_work_bot import IntranetSource
 
         user = User(**_make_user_kwargs(id="user-file3", username="fileuser3", email="f3@ex.com"))
@@ -1193,6 +1263,7 @@ class TestBotFileCommand:
     @pytest.mark.asyncio
     async def test_file_limit_10_results(self, db_session: AsyncSession):
         from unittest.mock import patch
+
         from app.models.wechat_work_bot import IntranetSource
 
         user = User(**_make_user_kwargs(id="user-file4", username="fileuser4", email="f4@ex.com"))

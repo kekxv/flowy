@@ -123,6 +123,10 @@ def _parse_time(value) -> str | None:
     if not value:
         return None
 
+    # Strip trailing timezone labels (GMT, UTC, etc.) for parsing
+    value = re.sub(r'\s+(GMT|UTC|CST|EST|PST|JST)\s*$', '', value, flags=re.IGNORECASE)
+    value = value.strip()
+
     # Try numeric timestamp
     if value.isdigit():
         try:

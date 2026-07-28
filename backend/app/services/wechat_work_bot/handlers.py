@@ -1546,7 +1546,7 @@ class CommandHandlers:
     # ─── Intranet File Search ────────────────────────────────────
 
     async def handle_file(self, args: list[str], quote: dict, frame: dict = None) -> str:
-        """Handle /file command — search configured intranet sources for files.
+        r"""Handle /file command — search configured intranet sources for files.
 
         Supports regex patterns (e.g. /file \.pdf$) and plain keywords.
         Results sorted by modification time (newest first), max 10 shown.

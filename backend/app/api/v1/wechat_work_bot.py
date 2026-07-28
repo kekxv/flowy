@@ -347,7 +347,11 @@ async def test_command(
     _user: User = Depends(require_admin),
 ):
     """Simulate a bot command and return the response (no real WeChat message)."""
-    from app.services.wechat_work_bot.command_parser import COMMANDS, CommandParser, check_permission
+    from app.services.wechat_work_bot.command_parser import (
+        COMMANDS,
+        CommandParser,
+        check_permission,
+    )
     from app.services.wechat_work_bot.handlers import CommandHandlers
     from app.services.wechat_work_bot.message_parser import MessageContext
 
