@@ -61,7 +61,10 @@ export default function IssueListPage() {
   const [activeTimerIds, setActiveTimerIds] = useState<Set<string>>(new Set<string>());
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState<string | null>(null);
+  const [popup, setPopup] = useState<{ issue: IssueData; type: "status" | "priority" } | null>(null);
+  const [labelPopup, setLabelPopup] = useState<IssueData | null>(null);
   const [msPopup, setMsPopup] = useState<{ issue: IssueData } | null>(null);
+  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [claimId, setClaimId] = useState<string | null>(null);
   const [claimRoles, setClaimRoles] = useState<string[]>([]);
   const [myRoles, setMyRoles] = useState<string[]>([]);
@@ -98,6 +101,15 @@ export default function IssueListPage() {
       fetch();
     } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error", "Failed")); }
   };
+  const doLabel = async (issueId: string, lid: string) => {
+    try {
+      const r = await api.get(`/issues/${issueId}`);
+      const ids = (r.data.labels || []).map((l: any) => l.id);
+      const next = ids.includes(lid) ? ids.filter((x: string) => x !== lid) : [...ids, lid];
+      await api.put(`/issues/${issueId}`, { label_ids: next });
+      fetch();
+    } catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error", "Failed")); }
+  };
 
   const fetch = () => {
     setLoading(true); const p: Record<string, string> = { page: String(page), per_page: "20" };
@@ -106,7 +118,7 @@ export default function IssueListPage() {
     if (sp.get("reporter") === "me" && user) p.reporter_id = user.id;
     listIssues(p).then(r => { setIssues(r.data); setTotal(r.meta.total); setLoading(false); });
   };
-  useEffect(() => { api.get("/milestones").then(r => setMilestones(r.data)); }, []);
+  useEffect(() => { api.get("/labels").then(r => setLabels(r.data)); api.get("/milestones").then(r => setMilestones(r.data)); }, []);
   useEffect(() => { const poll = () => api.get("/dashboard").then(r => { const ids = new Set<string>((r.data.active_timers || []).map((t: any) => t.issue_id as string)); setActiveTimerIds(ids); }); poll(); const i = setInterval(poll, 15000); return () => clearInterval(i); }, []);
   useEffect(fetch, [page, status, priority, q, labelId, issueType]);
 
@@ -190,22 +202,25 @@ export default function IssueListPage() {
                     </span>
                     {/* Title */}
                     <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors">{issue.title}</span>
-                    {/* Milestone flag */}
-                    {milestoneIds.length > 0 && (
-                      <button onClick={e => { e.stopPropagation(); e.preventDefault(); setMsPopup({ issue }); }}
-                        className={`flex items-center gap-0.5 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0 ${milestoneIds.length > 0 ? "bg-violet-50 text-violet-600" : "text-[var(--text-faint)] hover:text-violet-500"}`}>
-                        <Flag size={10} />{milestoneIds.length}
-                      </button>
-                    )}
-                    {/* Priority */}
-                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); doPopup(issue.id, "priority", PRIS[(PRIS.indexOf(issue.priority as any) + 1) % PRIS.length] as string); }}
+                    {/* Milestone flag — always show */}
+                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setMsPopup({ issue }); }}
+                      className={`flex items-center gap-0.5 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0 ${milestoneIds.length > 0 ? "bg-violet-50 text-violet-600" : "text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-50"}`}>
+                      <Flag size={10} />{milestoneIds.length > 0 ? milestoneIds.length : ""}
+                    </button>
+                    {/* Priority — popup */}
+                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "priority" }); }}
                       className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0`}>
                       {t(`issues.priority.${issue.priority}`)}
                     </button>
-                    {/* Status */}
-                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); doPopup(issue.id, "status", STAT[(STAT.indexOf(issue.status as any) + 1) % STAT.length] as string); }}
+                    {/* Status — popup */}
+                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "status" }); }}
                       className={`status-${issue.status} text-[11px] cursor-pointer transition-transform hover:scale-105 shrink-0 hidden sm:inline-flex`}>
                       {t(`issues.status.${issue.status}`)}
+                    </button>
+                    {/* Label */}
+                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setLabelPopup(issue); }}
+                      className="shrink-0 rounded p-1 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)] transition-all hidden sm:flex">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     </button>
                     {/* Claim */}
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); openClaim(issue.id); }}
@@ -276,6 +291,62 @@ export default function IssueListPage() {
               ))}
             </div>
             <button onClick={doClaim} disabled={claimRoles.length === 0} className="btn btn-primary btn-sm w-full">{t("common.confirm")}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Status / Priority popup */}
+      {popup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/20 sm:items-center" onClick={() => setPopup(null)}>
+          <div className="w-full max-w-xs rounded-t-2xl bg-white p-5 shadow-[var(--shadow-md)] animate-[fadeInUp_.15s_ease-out] sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold">{popup.type === "status" ? t("common.status") : t("common.priority")}</h3>
+              <button onClick={() => setPopup(null)} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={14} /></button>
+            </div>
+            <div className="space-y-0.5">
+              {(popup.type === "status" ? STAT : PRIS).map(v => {
+                const current = popup.type === "status" ? popup.issue.status : popup.issue.priority;
+                const isActive = v === current;
+                return (
+                  <button key={v} onClick={async () => { await doPopup(popup!.issue.id, popup!.type, v); setPopup(null); }}
+                    className={`flex w-full items-center gap-3 rounded-[8px] px-4 py-2.5 text-left text-[13px] font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-[.98] ${
+                      isActive ? "bg-[var(--primary-subtle)] text-[var(--primary)] ring-1 ring-[var(--primary)]/20" : "text-[var(--text-secondary)]"
+                    }`}>
+                    <span className={popup.type === "status" ? `status-${v}` : `priority-${v} rounded-[4px] px-2 py-0.5 text-[11px]`}>
+                      {popup.type === "status" ? t(`issues.status.${v}`) : t(`issues.priority.${v}`)}
+                    </span>
+                    {isActive && <span className="ml-auto text-[var(--primary)] text-[11px] font-semibold">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Label popup */}
+      {labelPopup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/20 sm:items-center" onClick={() => setLabelPopup(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-[var(--shadow-md)] animate-[fadeInUp_.15s_ease-out] sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold">{t("common.labels")}</h3>
+              <button onClick={() => setLabelPopup(null)} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={14} /></button>
+            </div>
+            <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
+              {labels.map(l => {
+                const active = (labelPopup.labels || []).some((il: any) => il.id === l.id);
+                return (
+                  <button key={l.id} onClick={async () => { await doLabel(labelPopup.id, l.id); }}
+                    className={`shrink-0 rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium transition-all active:scale-95 ${
+                      active ? "ring-2 ring-offset-1" : "border border-[var(--border)] hover:border-[#d1d5db]"
+                    }`}
+                    style={active ? { backgroundColor: l.color + "18", color: l.color } : { color: "var(--text-secondary)" }}>
+                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ backgroundColor: l.color }} />
+                    {l.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
