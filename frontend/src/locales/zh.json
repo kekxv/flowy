@@ -36,7 +36,9 @@
     "optional": "可选",
     "created_at": "创建时间",
     "updated_at": "更新时间",
-    "due_date": "截止日期"
+    "due_date": "截止日期",
+    "add": "添加",
+    "desc_hint": "简短描述"
   },
   "auth": {
     "login": "登录",
@@ -249,7 +251,9 @@
     "inactive": "停用",
     "users_label": "用户数",
     "connections_label": "连接数",
-    "connections": "外部连接"
+    "connections": "外部连接",
+    "registration": "注册开关",
+    "registration_hint": "允许新用户自行注册账号"
   },
   "external": {
     "linked_issues": "关联的外部 Issue",

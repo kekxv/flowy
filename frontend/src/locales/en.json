@@ -34,7 +34,11 @@
     "optional": "optional",
     "created_at": "Created",
     "updated_at": "Updated",
-    "due_date": "Due Date"
+    "due_date": "Due Date",
+    "clear": "Clear",
+    "error": "Operation failed",
+    "desc_hint": "Short description",
+    "add": "Add"
   },
   "auth": {
     "login": "Login",
@@ -80,7 +84,29 @@
     "comment": "Comment",
     "total": "issues",
     "milestone": "Milestone",
-    "select_milestone": "Select milestone"
+    "select_milestone": "Select milestone",
+    "type": {
+      "bug": "Bug",
+      "feature": "Feature"
+    },
+    "type_label": "Type",
+    "status": {
+      "open": "Open",
+      "in_progress": "In Progress",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "cancelled": "Cancelled",
+      "proposed": "Proposed",
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    },
+    "feature_owner": "Feature Owner",
+    "feature_require_owner": "A feature must have at least one assignee",
+    "new_bug": "New Bug",
+    "new_feature": "New Feature",
+    "quick_create": "Quick Create",
+    "title_placeholder": "Brief description",
+    "transfer": "Transfer Owner"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -98,6 +124,7 @@
     "none_pending": "All issues are assigned",
     "completion": "completion rate",
     "all_clear": "All clear",
+    "done": "done",
     "welcome": "Overview of your projects and tasks",
     "closed": "closed",
     "started": "Started"
@@ -116,8 +143,11 @@
     "reopen": "Reopen",
     "status": {
       "open": "Active",
-      "closed": "Closed"
+      "closed": "Closed",
+      "published": "Published"
     },
+    "desc_hint": "## Goals\n- Feature X\n- Bug fixes",
+    "publish": "Publish",
     "overdue": "overdue",
     "due_today": "Due today",
     "due_in": "left"
@@ -180,6 +210,7 @@
   },
   "settings": {
     "title": "Settings",
+    "profile": "Profile",
     "integrations": "Integrations",
     "notifications": "Notifications",
     "connect": "Connect",
@@ -199,7 +230,14 @@
     "oauth_desc": "Click below to authorize via OAuth.",
     "config": "Configuration",
     "not_set": "Not set",
-    "oauth_config_hint": "Set OAuth credentials for each provider. Leave empty to use server defaults."
+    "oauth_config_hint": "Set OAuth credentials for each provider. Leave empty to use server defaults.",
+    "connect_github": "Connect GitHub",
+    "connect_gitea": "Connect Gitea",
+    "connect_hint": "Connect GitHub or Gitea to link external issues.",
+    "available_oauth": "Available OAuth or Token",
+    "available_pat": "Personal Access Token",
+    "oauth_quick": "Quick OAuth Connection",
+    "instance_default": "Leave empty to use the default instance."
   },
   "admin": {
     "title": "Admin Panel",
@@ -214,7 +252,11 @@
     "deactivate": "Deactivate",
     "active": "Active",
     "inactive": "Inactive",
-    "connections": "Connections"
+    "connections": "Connections",
+    "users_label": "Users",
+    "connections_label": "Connections",
+    "registration": "Registration",
+    "registration_hint": "Allow new users to create accounts"
   },
   "external": {
     "linked_issues": "Linked Issues",
