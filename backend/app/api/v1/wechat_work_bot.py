@@ -42,6 +42,7 @@ from app.services.wechat_work_bot import bot_service
 from app.services.wechat_work_bot.bind_token import generate_bind_token as _gen_token
 
 router = APIRouter(prefix="/wechat-work-bot", tags=["wechat-work-bot"])
+public_router = APIRouter(tags=["wechat-work-bot"])
 
 MAX_INTRANET_FILE_BYTES = 50 * 1024 * 1024
 
@@ -534,6 +535,7 @@ async def preview_intranet_source(
 # ─── Intranet File Download Proxy ──────────────────────────────
 
 
+@public_router.get("/intranet/download")
 @router.get("/intranet/download")
 async def download_intranet_file(
     token: str = Query(...),

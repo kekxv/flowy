@@ -1619,10 +1619,8 @@ class CommandHandlers:
         total = len(all_matches)
         shown = all_matches[:10]
         lines = [f"📁 找到 **{total}** 个匹配「{keyword}」的文件：\n"]
-        lines.append("| 文件名 | 来源 | 下载 |")
-        lines.append("| --- | --- | --- |")
 
-        for m in shown:
+        for index, m in enumerate(shown, 1):
             if frontend_url:
                 dl_url = f"{frontend_url}/api/v1/intranet/download?token={m['token']}"
             else:
@@ -1630,7 +1628,14 @@ class CommandHandlers:
             name = m["name"]
             if len(name) > 40:
                 name = name[:37] + "..."
-            lines.append(f"| {name} | {m['source_name']} | [下载]({dl_url}) |")
+            lines.extend(
+                [
+                    f"{index}. **{name}**",
+                    f"   来源：{m['source_name']}",
+                    f"   [下载文件]({dl_url})",
+                    "",
+                ]
+            )
 
         if total > 10:
             lines.append(f"\n> _仅显示最新 10 个，共 {total} 个匹配_")

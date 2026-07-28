@@ -241,6 +241,16 @@ class TestIntranetSourcesCRUD:
 
 class TestDownloadProxy:
     @pytest.mark.asyncio
+    async def test_public_download_route_reaches_token_validation(
+        self, db_session: AsyncSession
+    ):
+        """The short download URL emitted by /file must be registered."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/intranet/download?token=invalid")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
     async def test_invalid_token(self, db_session: AsyncSession):
         """Download with invalid token returns 401."""
         transport = _build_transport(db_session)
@@ -356,8 +366,4 @@ class TestHandleFileRegex:
             handlers = CommandHandlers(db=db_session, bot_user=None, wechat_user_id="wx-test")
             result = await handlers.handle_file([".txt"], {})
             # Check order: new.txt first, then mid.txt, then old.txt
-            lines = result.split("\n")
-            file_lines = [l for l in lines if l.startswith("| ") and ".txt" in l]
-            assert "new.txt" in file_lines[0]
-            assert "mid.txt" in file_lines[1]
-            assert "old.txt" in file_lines[2]
+            assert result.index("new.txt") < result.index("mid.txt") < result.index("old.txt")

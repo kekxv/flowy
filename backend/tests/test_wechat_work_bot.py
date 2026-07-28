@@ -1326,6 +1326,13 @@ class TestBotFileCommand:
             # Should show 10 results, note total is 15
             assert "15" in result  # total count
             assert "仅显示最新 10 个" in result
-            # Count how many file rows are in the table
-            rows = [line for line in result.split("\n") if line.startswith("| file")]
-            assert len(rows) == 10
+            result_lines = result.splitlines()
+            headings = [
+                line
+                for line in result_lines
+                if any(line.startswith(f"{index}. **") for index in range(1, 11))
+            ]
+            assert len(headings) == 10
+            assert result.count("[下载文件](") == 10
+            assert "| 文件名 |" not in result
+            assert "| --- |" not in result
