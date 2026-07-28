@@ -34,13 +34,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f0f2f8]">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f6f6]">
       {/* Animated gradient background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute -top-1/3 -right-1/4 h-[700px] w-[700px] rounded-full opacity-40 blur-[120px]"
           style={{
-            background: "linear-gradient(135deg, #4f6ef7, #8b5cf6, #ec4899)",
+            background: "linear-gradient(135deg, #0d9488, #0891b2, #ec4899)",
             animation: "gradientShift 12s ease-in-out infinite",
             backgroundSize: "200% 200%",
           }}
@@ -48,7 +48,7 @@ export default function LoginPage() {
         <div
           className="absolute -bottom-1/3 -left-1/4 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px]"
           style={{
-            background: "linear-gradient(135deg, #06b6d4, #4f6ef7, #8b5cf6)",
+            background: "linear-gradient(135deg, #06b6d4, #0d9488, #0891b2)",
             animation: "gradientShift 15s ease-in-out infinite reverse",
             backgroundSize: "200% 200%",
           }}
@@ -65,7 +65,7 @@ export default function LoginPage() {
         <div
           className="absolute inset-0 opacity-[.3]"
           style={{
-            backgroundImage: "radial-gradient(circle, rgba(79,110,247,.15) 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(circle, rgba(13,148,136,.15) 1px, transparent 1px)",
             backgroundSize: "32px 32px",
           }}
         />
@@ -86,7 +86,7 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xl font-bold text-white shadow-[0_6px_20px_rgba(79,110,247,.35)]"
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-xl font-bold text-white shadow-[0_6px_20px_rgba(13,148,136,.35)]"
             style={{ animation: "float 4s ease-in-out infinite" }}
           >
             F

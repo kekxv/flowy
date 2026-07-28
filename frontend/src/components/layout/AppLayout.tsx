@@ -29,7 +29,7 @@ function Sidebar({ close }: { close?: () => void }) {
     <div className="flex h-full flex-col bg-white">
       {/* Logo */}
       <NavLink to="/dashboard" onClick={close} className="flex h-14 items-center gap-2.5 px-4 transition-colors hover:bg-[var(--bg-hover)]">
-        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-sm font-bold text-white shadow-[0_2px_8px_rgba(79,110,247,.3)]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-sm font-bold text-white shadow-[0_2px_8px_rgba(13,148,136,.3)]">
           F
         </div>
         <span className="text-[15px] font-bold tracking-tight text-[var(--text)]">Flowy</span>
@@ -45,7 +45,7 @@ function Sidebar({ close }: { close?: () => void }) {
             className={({ isActive }) =>
               `group relative flex items-center gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
                 isActive
-                  ? "bg-[var(--primary)]/8 text-[var(--primary)] shadow-[inset_0_0_0_1px_rgba(79,110,247,.08)]"
+                  ? "bg-[var(--primary)]/8 text-[var(--primary)] shadow-[inset_0_0_0_1px_rgba(13,148,136,.08)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
               }`}>
             {({ isActive }: { isActive: boolean }) => (<>
@@ -87,7 +87,7 @@ function Sidebar({ close }: { close?: () => void }) {
       {user && (
         <div className="border-t border-[var(--border-light)] p-2">
           <NavLink to="/profile" onClick={close} className="flex items-center gap-2.5 rounded-[10px] p-2 hover:bg-[var(--bg-hover)] transition-all duration-200 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-[var(--primary)]/15 to-[#8b5cf6]/15 text-xs font-bold text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-[var(--primary)]/15 to-[#0891b2]/15 text-xs font-bold text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
               {(user.display_name || user.username).slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -121,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Menu size={20} />
         </button>
         <NavLink to="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-sm font-bold text-white shadow-[0_2px_8px_rgba(79,110,247,.3)]">F</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-sm font-bold text-white shadow-[0_2px_8px_rgba(13,148,136,.3)]">F</div>
           <span className="text-[15px] font-bold tracking-tight text-[var(--text)]">Flowy</span>
         </NavLink>
       </div>
@@ -133,7 +133,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white animate-[slideInRight_.25s_cubic-bezier(.16,1,.3,1)]">
             <div className="flex h-14 items-center justify-between border-b border-[var(--border-light)] px-4">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xs font-bold text-white">F</div>
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-xs font-bold text-white">F</div>
                 <span className="font-bold tracking-tight">Flowy</span>
               </div>
               <button onClick={() => setOpen(false)} className="rounded-[10px] p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={18} /></button>

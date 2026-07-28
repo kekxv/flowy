@@ -75,10 +75,10 @@ export default function DashboardPage() {
       {/* Stats - compact row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { k:"total_issues", path:"/issues", icon:BarChart3, gradient:"from-[#4f6ef7] to-[#8b5cf6]", bg:"bg-[#4f6ef7]/8" },
+          { k:"total_issues", path:"/issues", icon:BarChart3, gradient:"from-[#0d9488] to-[#0891b2]", bg:"bg-[#0d9488]/8" },
           { k:"open_issues", path:"/issues?status=open,in_progress", icon:AlertCircle, gradient:"from-amber-400 to-orange-500", bg:"bg-amber-50" },
           { k:"closed_issues", path:"/issues?status=closed,resolved", icon:CheckCircle2, gradient:"from-emerald-400 to-teal-500", bg:"bg-emerald-50" },
-          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, gradient:"from-violet-400 to-purple-500", bg:"bg-violet-50" },
+          { k:"my_reported", path:"/issues?reporter=me", icon:Flag, gradient:"from-[#0d9488] to-[#0891b2]", bg:"bg-teal-50" },
         ].map(s => (
           <Link key={s.k} to={s.path} className="group relative flex items-center gap-3 card rounded-xl px-4 py-3 hover-lift overflow-hidden">
             {/* Subtle gradient accent */}
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                       <span className="font-mono text-[11px] font-semibold text-violet-600">{m.progress}%</span>
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
-                      <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-[#4f6ef7] transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#0d9488] to-[#0d9488] transition-all duration-700 ease-out" style={{width:`${m.progress}%`}}/>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
                       <span>{m.closed}/{m.total} {t("dashboard.done","done")}</span>

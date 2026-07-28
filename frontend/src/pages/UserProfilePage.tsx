@@ -82,7 +82,7 @@ export default function UserProfilePage() {
       {/* User info */}
       <div className="card rounded-xl p-5">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xl font-bold text-white shadow-[0_4px_12px_rgba(79,110,247,.25)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#0891b2] text-xl font-bold text-white shadow-[0_4px_12px_rgba(13,148,136,.25)]">
             {(user?.display_name||user?.username||"?").slice(0,2).toUpperCase()}
           </div>
           <div>
