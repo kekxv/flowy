@@ -77,11 +77,12 @@ export default function WikiCreatePage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate("/wiki")}
-          className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="btn btn-ghost btn-sm"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
+          {t("common.back", "Back")}
         </button>
-        <h1 className="text-xl font-bold tracking-tight flex-1">
+        <h1 className="text-xl font-bold tracking-tight flex-1 text-gradient">
           {t("wiki.new_page", "New Wiki Page")}
         </h1>
         <button onClick={handleSave} disabled={saving || !title.trim()} className="btn btn-primary">

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Plus, BookOpen, Search, Globe, Lock, Clock, User, X } from "lucide-react";
+import { Plus, BookOpen, Search, Globe, Lock, Clock, X } from "lucide-react";
 import { listWikiPages, type WikiPageData } from "../api/wiki";
 import Loader from "../components/Loader";
 
@@ -80,18 +80,18 @@ export default function WikiListPage() {
       {/* Search + Tabs */}
       <div className="card rounded-xl p-4 space-y-3">
         <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { setSearch(searchInput); setPage(1); } }}
-            placeholder={t("wiki.search_placeholder", "Search wiki…  ⏎")}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pl-8 pr-8 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(79,110,247,.12)]"
+            placeholder={t("wiki.search_placeholder", "Search wiki…")}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] py-2.5 pl-9 pr-9 text-[13px] text-[var(--text)] outline-none transition-all focus:border-[var(--primary)] focus:bg-[var(--bg-card)] focus:shadow-[0_0_0_3px_rgba(79,110,247,.08)]"
           />
           {searchInput && (
             <button onClick={() => { setSearchInput(""); setSearch(""); setPage(1); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
               <X size={14} />
             </button>
           )}
@@ -115,11 +115,16 @@ export default function WikiListPage() {
 
       {/* Page List */}
       {pages.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-16 rounded-xl text-[var(--text-muted)]">
-          <BookOpen size={40} className="opacity-30" />
-          <p className="mt-3 text-sm">{t("wiki.no_pages", "No wiki pages found")}</p>
-          {activeTab === "all" && (
-            <button onClick={() => navigate("/wiki/new")} className="btn btn-outline btn-sm mt-4">
+        <div className="card flex flex-col items-center justify-center py-20 rounded-xl text-[var(--text-muted)]">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bg-muted)]">
+            <BookOpen size={32} className="text-[var(--text-muted)]/50" />
+          </div>
+          <p className="text-[15px] font-medium text-[var(--text-secondary)]">{t("wiki.no_pages", "No wiki pages found")}</p>
+          <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+            {search ? "Try a different search term" : "Start by creating your first page"}
+          </p>
+          {activeTab === "all" && !search && (
+            <button onClick={() => navigate("/wiki/new")} className="btn btn-primary btn-sm mt-5">
               <Plus size={14} />
               {t("wiki.create_first", "Create your first page")}
             </button>
@@ -139,49 +144,55 @@ export default function WikiListPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold truncate group-hover:text-[var(--primary)] transition-colors">
+                    <h3 className="text-[14px] font-semibold truncate group-hover:text-[var(--primary)] transition-colors">
                       {page.title}
                     </h3>
                     {page.is_public ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600 border border-green-200">
-                        <Globe size={10} />
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 border border-emerald-200/50 shrink-0">
+                        <Globe size={9} />
                         {t("wiki.public", "Public")}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] border">
-                        <Lock size={10} />
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] border shrink-0">
+                        <Lock size={9} />
                         {t("wiki.private", "Private")}
                       </span>
                     )}
-                  </div>
-                  <p className="mt-1 text-[12px] text-[var(--text-secondary)] line-clamp-2">
-                    {getPreview(page.content)}
-                  </p>
-                  <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
-                    <span className="inline-flex items-center gap-1">
-                      <User size={11} />
-                      {page.owner_display_name || page.owner_name}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock size={11} />
-                      {formatDate(page.updated_at)}
-                    </span>
                     {page.weight > 0 && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 border border-amber-200">
+                      <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 border border-amber-200/50">
                         ★ {page.weight}
                       </span>
                     )}
-                    {page.tags && (
-                      <span className="flex items-center gap-1 flex-wrap">
-                        {page.tags.split(",").slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-[var(--primary)]/8 px-1.5 py-0.5 text-[10px] text-[var(--primary)]"
-                          >
-                            {tag.trim()}
-                          </span>
-                        ))}
+                  </div>
+                  <p className="mt-1.5 text-[12px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+                    {getPreview(page.content)}
+                  </p>
+                  <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7]/12 to-[#8b5cf6]/12 text-[8px] font-bold text-[var(--primary)]">
+                        {(page.owner_display_name || page.owner_name).charAt(0).toUpperCase()}
                       </span>
+                      {page.owner_display_name || page.owner_name}
+                    </span>
+                    <span className="text-[var(--border)]">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock size={10} className="text-[var(--text-muted)]/60" />
+                      {formatDate(page.updated_at)}
+                    </span>
+                    {page.tags && (
+                      <>
+                        <span className="text-[var(--border)]">·</span>
+                        <span className="flex items-center gap-1 flex-wrap">
+                          {page.tags.split(",").filter(t => t.trim()).slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-gradient-to-r from-[#4f6ef7]/6 to-[#8b5cf6]/6 px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]"
+                            >
+                              {tag.trim()}
+                            </span>
+                          ))}
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>

@@ -13,7 +13,6 @@ import {
   UserPlus,
   Users,
   Clock,
-  User,
   Image,
   Paperclip,
   Eye,
@@ -212,9 +211,10 @@ export default function WikiDetailPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate("/wiki")}
-          className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="btn btn-ghost btn-sm"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
+          {t("common.back", "Back")}
         </button>
         <div className="flex-1 min-w-0">
           {editing ? (
@@ -226,14 +226,14 @@ export default function WikiDetailPage() {
             />
           ) : (
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight truncate">{page.title}</h1>
+              <h1 className="text-xl font-bold tracking-tight truncate text-gradient">{page.title}</h1>
               {page.is_public ? (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600 border border-green-200">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 border border-emerald-200/60">
                   <Globe size={10} />
                   {t("wiki.public", "Public")}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] border">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] border">
                   <Lock size={10} />
                   {t("wiki.private", "Private")}
                 </span>
@@ -277,31 +277,38 @@ export default function WikiDetailPage() {
       </div>
 
       {/* Meta info */}
-      <div className="flex items-center gap-4 text-[12px] text-[var(--text-muted)]">
-        <span className="inline-flex items-center gap-1">
-          <User size={12} />
+      <div className="flex items-center gap-4 text-[12px] text-[var(--text-muted)] px-1">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7]/15 to-[#8b5cf6]/15 text-[9px] font-bold text-[var(--primary)]">
+            {(page.owner_display_name || page.owner_name).charAt(0).toUpperCase()}
+          </span>
           {page.owner_display_name || page.owner_name}
         </span>
         <span className="inline-flex items-center gap-1">
-          <Clock size={12} />
+          <Clock size={12} className="text-[var(--text-muted)]/60" />
           {new Date(page.updated_at).toLocaleString()}
         </span>
         {page.tags && (
           <span className="flex items-center gap-1 flex-wrap">
-            {page.tags.split(",").map((tag) => (
+            {page.tags.split(",").filter(t => t.trim()).map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-[var(--primary)]/8 px-2 py-0.5 text-[11px] text-[var(--primary)]"
+                className="rounded-full bg-gradient-to-r from-[#4f6ef7]/8 to-[#8b5cf6]/8 px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]"
               >
                 {tag.trim()}
               </span>
             ))}
           </span>
         )}
+        {page.weight > 0 && (
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 border border-amber-200/50">
+            ★ {page.weight}
+          </span>
+        )}
       </div>
 
       {/* Content */}
-      <div className="card rounded-xl p-5">
+      <div className="card rounded-xl p-6">
         {editing ? (
           <div className="space-y-4">
             <div>
@@ -461,9 +468,10 @@ export default function WikiDetailPage() {
 
       {/* Collaborator Panel */}
       {showCollabPanel && (
-        <div className="card rounded-xl p-5 animate-[fadeInUp_.15s_ease-out]">
+        <div className="card rounded-xl p-5 animate-[scaleIn_.2s_cubic-bezier(.16,1,.3,1)]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Users size={15} className="text-[var(--primary)]" />
               {t("wiki.collaborators", "Collaborators")} ({collaborators.length})
             </h3>
             <button onClick={() => setShowCollabPanel(false)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">
@@ -473,10 +481,10 @@ export default function WikiDetailPage() {
 
           {/* Current collaborators */}
           {collaborators.length > 0 && (
-            <div className="mb-4 space-y-2">
+            <div className="mb-4 space-y-1.5">
               {collaborators.map((c) => (
-                <div key={c.user_id} className="flex items-center gap-3 rounded-lg bg-[var(--bg)] p-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[11px] font-semibold text-[var(--primary)]">
+                <div key={c.user_id} className="flex items-center gap-3 rounded-xl bg-[var(--bg)]/60 p-2.5 transition-colors hover:bg-[var(--bg-hover)]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7]/15 to-[#8b5cf6]/15 text-[11px] font-bold text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     {(c.display_name || c.username).slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -485,7 +493,7 @@ export default function WikiDetailPage() {
                     </div>
                     <div className="text-[11px] text-[var(--text-muted)]">@{c.username}</div>
                   </div>
-                  <span className="text-[11px] text-[var(--primary)] bg-[var(--primary)]/8 rounded-full px-2 py-0.5">
+                  <span className="text-[11px] text-[var(--primary)] bg-[var(--primary)]/8 rounded-full px-2 py-0.5 font-medium">
                     {c.permission}
                   </span>
                   {isOwner && (
