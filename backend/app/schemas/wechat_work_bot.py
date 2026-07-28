@@ -75,3 +75,44 @@ class BindTokenResponse(BaseModel):
     token: str
     command: str
     expires_in_seconds: int = 600
+
+
+# ─── Intranet Sources ─────────────────────────────────────────
+
+
+class IntranetSourceCreate(BaseModel):
+    name: str
+    url: str
+    source_type: str = Field(default="json", pattern="^(json|nginx)$")
+    file_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+
+
+class IntranetSourceUpdate(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    source_type: str | None = Field(default=None, pattern="^(json|nginx)$")
+    file_ttl_seconds: int | None = Field(default=None, ge=60, le=86400)
+
+
+class IntranetSourceResponse(BaseModel):
+    id: str
+    name: str
+    url: str
+    source_type: str
+    file_ttl_seconds: int
+    created_at: str
+    updated_at: str
+
+
+class IntranetPreviewResponse(BaseModel):
+    files: list[dict]
+    total: int
+
+
+class TestCommandRequest(BaseModel):
+    command: str
+
+
+class TestCommandResponse(BaseModel):
+    response: str = ""
+    error: str | None = None

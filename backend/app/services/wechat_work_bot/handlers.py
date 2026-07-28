@@ -3,6 +3,7 @@
 import io
 import json
 import logging
+import re
 import uuid
 from datetime import datetime
 
@@ -151,6 +152,7 @@ class CommandHandlers:
 | `/list` `/列表` [status] | 问题列表 |
 | `/stats` `/统计` | 问题统计 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
+| `/file` `/文件` [关键词] | 搜索内网文件 |
 
 ### ✏️ 操作类
 | 指令 | 说明 |
@@ -1538,5 +1540,102 @@ class CommandHandlers:
 
         # Store pending results for numeric selection
         self.pending_wiki_results = [p.id for p in pages]
+
+        return "\n".join(lines)
+
+    # ─── Intranet File Search ────────────────────────────────────
+
+    async def handle_file(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Handle /file command — search configured intranet sources for files.
+
+        Supports regex patterns (e.g. /file \.pdf$) and plain keywords.
+        Results sorted by modification time (newest first), max 10 shown.
+        """
+        if not args:
+            return "❌ 用法: `/file 关键词`\n\n支持正则表达式，如 `/file \\.pdf$`\n\n搜索管理员配置的内网文件源"
+
+        keyword = " ".join(args).strip()
+
+        # Load configured intranet sources
+        from app.models.wechat_work_bot import IntranetSource
+        from app.services.wechat_work_bot.file_token import generate_file_token
+        from app.services.wechat_work_bot.intranet_parser import parse_source
+        from app.utils.settings import get_frontend_url
+
+        result = await self.db.execute(select(IntranetSource))
+        sources = list(result.scalars().all())
+
+        if not sources:
+            return "❌ 暂无内网文件源\n\n请联系管理员配置内网文件地址"
+
+        # Build matcher: try regex first, fallback to substring
+        is_regex = False
+        pattern = None
+        try:
+            pattern = re.compile(keyword, re.IGNORECASE)
+            is_regex = True
+        except re.error:
+            pass
+
+        def matches(name: str) -> bool:
+            if is_regex and pattern:
+                return bool(pattern.search(name))
+            return keyword.lower() in name.lower()
+
+        # Search across all sources
+        all_matches: list[dict] = []
+        errors: list[str] = []
+
+        for source in sources:
+            try:
+                files = await parse_source(source.url, source.source_type)
+                matched = [f for f in files if matches(f["name"])]
+                for m in matched:
+                    token = generate_file_token(source.id, m["url"], source.file_ttl_seconds)
+                    m["source_name"] = source.name
+                    m["token"] = token
+                all_matches.extend(matched)
+            except Exception as e:
+                logger.warning(f"Failed to parse source '{source.name}': {e}")
+                errors.append(source.name)
+
+        # Sort by mtime descending (newest first), entries without time go last
+        all_matches.sort(
+            key=lambda x: x.get("mtime") or "",
+            reverse=True,
+        )
+
+        if not all_matches:
+            error_hint = f"\n\n_部分源获取失败: {', '.join(errors)}_" if errors else ""
+            return f"❌ 未找到与「{keyword}」匹配的文件{error_hint}"
+
+        # Get frontend URL for download links
+        try:
+            frontend_url = await get_frontend_url(self.db)
+        except Exception:
+            frontend_url = ""
+
+        # Build markdown response
+        total = len(all_matches)
+        shown = all_matches[:10]
+        lines = [f"📁 找到 **{total}** 个匹配「{keyword}」的文件：\n"]
+        lines.append("| 文件名 | 来源 | 下载 |")
+        lines.append("| --- | --- | --- |")
+
+        for m in shown:
+            if frontend_url:
+                dl_url = f"{frontend_url}/api/v1/intranet/download?token={m['token']}"
+            else:
+                dl_url = f"/api/v1/intranet/download?token={m['token']}"
+            name = m["name"]
+            if len(name) > 40:
+                name = name[:37] + "..."
+            lines.append(f"| {name} | {m['source_name']} | [下载]({dl_url}) |")
+
+        if total > 10:
+            lines.append(f"\n> _仅显示最新 10 个，共 {total} 个匹配_")
+
+        if errors:
+            lines.append(f"\n> _部分源获取失败: {', '.join(errors)}_")
 
         return "\n".join(lines)

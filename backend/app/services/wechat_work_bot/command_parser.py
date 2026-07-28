@@ -41,6 +41,8 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "milestone": {"handler": "handle_milestone", "roles": ["helper", "admin"], "aliases": ["里程碑", "版本", "迭代"]},
     # Wiki / Knowledge Base
     "wiki": {"handler": "handle_wiki", "roles": ["viewer", "helper", "admin"], "aliases": ["知识库", "wiki", "搜索知识库"]},
+    # Intranet file search
+    "file": {"handler": "handle_file", "roles": ["viewer", "helper", "admin"], "aliases": ["文件", "搜索文件", "查找文件", "下载文件"]},
     # User management (admin only)
     "add_user": {"handler": "handle_add_user", "roles": ["admin"], "aliases": ["添加用户", "加人"]},
     "remove_user": {"handler": "handle_remove_user", "roles": ["admin"], "aliases": ["移除用户", "删除用户"]},
@@ -76,6 +78,7 @@ AI_KEYWORDS: dict[str, list[str]] = {
     "comment": ["评论", "留言", "回复问题"],
     "priority": ["优先级", "改优先级", "调整优先级"],
     "wiki": ["知识库", "搜索知识库", "查知识库", "wiki", "查找文档", "文档"],
+    "file": ["文件", "搜索文件", "查找文件", "下载文件", "找文件"],
 }
 
 

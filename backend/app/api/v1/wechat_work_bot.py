@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,7 @@ from app.database import get_db
 from app.dependencies import require_admin
 from app.models.user import User
 from app.models.wechat_work_bot import (
+    IntranetSource,
     WeChatWorkBotConfig,
     WeChatWorkBotLog,
     WeChatWorkBotUser,
@@ -28,6 +30,12 @@ from app.schemas.wechat_work_bot import (
     BotUserCreate,
     BotUserResponse,
     BotUserUpdate,
+    IntranetPreviewResponse,
+    IntranetSourceCreate,
+    IntranetSourceResponse,
+    IntranetSourceUpdate,
+    TestCommandRequest,
+    TestCommandResponse,
 )
 from app.services.wechat_work_bot import bot_service
 from app.services.wechat_work_bot.bind_token import generate_bind_token as _gen_token
@@ -326,5 +334,243 @@ async def generate_bind_token(
         token=token,
         command=f"/bind {token}",
         expires_in_seconds=600,
+    )
+
+
+# ─── Command Test ──────────────────────────────────────────────
+
+
+@router.post("/test-command", response_model=TestCommandResponse)
+async def test_command(
+    body: TestCommandRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    """Simulate a bot command and return the response (no real WeChat message)."""
+    from app.services.wechat_work_bot.command_parser import COMMANDS, CommandParser, check_permission
+    from app.services.wechat_work_bot.handlers import CommandHandlers
+    from app.services.wechat_work_bot.message_parser import MessageContext
+
+    text = body.command.strip()
+    if not text:
+        return TestCommandResponse(error="命令不能为空")
+
+    # Create a synthetic message context
+    msg_ctx = MessageContext(
+        text=text,
+        from_userid="admin-test",
+        chattype="single",
+    )
+
+    parser = CommandParser()
+    parsed = await parser.parse(msg_ctx)
+
+    if not parsed:
+        return TestCommandResponse(error=f"无法识别的命令: {text}")
+
+    cmd_def = COMMANDS.get(parsed.command, {})
+
+    # Create a synthetic admin-level bot user for testing
+    from app.models.wechat_work_bot import WeChatWorkBotUser
+    test_bot_user = WeChatWorkBotUser(
+        id="test-admin",
+        wechat_user_id="admin-test",
+        flowy_user_id=_user.id,
+        role="admin",
+    )
+
+    handlers = CommandHandlers(db, test_bot_user, "admin-test")
+    handler_name = cmd_def.get("handler", "")
+    handler_func = getattr(handlers, handler_name, None)
+
+    if not handler_func:
+        return TestCommandResponse(error=f"指令处理器不存在: {handler_name}")
+
+    try:
+        response = await handler_func(parsed.args, parsed.quote_context, {})
+        return TestCommandResponse(response=response)
+    except Exception as e:
+        return TestCommandResponse(error=f"执行出错: {e}")
+
+
+# ─── Intranet Sources ──────────────────────────────────────────
+
+
+@router.get("/intranet-sources", response_model=list[IntranetSourceResponse])
+async def list_intranet_sources(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    query = select(IntranetSource).order_by(IntranetSource.created_at.desc())
+    result = await db.execute(query)
+    sources = result.scalars().all()
+    return [
+        IntranetSourceResponse(
+            id=s.id,
+            name=s.name,
+            url=s.url,
+            source_type=s.source_type,
+            file_ttl_seconds=s.file_ttl_seconds,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )
+        for s in sources
+    ]
+
+
+@router.post("/intranet-sources", response_model=IntranetSourceResponse)
+async def create_intranet_source(
+    body: IntranetSourceCreate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    now = datetime.now().isoformat()
+    source = IntranetSource(
+        id=str(uuid.uuid4()),
+        name=body.name,
+        url=body.url,
+        source_type=body.source_type,
+        file_ttl_seconds=body.file_ttl_seconds,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(source)
+    await db.commit()
+    await db.refresh(source)
+    return IntranetSourceResponse(
+        id=source.id,
+        name=source.name,
+        url=source.url,
+        source_type=source.source_type,
+        file_ttl_seconds=source.file_ttl_seconds,
+        created_at=source.created_at,
+        updated_at=source.updated_at,
+    )
+
+
+@router.put("/intranet-sources/{source_id}", response_model=IntranetSourceResponse)
+async def update_intranet_source(
+    source_id: str,
+    body: IntranetSourceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    source = await db.get(IntranetSource, source_id)
+    if not source:
+        raise HTTPException(404, "文件源不存在")
+
+    if body.name is not None:
+        source.name = body.name
+    if body.url is not None:
+        source.url = body.url
+    if body.source_type is not None:
+        source.source_type = body.source_type
+    if body.file_ttl_seconds is not None:
+        source.file_ttl_seconds = body.file_ttl_seconds
+    source.updated_at = datetime.now().isoformat()
+
+    await db.commit()
+    await db.refresh(source)
+    return IntranetSourceResponse(
+        id=source.id,
+        name=source.name,
+        url=source.url,
+        source_type=source.source_type,
+        file_ttl_seconds=source.file_ttl_seconds,
+        created_at=source.created_at,
+        updated_at=source.updated_at,
+    )
+
+
+@router.delete("/intranet-sources/{source_id}")
+async def delete_intranet_source(
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    source = await db.get(IntranetSource, source_id)
+    if not source:
+        raise HTTPException(404, "文件源不存在")
+    await db.delete(source)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/intranet-sources/{source_id}/preview", response_model=IntranetPreviewResponse)
+async def preview_intranet_source(
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    """Parse a source and return the file list for preview."""
+    from app.services.wechat_work_bot.intranet_parser import parse_source
+
+    source = await db.get(IntranetSource, source_id)
+    if not source:
+        raise HTTPException(404, "文件源不存在")
+
+    try:
+        files = await parse_source(source.url, source.source_type)
+        return IntranetPreviewResponse(files=files[:30], total=len(files))
+    except Exception as e:
+        raise HTTPException(502, f"获取文件列表失败: {e}")
+
+
+# ─── Intranet File Download Proxy ──────────────────────────────
+
+
+@router.get("/intranet/download")
+async def download_intranet_file(
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Proxy download for intranet files. Uses signed token for auth."""
+    from app.services.wechat_work_bot.file_token import verify_file_token
+
+    # Verify token
+    payload = verify_file_token(token)
+    if not payload:
+        raise HTTPException(401, "下载链接无效或已过期")
+
+    source_id = payload["sid"]
+    file_url = payload["url"]
+
+    # Verify source exists
+    source = await db.get(IntranetSource, source_id)
+    if not source:
+        raise HTTPException(404, "文件源不存在或已被删除")
+
+    # Security: verify file_url belongs to the configured source
+    if not file_url.startswith(source.url.rstrip("/") + "/") and file_url != source.url:
+        # Also allow if file_url starts with source.url exactly
+        source_base = source.url.rstrip("/")
+        if not file_url.startswith(source_base + "/"):
+            raise HTTPException(403, "文件地址不在配置的源范围内")
+
+    # Fetch file from intranet
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(file_url)
+            resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(502, f"内网文件获取失败: HTTP {e.response.status_code}")
+    except Exception as e:
+        raise HTTPException(502, f"内网文件获取失败: {e}")
+
+    # Determine filename from URL
+    filename = file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
+
+    # Build response with streaming
+    content_type = resp.headers.get("content-type", "application/octet-stream")
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Length": str(len(resp.content)),
+    }
+
+    return StreamingResponse(
+        iter([resp.content]),
+        media_type=content_type,
+        headers=headers,
     )
 

@@ -1015,3 +1015,209 @@ class TestBotStats:
         assert "已解决 0" in result
         assert "总计 3" in result
         assert "□" * 10 in result
+
+
+# ── TestIntranetParser ──────────────────────────────────────────
+
+class TestIntranetParser:
+    def test_parse_json_array_of_objects(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_json
+
+        body = '[{"name": "report.pdf", "url": "http://nas/report.pdf"}, {"name": "data.zip", "url": "http://nas/data.zip"}]'
+        result = _parse_json(body, "http://nas/")
+        assert len(result) == 2
+        names = {r["name"] for r in result}
+        assert names == {"report.pdf", "data.zip"}
+        assert all("mtime" in r for r in result)
+
+    def test_parse_json_nested_files_key(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_json
+
+        body = '{"files": [{"name": "a.txt", "url": "http://x/a.txt"}]}'
+        result = _parse_json(body, "http://x/")
+        assert len(result) == 1
+        assert result[0]["name"] == "a.txt"
+
+    def test_parse_json_flat_strings(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_json
+
+        body = '["file1.txt", "file2.zip"]'
+        result = _parse_json(body, "http://nas/share/")
+        assert len(result) == 2
+        names = {r["name"] for r in result}
+        assert names == {"file1.txt", "file2.zip"}
+
+    def test_parse_json_with_mtime_sorted_newest_first(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_json
+
+        body = '[{"name": "old.txt", "url": "http://x/old.txt", "mtime": "2024-01-01 10:00:00"}, {"name": "new.txt", "url": "http://x/new.txt", "mtime": "2024-06-01 10:00:00"}]'
+        result = _parse_json(body, "http://x/")
+        assert len(result) == 2
+        assert result[0]["name"] == "new.txt"
+        assert result[1]["name"] == "old.txt"
+
+    def test_parse_nginx_index(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = """
+        <html><body>
+        <h1>Index of /files</h1>
+        <table>
+        <tr><td><a href="../">Parent Directory</a></td></tr>
+        <tr><td><a href="document.pdf">document.pdf</a></td><td>2024-01-15 10:30</td><td>1.2M</td></tr>
+        <tr><td><a href="image.png">image.png</a></td><td>2024-06-20 14:00</td><td>3.4M</td></tr>
+        <tr><td><a href="backup/">backup/</a></td><td>2024-01-03</td><td>-</td></tr>
+        </table>
+        </body></html>
+        """
+        result = _parse_nginx(html, "http://nas/files/")
+        assert len(result) == 2  # skips ../ and backup/
+        names = {r["name"] for r in result}
+        assert names == {"document.pdf", "image.png"}
+        # image.png has newer mtime → should be first
+        assert result[0]["name"] == "image.png"
+
+    def test_parse_nginx_html_entities_in_text(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        # Nginx sometimes renders filenames with HTML entities in text
+        # e.g. a file named "a>b.txt" shows as "a&gt;b.txt"
+        html = '<a href="a&gt;b.txt">a&gt;b.txt</a>   2024-03-01 10:00<a href="c&amp;d.zip">c&amp;d.zip</a>   2024-05-01 10:00'
+        result = _parse_nginx(html, "http://nas/")
+        assert len(result) == 2
+        assert result[0]["name"] == "c&d.zip"  # newer mtime first
+        assert result[1]["name"] == "a>b.txt"
+
+    def test_parse_nginx_url_encoded_href(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = '<a href="%E6%96%87%E4%BB%B6.pdf">%E6%96%87%E4%BB%B6.pdf</a>'
+        result = _parse_nginx(html, "http://nas/")
+        assert len(result) == 1
+        assert result[0]["name"] == "文件.pdf"
+
+    def test_parse_nginx_skips_sort_links(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_nginx
+
+        html = '<a href="?C=N;O=D">Name</a><a href="file.txt">file.txt</a>'
+        result = _parse_nginx(html, "http://nas/")
+        assert len(result) == 1
+        assert result[0]["name"] == "file.txt"
+
+
+# ── TestFileToken ───────────────────────────────────────────────
+
+class TestFileToken:
+    def test_generate_and_verify(self):
+        from app.services.wechat_work_bot.file_token import generate_file_token, verify_file_token
+
+        token = generate_file_token("source-123", "http://nas/file.pdf", 3600)
+        result = verify_file_token(token)
+        assert result is not None
+        assert result["sid"] == "source-123"
+        assert result["url"] == "http://nas/file.pdf"
+
+    def test_expired_token(self):
+        from app.services.wechat_work_bot.file_token import generate_file_token, verify_file_token
+
+        token = generate_file_token("src", "http://x/f", ttl_seconds=-10)
+        result = verify_file_token(token)
+        assert result is None
+
+    def test_tampered_token(self):
+        from app.services.wechat_work_bot.file_token import verify_file_token
+
+        result = verify_file_token("invalid-token-data")
+        assert result is None
+
+    def test_empty_token(self):
+        from app.services.wechat_work_bot.file_token import verify_file_token
+
+        result = verify_file_token("")
+        assert result is None
+
+
+# ── TestBotFileCommand ──────────────────────────────────────────
+
+class TestBotFileCommand:
+    @pytest.mark.asyncio
+    async def test_file_no_args(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-file1", username="fileuser1", email="f1@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+        result = await handlers.handle_file([], {})
+        assert "用法" in result or "Usage" in result.lower() or "用法" in result
+
+    @pytest.mark.asyncio
+    async def test_file_no_sources(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-file2", username="fileuser2", email="f2@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+        result = await handlers.handle_file(["test.pdf"], {})
+        assert "暂无" in result or "配置" in result
+
+    @pytest.mark.asyncio
+    async def test_file_regex_match(self, db_session: AsyncSession):
+        from unittest.mock import patch
+        from app.models.wechat_work_bot import IntranetSource
+
+        user = User(**_make_user_kwargs(id="user-file3", username="fileuser3", email="f3@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        source = IntranetSource(
+            id="src-regex", name="Test", url="http://x/",
+            source_type="json", file_ttl_seconds=3600,
+            created_at=NOW, updated_at=NOW,
+        )
+        db_session.add(source)
+        await db_session.flush()
+
+        mock_files = [
+            {"name": "report.pdf", "url": "http://x/report.pdf", "mtime": None},
+            {"name": "data.csv", "url": "http://x/data.csv", "mtime": None},
+            {"name": "notes.pdf", "url": "http://x/notes.pdf", "mtime": None},
+            {"name": "image.png", "url": "http://x/image.png", "mtime": None},
+        ]
+
+        with patch("app.services.wechat_work_bot.intranet_parser.parse_source", return_value=mock_files):
+            handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+            # Regex: match files ending in .pdf
+            result = await handlers.handle_file([r"\.pdf$"], {})
+            assert "report.pdf" in result
+            assert "notes.pdf" in result
+            assert "data.csv" not in result
+            assert "image.png" not in result
+
+    @pytest.mark.asyncio
+    async def test_file_limit_10_results(self, db_session: AsyncSession):
+        from unittest.mock import patch
+        from app.models.wechat_work_bot import IntranetSource
+
+        user = User(**_make_user_kwargs(id="user-file4", username="fileuser4", email="f4@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        source = IntranetSource(
+            id="src-limit", name="Test", url="http://x/",
+            source_type="json", file_ttl_seconds=3600,
+            created_at=NOW, updated_at=NOW,
+        )
+        db_session.add(source)
+        await db_session.flush()
+
+        mock_files = [
+            {"name": f"file{i:02d}.txt", "url": f"http://x/file{i:02d}.txt",
+             "mtime": f"2024-01-{i+1:02d} 10:00:00"}
+            for i in range(15)
+        ]
+
+        with patch("app.services.wechat_work_bot.intranet_parser.parse_source", return_value=mock_files):
+            handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+            result = await handlers.handle_file(["file"], {})
+            # Should show 10 results, note total is 15
+            assert "15" in result  # total count
+            assert "仅显示最新 10 个" in result
+            # Count how many file rows are in the table
+            rows = [line for line in result.split("\n") if line.startswith("| file")]
+            assert len(rows) == 10

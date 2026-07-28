@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bot, Play, Square, RefreshCw, Plus, Trash2, Pencil, Users, Settings, ScrollText,
-  CheckCircle2, XCircle, Shield, Wrench, Eye, Loader2, Link, Copy, X,
+  CheckCircle2, XCircle, Shield, Wrench, Eye, Loader2, Link, Copy, X, Terminal,
+  FolderOpen, Server, Send,
 } from "lucide-react";
 import api from "../api/client";
 
@@ -37,8 +38,17 @@ interface FlowyUser {
   username: string;
   display_name: string;
 }
+interface IntranetSource {
+  id: string;
+  name: string;
+  url: string;
+  source_type: "json" | "nginx";
+  file_ttl_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
 
-type Tab = "config" | "users" | "logs";
+type Tab = "config" | "users" | "logs" | "files";
 
 const ROLE_ICONS: Record<string, typeof Shield> = {
   admin: Shield,
@@ -77,6 +87,21 @@ export default function WeChatWorkBotPage() {
   const [bindLoading, setBindLoading] = useState(false);
   const successTimer = useRef<any>(null);
 
+  // Command test state
+  const [testCmd, setTestCmd] = useState("");
+  const [testResponse, setTestResponse] = useState("");
+  const [testError, setTestError] = useState("");
+  const [testLoading, setTestLoading] = useState(false);
+
+  // Intranet sources state
+  const [intranetSources, setIntranetSources] = useState<IntranetSource[]>([]);
+  const [showSourceForm, setShowSourceForm] = useState(false);
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+  const [sourceForm, setSourceForm] = useState({ name: "", url: "", source_type: "json" as "json" | "nginx", file_ttl_seconds: 3600 });
+  const [previewFiles, setPreviewFiles] = useState<{ name: string; url: string }[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
+
   const flashSuccess = (msg: string) => {
     setSuccess(msg);
     clearTimeout(successTimer.current);
@@ -108,9 +133,17 @@ export default function WeChatWorkBotPage() {
     } catch { /* ignore */ }
   };
 
+  const fetchIntranetSources = async () => {
+    try {
+      const res = await api.get("/wechat-work-bot/intranet-sources");
+      setIntranetSources(res.data);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => { fetchConfig(); }, []);
   useEffect(() => { if (tab === "users") fetchUsers(); }, [tab]);
   useEffect(() => { if (tab === "logs") fetchLogs(); }, [tab]);
+  useEffect(() => { if (tab === "files") fetchIntranetSources(); }, [tab]);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,6 +257,82 @@ export default function WeChatWorkBotPage() {
     }
   };
 
+  // ─── Command Test ──────────────────────────────────────────
+
+  const handleTestCommand = async () => {
+    if (!testCmd.trim()) return;
+    setTestResponse("");
+    setTestError("");
+    setTestLoading(true);
+    try {
+      const res = await api.post("/wechat-work-bot/test-command", { command: testCmd });
+      if (res.data.error) {
+        setTestError(res.data.error);
+      } else {
+        setTestResponse(res.data.response);
+      }
+    } catch (err: any) {
+      setTestError(err.response?.data?.detail || err.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // ─── Intranet Sources ──────────────────────────────────────
+
+  const handleSaveSource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (editingSourceId) {
+        await api.put(`/wechat-work-bot/intranet-sources/${editingSourceId}`, sourceForm);
+      } else {
+        await api.post("/wechat-work-bot/intranet-sources", sourceForm);
+      }
+      setShowSourceForm(false);
+      setEditingSourceId(null);
+      setSourceForm({ name: "", url: "", source_type: "json", file_ttl_seconds: 3600 });
+      await fetchIntranetSources();
+      flashSuccess(t("common.saved"));
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSource = async (id: string) => {
+    if (!confirm("确定删除此文件源？")) return;
+    try {
+      await api.delete(`/wechat-work-bot/intranet-sources/${id}`);
+      await fetchIntranetSources();
+      flashSuccess(t("common.delete") + " ✓");
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    }
+  };
+
+  const openEditSource = (s: IntranetSource) => {
+    setEditingSourceId(s.id);
+    setSourceForm({ name: s.name, url: s.url, source_type: s.source_type, file_ttl_seconds: s.file_ttl_seconds });
+    setShowSourceForm(true);
+  };
+
+  const handlePreviewSource = async (id: string) => {
+    setPreviewLoading(true);
+    setPreviewFiles([]);
+    setPreviewSourceId(id);
+    try {
+      const res = await api.post(`/wechat-work-bot/intranet-sources/${id}/preview`);
+      setPreviewFiles(res.data.files);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 page-enter">
       <div>
@@ -245,6 +354,7 @@ export default function WeChatWorkBotPage() {
           { key: "config" as Tab, label: t("wechat_work_bot.config", "配置"), icon: Settings },
           { key: "users" as Tab, label: t("wechat_work_bot.users", "用户管理"), icon: Users },
           { key: "logs" as Tab, label: t("wechat_work_bot.logs", "指令日志"), icon: ScrollText },
+          { key: "files" as Tab, label: "内网文件", icon: FolderOpen },
         ]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${tab === key ? "bg-white shadow-sm text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
@@ -255,6 +365,7 @@ export default function WeChatWorkBotPage() {
 
       {/* Tab: Config */}
       {tab === "config" && (
+        <>
         <div className="card rounded-xl overflow-hidden">
           <form onSubmit={handleSaveConfig} className="space-y-5 p-5">
             {/* Status bar */}
@@ -333,6 +444,43 @@ export default function WeChatWorkBotPage() {
             </div>
           </form>
         </div>
+
+        {/* Command Test */}
+        <div className="card rounded-xl overflow-hidden mt-6">
+          <div className="flex items-center gap-2 border-b border-[var(--border-light)] px-5 py-3.5">
+            <Terminal size={14} className="text-[var(--text-muted)]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">指令测试</h2>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={testCmd}
+                onChange={e => setTestCmd(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleTestCommand()}
+                className="input flex-1 text-[13px] font-mono"
+                placeholder="/help 或 /统计 ..."
+              />
+              <button
+                onClick={handleTestCommand}
+                disabled={testLoading || !testCmd.trim()}
+                className="btn btn-primary btn-sm"
+              >
+                {testLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} className="mr-1" />}
+                测试
+              </button>
+            </div>
+            {testError && (
+              <div className="rounded-lg bg-red-50 px-4 py-2.5 text-[12px] text-red-600">{testError}</div>
+            )}
+            {testResponse && (
+              <div className="rounded-lg bg-[var(--bg-muted)] px-4 py-3 text-[12px] font-mono whitespace-pre-wrap break-words max-h-80 overflow-y-auto">
+                {testResponse}
+              </div>
+            )}
+          </div>
+        </div>
+        </>
       )}
 
       {/* Tab: Users */}
@@ -545,6 +693,150 @@ export default function WeChatWorkBotPage() {
                   </div>
                   {log.error && (
                     <div className="mt-1 text-[11px] text-red-500">{log.error}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Files */}
+      {tab === "files" && (
+        <div className="card rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <FolderOpen size={14} />
+              内网文件源
+              <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{intranetSources.length}</span>
+            </h2>
+            <button
+              onClick={() => { setShowSourceForm(true); setEditingSourceId(null); setSourceForm({ name: "", url: "", source_type: "json", file_ttl_seconds: 3600 }); }}
+              className="btn btn-outline btn-sm"
+            >
+              <Plus size={12} className="mr-1" />添加源
+            </button>
+          </div>
+
+          {/* Add/Edit Source Dialog */}
+          {showSourceForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowSourceForm(false); setEditingSourceId(null); }}>
+              <div className="card w-full max-w-md rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[15px] font-semibold flex items-center gap-2">
+                    <Server size={18} className="text-[var(--primary)]" />
+                    {editingSourceId ? "编辑文件源" : "添加文件源"}
+                  </h3>
+                  <button onClick={() => { setShowSourceForm(false); setEditingSourceId(null); }} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"><X size={16} /></button>
+                </div>
+
+                <form onSubmit={handleSaveSource} className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">名称</label>
+                    <input type="text" value={sourceForm.name}
+                      onChange={e => setSourceForm({ ...sourceForm, name: e.target.value })}
+                      className="input mt-1 text-[13px]" placeholder="NAS 文件服务器" required />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">URL</label>
+                    <input type="url" value={sourceForm.url}
+                      onChange={e => setSourceForm({ ...sourceForm, url: e.target.value })}
+                      className="input mt-1 text-[13px] font-mono" placeholder="http://192.168.1.100/files/" required />
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">JSON API 或 nginx Index 页面地址</p>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">类型</label>
+                    <select value={sourceForm.source_type}
+                      onChange={e => setSourceForm({ ...sourceForm, source_type: e.target.value as "json" | "nginx" })}
+                      className="input mt-1 text-[13px]">
+                      <option value="json">JSON API</option>
+                      <option value="nginx">Nginx Index</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">下载有效期（小时）</label>
+                    <input type="number" value={Math.round(sourceForm.file_ttl_seconds / 3600)}
+                      onChange={e => setSourceForm({ ...sourceForm, file_ttl_seconds: Math.max(60, parseInt(e.target.value) * 3600) || 3600 })}
+                      className="input mt-1 text-[13px]" min={1} max={24} step={1} />
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">下载链接的有效时间，默认 1 小时</p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => { setShowSourceForm(false); setEditingSourceId(null); }}
+                      className="btn btn-outline btn-sm">{t("common.cancel")}</button>
+                    <button type="submit" className="btn btn-primary btn-sm">
+                      {editingSourceId ? t("common.save") : t("common.create")}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {intranetSources.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-[var(--text-muted)]">
+              <FolderOpen size={28} className="mb-2 opacity-30" />
+              <p className="text-[13px]">暂无内网文件源</p>
+              <p className="text-[11px] mt-1">添加 JSON API 或 nginx Index 页面地址</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--border-light)]">
+              {intranetSources.map(s => (
+                <div key={s.id} className="group hover:bg-[var(--bg-hover)] transition-colors">
+                  <div className="flex items-center justify-between px-5 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <Server size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium">{s.name}</div>
+                        <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono truncate max-w-[200px]">{s.url}</span>
+                          <span className="rounded-full bg-blue-50 text-blue-600 px-1.5 py-0.5 text-[9px] font-medium">
+                            {s.source_type === "json" ? "JSON" : "Nginx"}
+                          </span>
+                          <span className="text-[9px]">TTL: {Math.round(s.file_ttl_seconds / 3600)}h</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button onClick={() => handlePreviewSource(s.id)}
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]" title="预览文件">
+                        <Eye size={13} />
+                      </button>
+                      <button onClick={() => openEditSource(s)}
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]">
+                        <Pencil size={13} />
+                      </button>
+                      <button onClick={() => handleDeleteSource(s.id)}
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview panel */}
+                  {previewSourceId === s.id && (
+                    <div className="px-5 pb-3">
+                      {previewLoading ? (
+                        <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)] py-2">
+                          <Loader2 size={12} className="animate-spin" />
+                          正在获取文件列表...
+                        </div>
+                      ) : previewFiles.length > 0 ? (
+                        <div className="rounded-lg bg-[var(--bg-muted)] p-3 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-[var(--text-muted)] mb-1.5">
+                            文件列表（共 {previewFiles.length} 个）
+                          </div>
+                          {previewFiles.map((f, i) => (
+                            <div key={i} className="text-[11px] font-mono text-[var(--text)] py-0.5 truncate">
+                              {f.name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-[var(--text-muted)] py-2">未获取到文件</div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

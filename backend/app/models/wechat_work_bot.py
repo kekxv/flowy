@@ -61,6 +61,35 @@ class WeChatWorkBotUser(Base):
     )
 
 
+class IntranetSource(Base):
+    """Configured intranet file sources for the /file command.
+
+    Admins set up intranet addresses (JSON API or nginx Index pages).
+    Bot users can search and download files via signed proxy URLs.
+    """
+
+    __tablename__ = "intranet_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    url: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False, default="json")
+    file_ttl_seconds: Mapped[int] = mapped_column(default=3600)
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
+    updated_at: Mapped[str] = mapped_column(
+        String(32),
+        default=lambda: datetime.now().isoformat(),
+        onupdate=lambda: datetime.now().isoformat(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('json','nginx')",
+            name="ck_intranet_source_type",
+        ),
+    )
+
+
 class WeChatWorkBotLog(Base):
     """Command execution log for the bot."""
 
