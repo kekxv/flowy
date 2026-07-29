@@ -3,6 +3,7 @@ import json
 import socket
 
 import pytest
+from httpx import BasicAuth, Request
 
 from app.core.url_security import url_belongs_to_source, validate_http_url
 from app.services.notifications.base import NotificationEvent
@@ -203,5 +204,53 @@ async def test_intranet_parser_discards_urls_outside_configured_source(monkeypat
     files = await parse_source("http://files.internal/base", "json")
 
     assert files == [
-        {"name": "safe.pdf", "url": "http://files.internal/base/safe.pdf", "mtime": None}
+        {
+            "name": "safe.pdf",
+            "url": "http://files.internal/base/safe.pdf",
+            "mtime": None,
+            "size": None,
+        }
     ]
+
+
+@pytest.mark.asyncio
+async def test_intranet_parser_sends_basic_auth(monkeypatch):
+    """Protected listing requests receive an Authorization header."""
+    captured_auth = None
+
+    def resolve_private(*_args, **_kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.10.20", 80))]
+
+    class FakeResponse:
+        status_code = 200
+        text = "[]"
+
+        def raise_for_status(self):
+            return None
+
+    class FakeHttpClient:
+        def __init__(self, *_args, auth=None, **_kwargs):
+            nonlocal captured_auth
+            captured_auth = auth
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def get(self, _url):
+            return FakeResponse()
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve_private)
+    monkeypatch.setattr("httpx.AsyncClient", FakeHttpClient)
+
+    await parse_source(
+        "http://files.internal/base",
+        "json",
+        auth=("reader", "source-secret"),
+    )
+
+    assert isinstance(captured_auth, BasicAuth)
+    request = next(captured_auth.auth_flow(Request("GET", "http://files.internal/base")))
+    assert request.headers["Authorization"] == "Basic cmVhZGVyOnNvdXJjZS1zZWNyZXQ="

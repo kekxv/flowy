@@ -40,6 +40,7 @@ from app.schemas.wechat_work_bot import (
 )
 from app.services.wechat_work_bot import bot_service
 from app.services.wechat_work_bot.bind_token import generate_bind_token as _gen_token
+from app.services.wechat_work_bot.intranet_auth import get_source_credentials
 
 router = APIRouter(prefix="/wechat-work-bot", tags=["wechat-work-bot"])
 public_router = APIRouter(tags=["wechat-work-bot"])
@@ -404,6 +405,20 @@ async def test_command(
 # ─── Intranet Sources ──────────────────────────────────────────
 
 
+def _source_response(source: IntranetSource) -> IntranetSourceResponse:
+    return IntranetSourceResponse(
+        id=source.id,
+        name=source.name,
+        url=source.url,
+        source_type=source.source_type,
+        file_ttl_seconds=source.file_ttl_seconds,
+        auth_username=source.auth_username or "",
+        has_auth=bool(source.auth_username and source.auth_password_encrypted),
+        created_at=source.created_at,
+        updated_at=source.updated_at,
+    )
+
+
 @router.get("/intranet-sources", response_model=list[IntranetSourceResponse])
 async def list_intranet_sources(
     db: AsyncSession = Depends(get_db),
@@ -412,18 +427,7 @@ async def list_intranet_sources(
     query = select(IntranetSource).order_by(IntranetSource.created_at.desc())
     result = await db.execute(query)
     sources = result.scalars().all()
-    return [
-        IntranetSourceResponse(
-            id=s.id,
-            name=s.name,
-            url=s.url,
-            source_type=s.source_type,
-            file_ttl_seconds=s.file_ttl_seconds,
-            created_at=s.created_at,
-            updated_at=s.updated_at,
-        )
-        for s in sources
-    ]
+    return [_source_response(source) for source in sources]
 
 
 @router.post("/intranet-sources", response_model=IntranetSourceResponse)
@@ -443,21 +447,15 @@ async def create_intranet_source(
         url=body.url,
         source_type=body.source_type,
         file_ttl_seconds=body.file_ttl_seconds,
+        auth_username=body.auth_username.strip() or None,
+        auth_password_encrypted=(encrypt_token(body.auth_password) if body.auth_password else None),
         created_at=now,
         updated_at=now,
     )
     db.add(source)
     await db.commit()
     await db.refresh(source)
-    return IntranetSourceResponse(
-        id=source.id,
-        name=source.name,
-        url=source.url,
-        source_type=source.source_type,
-        file_ttl_seconds=source.file_ttl_seconds,
-        created_at=source.created_at,
-        updated_at=source.updated_at,
-    )
+    return _source_response(source)
 
 
 @router.put("/intranet-sources/{source_id}", response_model=IntranetSourceResponse)
@@ -483,19 +481,26 @@ async def update_intranet_source(
         source.source_type = body.source_type
     if body.file_ttl_seconds is not None:
         source.file_ttl_seconds = body.file_ttl_seconds
+    if body.clear_auth:
+        source.auth_username = None
+        source.auth_password_encrypted = None
+    else:
+        if body.auth_username is not None:
+            username = body.auth_username.strip()
+            if not username:
+                raise HTTPException(422, "清除认证请使用 clear_auth")
+            source.auth_username = username
+        if body.auth_password:
+            if not source.auth_username:
+                raise HTTPException(422, "Basic Auth 用户名不能为空")
+            source.auth_password_encrypted = encrypt_token(body.auth_password)
+        if bool(source.auth_username) != bool(source.auth_password_encrypted):
+            raise HTTPException(422, "Basic Auth 用户名和密码必须同时配置")
     source.updated_at = datetime.now().isoformat()
 
     await db.commit()
     await db.refresh(source)
-    return IntranetSourceResponse(
-        id=source.id,
-        name=source.name,
-        url=source.url,
-        source_type=source.source_type,
-        file_ttl_seconds=source.file_ttl_seconds,
-        created_at=source.created_at,
-        updated_at=source.updated_at,
-    )
+    return _source_response(source)
 
 
 @router.delete("/intranet-sources/{source_id}")
@@ -526,7 +531,11 @@ async def preview_intranet_source(
         raise HTTPException(404, "文件源不存在")
 
     try:
-        files = await parse_source(source.url, source.source_type)
+        files = await parse_source(
+            source.url,
+            source.source_type,
+            auth=get_source_credentials(source),
+        )
         return IntranetPreviewResponse(files=files[:30], total=len(files))
     except Exception as e:
         raise HTTPException(502, f"获取文件列表失败: {e}")
@@ -571,9 +580,15 @@ async def download_intranet_file(
 
     content = bytearray()
     content_type = "application/octet-stream"
+    credentials = get_source_credentials(source)
+    basic_auth = httpx.BasicAuth(*credentials) if credentials else None
     try:
         async with (
-            httpx.AsyncClient(timeout=30, follow_redirects=False) as client,
+            httpx.AsyncClient(
+                timeout=30,
+                follow_redirects=False,
+                auth=basic_auth,
+            ) as client,
             client.stream("GET", file_url) as resp,
         ):
             if 300 <= resp.status_code < 400:

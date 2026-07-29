@@ -6,6 +6,11 @@ import {
   FolderOpen, Server, Send,
 } from "lucide-react";
 import api from "../api/client";
+import {
+  buildIntranetSourcePayload,
+  formatFileSize,
+  type IntranetSourceForm,
+} from "../utils/intranetSource";
 
 interface BotConfig {
   bot_id: string;
@@ -44,6 +49,8 @@ interface IntranetSource {
   url: string;
   source_type: "json" | "nginx";
   file_ttl_seconds: number;
+  auth_username: string;
+  has_auth: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -64,6 +71,16 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "管理员",
   helper: "协助人员",
   viewer: "查看者",
+};
+
+const EMPTY_SOURCE_FORM: IntranetSourceForm = {
+  name: "",
+  url: "",
+  source_type: "json",
+  file_ttl_seconds: 3600,
+  use_basic_auth: false,
+  auth_username: "",
+  auth_password: "",
 };
 
 export default function WeChatWorkBotPage() {
@@ -97,8 +114,9 @@ export default function WeChatWorkBotPage() {
   const [intranetSources, setIntranetSources] = useState<IntranetSource[]>([]);
   const [showSourceForm, setShowSourceForm] = useState(false);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [sourceForm, setSourceForm] = useState({ name: "", url: "", source_type: "json" as "json" | "nginx", file_ttl_seconds: 3600 });
-  const [previewFiles, setPreviewFiles] = useState<{ name: string; url: string }[]>([]);
+  const [sourceForm, setSourceForm] = useState<IntranetSourceForm>(EMPTY_SOURCE_FORM);
+  const [editingSourceHasAuth, setEditingSourceHasAuth] = useState(false);
+  const [previewFiles, setPreviewFiles] = useState<{ name: string; url: string; size?: number | null }[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
 
@@ -285,14 +303,16 @@ export default function WeChatWorkBotPage() {
     setError("");
     setLoading(true);
     try {
+      const payload = buildIntranetSourcePayload(sourceForm, editingSourceHasAuth);
       if (editingSourceId) {
-        await api.put(`/wechat-work-bot/intranet-sources/${editingSourceId}`, sourceForm);
+        await api.put(`/wechat-work-bot/intranet-sources/${editingSourceId}`, payload);
       } else {
-        await api.post("/wechat-work-bot/intranet-sources", sourceForm);
+        await api.post("/wechat-work-bot/intranet-sources", payload);
       }
       setShowSourceForm(false);
       setEditingSourceId(null);
-      setSourceForm({ name: "", url: "", source_type: "json", file_ttl_seconds: 3600 });
+      setEditingSourceHasAuth(false);
+      setSourceForm(EMPTY_SOURCE_FORM);
       await fetchIntranetSources();
       flashSuccess(t("common.saved"));
     } catch (err: any) {
@@ -315,7 +335,16 @@ export default function WeChatWorkBotPage() {
 
   const openEditSource = (s: IntranetSource) => {
     setEditingSourceId(s.id);
-    setSourceForm({ name: s.name, url: s.url, source_type: s.source_type, file_ttl_seconds: s.file_ttl_seconds });
+    setEditingSourceHasAuth(s.has_auth);
+    setSourceForm({
+      name: s.name,
+      url: s.url,
+      source_type: s.source_type,
+      file_ttl_seconds: s.file_ttl_seconds,
+      use_basic_auth: s.has_auth,
+      auth_username: s.auth_username,
+      auth_password: "",
+    });
     setShowSourceForm(true);
   };
 
@@ -711,7 +740,7 @@ export default function WeChatWorkBotPage() {
               <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{intranetSources.length}</span>
             </h2>
             <button
-              onClick={() => { setShowSourceForm(true); setEditingSourceId(null); setSourceForm({ name: "", url: "", source_type: "json", file_ttl_seconds: 3600 }); }}
+              onClick={() => { setShowSourceForm(true); setEditingSourceId(null); setEditingSourceHasAuth(false); setSourceForm(EMPTY_SOURCE_FORM); }}
               className="btn btn-outline btn-sm"
             >
               <Plus size={12} className="mr-1" />添加源
@@ -744,6 +773,34 @@ export default function WeChatWorkBotPage() {
                       className="input mt-1 text-[13px] font-mono" placeholder="http://192.168.1.100/files/" required />
                     <p className="text-[10px] text-[var(--text-muted)] mt-0.5">JSON API 或 nginx Index 页面地址</p>
                   </div>
+                  <label className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+                    <input
+                      type="checkbox"
+                      checked={sourceForm.use_basic_auth}
+                      onChange={e => setSourceForm({ ...sourceForm, use_basic_auth: e.target.checked })}
+                    />
+                    使用 HTTP Basic Auth
+                  </label>
+                  {sourceForm.use_basic_auth && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text-secondary)]">用户名</label>
+                        <input type="text" value={sourceForm.auth_username}
+                          onChange={e => setSourceForm({ ...sourceForm, auth_username: e.target.value })}
+                          className="input mt-1 text-[13px]" autoComplete="username" required />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text-secondary)]">密码</label>
+                        <input type="password" value={sourceForm.auth_password}
+                          onChange={e => setSourceForm({ ...sourceForm, auth_password: e.target.value })}
+                          className="input mt-1 text-[13px]" autoComplete="new-password"
+                          required={!editingSourceId || !editingSourceHasAuth} />
+                        {editingSourceHasAuth && (
+                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">留空则保留原密码</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="text-[11px] font-medium text-[var(--text-secondary)]">类型</label>
                     <select value={sourceForm.source_type}
@@ -795,6 +852,11 @@ export default function WeChatWorkBotPage() {
                             {s.source_type === "json" ? "JSON" : "Nginx"}
                           </span>
                           <span className="text-[9px]">TTL: {Math.round(s.file_ttl_seconds / 3600)}h</span>
+                          {s.has_auth && (
+                            <span className="rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[9px] font-medium">
+                              Basic Auth
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -828,8 +890,9 @@ export default function WeChatWorkBotPage() {
                             文件列表（共 {previewFiles.length} 个）
                           </div>
                           {previewFiles.map((f, i) => (
-                            <div key={i} className="text-[11px] font-mono text-[var(--text)] py-0.5 truncate">
-                              {f.name}
+                            <div key={i} className="flex items-center justify-between gap-3 text-[11px] font-mono text-[var(--text)] py-0.5">
+                              <span className="truncate">{f.name}</span>
+                              <span className="shrink-0 text-[var(--text-muted)]">{formatFileSize(f.size)}</span>
                             </div>
                           ))}
                         </div>

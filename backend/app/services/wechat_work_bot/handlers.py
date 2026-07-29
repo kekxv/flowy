@@ -26,6 +26,23 @@ from app.services.wechat_work_bot.bind_token import verify_bind_token
 logger = logging.getLogger("uvicorn")
 
 
+def _format_file_size(size: int | None) -> str:
+    if size is None or size < 0:
+        return "未知"
+    value = float(size)
+    units = ("B", "KB", "MB", "GB", "TB")
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if value < 1024 or candidate == units[-1]:
+            break
+        value /= 1024
+    if unit == "B":
+        return f"{int(value)} B"
+    rendered = f"{value:.1f}".rstrip("0").rstrip(".")
+    return f"{rendered} {unit}"
+
+
 class CommandHandlers:
     """Handles all bot commands. Each handler returns a markdown string."""
 
@@ -1559,6 +1576,7 @@ class CommandHandlers:
         # Load configured intranet sources
         from app.models.wechat_work_bot import IntranetSource
         from app.services.wechat_work_bot.file_token import generate_file_token
+        from app.services.wechat_work_bot.intranet_auth import get_source_credentials
         from app.services.wechat_work_bot.intranet_parser import parse_source
         from app.utils.settings import get_frontend_url
 
@@ -1588,7 +1606,11 @@ class CommandHandlers:
 
         for source in sources:
             try:
-                files = await parse_source(source.url, source.source_type)
+                files = await parse_source(
+                    source.url,
+                    source.source_type,
+                    auth=get_source_credentials(source),
+                )
                 matched = [f for f in files if matches(f["name"])]
                 for m in matched:
                     token = generate_file_token(source.id, m["url"], source.file_ttl_seconds)
@@ -1631,7 +1653,7 @@ class CommandHandlers:
             lines.extend(
                 [
                     f"{index}. **{name}**",
-                    f"   来源：{m['source_name']}",
+                    f"   来源：{m['source_name']} · 大小：{_format_file_size(m.get('size'))}",
                     f"   [下载文件]({dl_url})",
                     "",
                 ]

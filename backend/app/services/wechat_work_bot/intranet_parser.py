@@ -13,13 +13,22 @@ from app.core.url_security import url_belongs_to_source, validate_http_url
 logger = logging.getLogger("uvicorn")
 
 
-async def parse_source(url: str, source_type: str) -> list[dict]:
+async def parse_source(
+    url: str,
+    source_type: str,
+    auth: tuple[str, str] | None = None,
+) -> list[dict]:
     """Fetch and parse a file listing from an intranet source.
 
     Returns list of {"name": str, "url": str} dicts.
     """
     await validate_http_url(url, allow_private=True)
-    async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+    basic_auth = httpx.BasicAuth(*auth) if auth else None
+    async with httpx.AsyncClient(
+        timeout=10,
+        follow_redirects=False,
+        auth=basic_auth,
+    ) as client:
         resp = await client.get(url)
         if 300 <= getattr(resp, "status_code", 200) < 400:
             raise ValueError("Intranet source redirects are not allowed")
@@ -70,6 +79,7 @@ def _normalize_json_items(items: list, base_url: str) -> list[dict]:
             name = item
             file_url = urljoin(base, item)
             mtime = None
+            size = None
         elif isinstance(item, dict):
             name = item.get("name") or item.get("filename") or item.get("title", "")
             file_url = item.get("url") or item.get("link") or item.get("href", "")
@@ -80,11 +90,16 @@ def _normalize_json_items(items: list, base_url: str) -> list[dict]:
                 item.get("mtime") or item.get("time") or item.get("modified")
                 or item.get("last_modified") or item.get("updated_at")
             )
+            raw_size = next(
+                (item[key] for key in ("size", "file_size", "content_length") if key in item),
+                None,
+            )
+            size = _parse_size(raw_size)
         else:
             continue
 
         if name:
-            result.append({"name": name, "url": file_url, "mtime": mtime})
+            result.append({"name": name, "url": file_url, "mtime": mtime, "size": size})
 
     # Sort by mtime descending (newest first), fallback to name
     return sorted(
@@ -150,6 +165,40 @@ def _parse_time(value) -> str | None:
     return None
 
 
+def _parse_size(value) -> int | None:
+    """Normalize byte counts and human-readable binary units to bytes."""
+    if value is None or isinstance(value, bool):
+        return None
+    match = re.fullmatch(
+        r"(\d+(?:\.\d+)?)\s*([kmgt]?i?b?)?",
+        str(value).strip(),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    units = {
+        "": 1,
+        "B": 1,
+        "K": 1024,
+        "KB": 1024,
+        "KIB": 1024,
+        "M": 1024**2,
+        "MB": 1024**2,
+        "MIB": 1024**2,
+        "G": 1024**3,
+        "GB": 1024**3,
+        "GIB": 1024**3,
+        "T": 1024**4,
+        "TB": 1024**4,
+        "TIB": 1024**4,
+    }
+    unit = (match.group(2) or "").upper()
+    multiplier = units.get(unit)
+    if multiplier is None:
+        return None
+    return int(float(match.group(1)) * multiplier)
+
+
 def _parse_nginx(html_text: str, base_url: str) -> list[dict]:
     """Parse nginx 'Index of /' HTML page into file list.
 
@@ -202,9 +251,10 @@ def _parse_nginx(html_text: str, base_url: str) -> list[dict]:
 
         # Try to extract modification time from nearby content
         mtime = _extract_nginx_time(html_text, href)
+        size = _extract_nginx_size(html_text, href)
 
         file_url = urljoin(base, href)
-        result.append({"name": name, "url": file_url, "mtime": mtime})
+        result.append({"name": name, "url": file_url, "mtime": mtime, "size": size})
 
     # Sort by mtime descending (newest first), fallback to name
     return sorted(
@@ -249,3 +299,24 @@ def _extract_nginx_time(html_text: str, href: str) -> str | None:
                 return parsed
 
     return None
+
+
+def _extract_nginx_size(html_text: str, href: str) -> int | None:
+    """Extract a trailing size value from the link's row or preformatted line."""
+    pos = html_text.find(href)
+    if pos == -1:
+        return None
+    anchor_end = html_text.find("</a>", pos)
+    if anchor_end == -1:
+        return None
+    line_end = html_text.find("\n", anchor_end)
+    if line_end == -1:
+        line_end = min(anchor_end + 300, len(html_text))
+    context = html_text[anchor_end + 4 : line_end]
+    plain_text = html.unescape(re.sub(r"<[^>]+>", " ", context)).strip()
+    match = re.search(
+        r"(?:^|\s)(\d+(?:\.\d+)?\s*(?:[kmgt](?:i?b)?|b)?)\s*$",
+        plain_text,
+        re.IGNORECASE,
+    )
+    return _parse_size(match.group(1)) if match else None

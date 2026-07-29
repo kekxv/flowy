@@ -123,6 +123,156 @@ class TestCommandTest:
 
 class TestIntranetSourcesCRUD:
     @pytest.mark.asyncio
+    async def test_create_source_encrypts_basic_auth_password(
+        self, db_session: AsyncSession
+    ):
+        """Basic Auth passwords are encrypted at rest and omitted from responses."""
+        from app.core.crypto import decrypt_token
+
+        await _setup_admin(db_session)
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources",
+                json={
+                    "name": "Protected NAS",
+                    "url": "http://192.168.1.101/files/",
+                    "source_type": "nginx",
+                    "file_ttl_seconds": 3600,
+                    "auth_username": "reader",
+                    "auth_password": "source-secret",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["auth_username"] == "reader"
+        assert data["has_auth"] is True
+        assert "auth_password" not in data
+        assert "auth_password_encrypted" not in data
+
+        source = await db_session.get(IntranetSource, data["id"])
+        assert source is not None
+        assert source.auth_password_encrypted != "source-secret"
+        assert decrypt_token(source.auth_password_encrypted) == "source-secret"
+
+    @pytest.mark.asyncio
+    async def test_update_source_preserves_then_clears_basic_auth(
+        self, db_session: AsyncSession
+    ):
+        """An empty edit password preserves credentials and clear_auth removes them."""
+        from app.core.crypto import encrypt_token
+
+        await _setup_admin(db_session)
+        ciphertext = encrypt_token("existing-secret")
+        source = IntranetSource(
+            id="src-auth-update",
+            name="Protected Source",
+            url="http://192.168.1.102/files/",
+            source_type="json",
+            file_ttl_seconds=3600,
+            auth_username="reader",
+            auth_password_encrypted=ciphertext,
+        )
+        db_session.add(source)
+        await db_session.flush()
+
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            preserved = await client.put(
+                "/api/v1/wechat-work-bot/intranet-sources/src-auth-update",
+                json={"auth_username": "new-reader", "auth_password": ""},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert preserved.status_code == 200
+            assert preserved.json()["auth_username"] == "new-reader"
+            assert preserved.json()["has_auth"] is True
+            assert source.auth_password_encrypted == ciphertext
+
+            cleared = await client.put(
+                "/api/v1/wechat-work-bot/intranet-sources/src-auth-update",
+                json={"clear_auth": True},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert cleared.status_code == 200
+        assert cleared.json()["auth_username"] == ""
+        assert cleared.json()["has_auth"] is False
+        assert source.auth_username is None
+        assert source.auth_password_encrypted is None
+
+    @pytest.mark.asyncio
+    async def test_create_source_rejects_incomplete_basic_auth(
+        self, db_session: AsyncSession
+    ):
+        """A source cannot be created with only one Basic Auth credential."""
+        await _setup_admin(db_session)
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources",
+                json={
+                    "name": "Broken Auth",
+                    "url": "http://192.168.1.103/files/",
+                    "auth_username": "reader",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_preview_source_uses_basic_auth(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        """Admin previews can read protected source listings."""
+        from app.core.crypto import encrypt_token
+
+        await _setup_admin(db_session)
+        source = IntranetSource(
+            id="src-auth-preview",
+            name="Protected Preview",
+            url="http://192.168.1.104/files/",
+            source_type="json",
+            file_ttl_seconds=3600,
+            auth_username="reader",
+            auth_password_encrypted=encrypt_token("source-secret"),
+        )
+        db_session.add(source)
+        await db_session.flush()
+
+        async def protected_parser(_url, _source_type, auth=None):
+            if auth != ("reader", "source-secret"):
+                raise PermissionError("missing Basic Auth")
+            return [
+                {
+                    "name": "protected.txt",
+                    "url": "http://192.168.1.104/files/protected.txt",
+                    "mtime": None,
+                    "size": 4,
+                }
+            ]
+
+        monkeypatch.setattr(
+            "app.services.wechat_work_bot.intranet_parser.parse_source",
+            protected_parser,
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/src-auth-preview/preview",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["files"][0]["name"] == "protected.txt"
+
+    @pytest.mark.asyncio
     async def test_create_source(self, db_session: AsyncSession):
         """Create an intranet source."""
         await _setup_admin(db_session)

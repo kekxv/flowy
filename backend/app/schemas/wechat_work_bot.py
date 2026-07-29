@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class BotConfigResponse(BaseModel):
@@ -85,6 +85,14 @@ class IntranetSourceCreate(BaseModel):
     url: str
     source_type: str = Field(default="json", pattern="^(json|nginx)$")
     file_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    auth_username: str = Field(default="", max_length=256)
+    auth_password: str = Field(default="", max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_basic_auth_pair(self):
+        if bool(self.auth_username.strip()) != bool(self.auth_password):
+            raise ValueError("Basic Auth username and password must be provided together")
+        return self
 
 
 class IntranetSourceUpdate(BaseModel):
@@ -92,6 +100,9 @@ class IntranetSourceUpdate(BaseModel):
     url: str | None = None
     source_type: str | None = Field(default=None, pattern="^(json|nginx)$")
     file_ttl_seconds: int | None = Field(default=None, ge=60, le=86400)
+    auth_username: str | None = Field(default=None, max_length=256)
+    auth_password: str | None = Field(default=None, max_length=1024)
+    clear_auth: bool = False
 
 
 class IntranetSourceResponse(BaseModel):
@@ -100,6 +111,8 @@ class IntranetSourceResponse(BaseModel):
     url: str
     source_type: str
     file_ttl_seconds: int
+    auth_username: str = ""
+    has_auth: bool = False
     created_at: str
     updated_at: str
 

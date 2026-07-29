@@ -1093,6 +1093,25 @@ class TestIntranetParser:
         assert result[0]["name"] == "new.txt"
         assert result[1]["name"] == "old.txt"
 
+    def test_parse_json_normalizes_common_size_fields(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_json
+
+        body = """[
+            {"name": "bytes.bin", "url": "http://x/bytes.bin", "size": 1536},
+            {"name": "kilobytes.bin", "url": "http://x/kilobytes.bin", "file_size": "2 KB"},
+            {"name": "megabyte.bin", "url": "http://x/megabyte.bin", "content_length": "1048576"},
+            {"name": "unknown.bin", "url": "http://x/unknown.bin", "size": "-"}
+        ]"""
+
+        result = {item["name"]: item["size"] for item in _parse_json(body, "http://x/")}
+
+        assert result == {
+            "bytes.bin": 1536,
+            "kilobytes.bin": 2048,
+            "megabyte.bin": 1048576,
+            "unknown.bin": None,
+        }
+
     def test_parse_nginx_index(self):
         from app.services.wechat_work_bot.intranet_parser import _parse_nginx
 
@@ -1113,6 +1132,8 @@ class TestIntranetParser:
         assert names == {"document.pdf", "image.png"}
         # image.png has newer mtime → should be first
         assert result[0]["name"] == "image.png"
+        assert result[0]["size"] == int(3.4 * 1024 * 1024)
+        assert result[1]["size"] == int(1.2 * 1024 * 1024)
 
     def test_parse_nginx_html_entities_in_text(self):
         from app.services.wechat_work_bot.intranet_parser import _parse_nginx
@@ -1172,6 +1193,25 @@ class TestParseTime:
         assert _parse_time("") is None
         assert _parse_time("invalid-date") is None
         assert _parse_time([]) is None
+
+
+class TestParseSize:
+    def test_byte_and_unit_values(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_size
+
+        assert _parse_size(0) == 0
+        assert _parse_size(1536) == 1536
+        assert _parse_size("1.5K") == 1536
+        assert _parse_size("2 KB") == 2048
+        assert _parse_size("1 MiB") == 1048576
+
+    def test_invalid_values_are_unknown(self):
+        from app.services.wechat_work_bot.intranet_parser import _parse_size
+
+        assert _parse_size(None) is None
+        assert _parse_size("-") is None
+        assert _parse_size(-1) is None
+        assert _parse_size(True) is None
 
 
 class TestNginxTimeExtraction:
@@ -1263,6 +1303,110 @@ class TestBotFileCommand:
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
         result = await handlers.handle_file(["test.pdf"], {})
         assert "暂无" in result or "配置" in result
+
+    @pytest.mark.asyncio
+    async def test_file_search_uses_source_basic_auth(self, db_session: AsyncSession):
+        """The /file command can search a protected intranet source."""
+        from unittest.mock import patch
+
+        from app.core.crypto import encrypt_token
+        from app.models.wechat_work_bot import IntranetSource
+
+        user = User(
+            **_make_user_kwargs(
+                id="user-file-auth",
+                username="fileauth",
+                email="fileauth@example.com",
+            )
+        )
+        db_session.add(user)
+        db_session.add(
+            IntranetSource(
+                id="src-file-auth",
+                name="Protected",
+                url="http://10.20.0.8/files/",
+                source_type="json",
+                file_ttl_seconds=3600,
+                auth_username="reader",
+                auth_password_encrypted=encrypt_token("source-secret"),
+            )
+        )
+        await db_session.flush()
+
+        async def protected_parser(_url, _source_type, auth=None):
+            if auth != ("reader", "source-secret"):
+                raise PermissionError("missing Basic Auth")
+            return [
+                {
+                    "name": "protected.txt",
+                    "url": "http://10.20.0.8/files/protected.txt",
+                    "mtime": None,
+                    "size": 4,
+                }
+            ]
+
+        with patch(
+            "app.services.wechat_work_bot.intranet_parser.parse_source",
+            side_effect=protected_parser,
+        ):
+            handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+            result = await handlers.handle_file(["protected"], {})
+
+        assert "protected.txt" in result
+        assert "部分源获取失败" not in result
+
+    @pytest.mark.asyncio
+    async def test_file_results_display_known_and_unknown_sizes(
+        self, db_session: AsyncSession
+    ):
+        from unittest.mock import patch
+
+        from app.models.wechat_work_bot import IntranetSource
+
+        user = User(
+            **_make_user_kwargs(
+                id="user-file-size",
+                username="filesize",
+                email="filesize@example.com",
+            )
+        )
+        db_session.add(user)
+        db_session.add(
+            IntranetSource(
+                id="src-file-size",
+                name="Sized files",
+                url="http://10.20.0.8/files/",
+                source_type="json",
+                file_ttl_seconds=3600,
+            )
+        )
+        await db_session.flush()
+        files = [
+            {
+                "name": "known.bin",
+                "url": "http://10.20.0.8/files/known.bin",
+                "mtime": None,
+                "size": 1536,
+            },
+            {
+                "name": "unknown.bin",
+                "url": "http://10.20.0.8/files/unknown.bin",
+                "mtime": None,
+                "size": None,
+            },
+        ]
+
+        with patch(
+            "app.services.wechat_work_bot.intranet_parser.parse_source",
+            return_value=files,
+        ):
+            handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+            result = await handlers.handle_file([".bin"], {})
+
+        assert "known.bin" in result
+        assert "大小：1.5 KB" in result
+        assert "unknown.bin" in result
+        assert "大小：未知" in result
 
     @pytest.mark.asyncio
     async def test_file_regex_match(self, db_session: AsyncSession):

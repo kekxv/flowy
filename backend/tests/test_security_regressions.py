@@ -713,6 +713,73 @@ class TestOutboundDestinationSecurity:
         assert response.status_code == 502
 
     @pytest.mark.asyncio
+    async def test_intranet_download_sends_source_basic_auth(
+        self, db_session, monkeypatch
+    ):
+        from httpx import BasicAuth, Request
+
+        from app.services.wechat_work_bot.file_token import generate_file_token
+
+        source = IntranetSource(
+            id="source-authenticated-download",
+            name="Protected files",
+            url="http://10.20.0.8/base",
+            source_type="nginx",
+            file_ttl_seconds=3600,
+            auth_username="reader",
+            auth_password_encrypted=encrypt_token("source-secret"),
+        )
+        db_session.add(source)
+        await db_session.flush()
+        token = generate_file_token(source.id, "http://10.20.0.8/base/file.txt")
+        captured_auth = None
+
+        class FileResponse:
+            status_code = 200
+            headers = {"content-type": "text/plain", "content-length": "4"}
+
+            def raise_for_status(self):
+                return None
+
+            async def aiter_bytes(self):
+                yield b"data"
+
+        class ResponseContext:
+            async def __aenter__(self):
+                return FileResponse()
+
+            async def __aexit__(self, *_args):
+                return False
+
+        class FakeHttpClient:
+            def __init__(self, *_args, auth=None, **_kwargs):
+                nonlocal captured_auth
+                captured_auth = auth
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            def stream(self, _method, _url):
+                return ResponseContext()
+
+        monkeypatch.setattr("httpx.AsyncClient", FakeHttpClient)
+
+        async with AsyncClient(transport=_transport(db_session), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/intranet/download",
+                params={"token": token},
+            )
+
+        assert response.status_code == 200
+        assert response.content == b"data"
+        assert isinstance(captured_auth, BasicAuth)
+        request = next(captured_auth.auth_flow(Request("GET", source.url)))
+        assert request.headers["Authorization"] == "Basic cmVhZGVyOnNvdXJjZS1zZWNyZXQ="
+
+    @pytest.mark.asyncio
     async def test_intranet_download_rejects_oversized_response(
         self, db_session, monkeypatch
     ):

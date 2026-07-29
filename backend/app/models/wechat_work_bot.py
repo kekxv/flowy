@@ -75,6 +75,8 @@ class IntranetSource(Base):
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     source_type: Mapped[str] = mapped_column(String(16), nullable=False, default="json")
     file_ttl_seconds: Mapped[int] = mapped_column(default=3600)
+    auth_username: Mapped[str | None] = mapped_column(String(256), nullable=True, default=None)
+    auth_password_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now().isoformat())
     updated_at: Mapped[str] = mapped_column(
         String(32),
