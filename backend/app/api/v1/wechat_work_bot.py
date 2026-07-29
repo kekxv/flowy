@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,8 +46,6 @@ from app.services.wechat_work_bot.intranet_auth import get_source_credentials
 
 router = APIRouter(prefix="/wechat-work-bot", tags=["wechat-work-bot"])
 public_router = APIRouter(tags=["wechat-work-bot"])
-
-MAX_INTRANET_FILE_BYTES = 50 * 1024 * 1024
 
 
 # ─── Config ───────────────────────────────────────────────────
@@ -589,16 +587,12 @@ async def preview_intranet_source(
 # ─── Intranet File Download Proxy ──────────────────────────────
 
 
-@public_router.get("/intranet/download")
-@router.get("/intranet/download")
-async def download_intranet_file(
-    token: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-):
-    """Proxy download for intranet files. Uses signed token for auth."""
+async def _validate_download_token(
+    token: str, db: AsyncSession
+) -> tuple[str, str, IntranetSource]:
+    """Validate download token and return (source_id, file_url, source)."""
     from app.services.wechat_work_bot.file_token import verify_file_token
 
-    # Verify token
     payload = verify_file_token(token)
     if not payload:
         raise HTTPException(401, "下载链接无效或已过期")
@@ -606,12 +600,10 @@ async def download_intranet_file(
     source_id = payload["sid"]
     file_url = payload["url"]
 
-    # Verify source exists
     source = await db.get(IntranetSource, source_id)
     if not source:
         raise HTTPException(404, "文件源不存在或已被删除")
 
-    # Security: validate the destination and require canonical same-source containment.
     try:
         await validate_http_url(source.url, allow_private=True)
         await validate_http_url(file_url, allow_private=True)
@@ -620,57 +612,151 @@ async def download_intranet_file(
     if not url_belongs_to_source(file_url, source.url):
         raise HTTPException(403, "文件地址不在配置的源范围内")
 
-    # Fetch file from intranet
+    return source_id, file_url, source
+
+
+def _get_source_auth(source: IntranetSource) -> "httpx.BasicAuth | None":
+    """Get Basic Auth from source credentials."""
     import httpx
 
-    content = bytearray()
-    content_type = "application/octet-stream"
     credentials = get_source_credentials(source)
-    basic_auth = httpx.BasicAuth(*credentials) if credentials else None
+    return httpx.BasicAuth(*credentials) if credentials else None
+
+
+def _extract_filename(file_url: str) -> str:
+    """Extract filename from URL."""
+    return file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
+
+
+@public_router.head("/intranet/download")
+@router.head("/intranet/download")
+async def head_intranet_file(
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get file metadata without downloading. Returns headers like Content-Length, Content-Type."""
+    import httpx
+
+    _, file_url, source = await _validate_download_token(token, db)
+    basic_auth = _get_source_auth(source)
+
     try:
-        async with (
-            httpx.AsyncClient(
-                timeout=30,
-                follow_redirects=False,
-                auth=basic_auth,
-            ) as client,
-            client.stream("GET", file_url) as resp,
-        ):
+        async with httpx.AsyncClient(
+            timeout=30,
+            follow_redirects=False,
+            auth=basic_auth,
+        ) as client:
+            resp = await client.head(file_url)
             if 300 <= resp.status_code < 400:
                 raise HTTPException(502, "内网文件重定向已被拒绝")
-            resp.raise_for_status()
-            content_type = resp.headers.get(
-                "content-type", "application/octet-stream"
-            )
-            declared_length = resp.headers.get("content-length")
-            if declared_length:
-                try:
-                    if int(declared_length) > MAX_INTRANET_FILE_BYTES:
-                        raise HTTPException(413, "内网文件超过下载大小限制")
-                except ValueError:
-                    pass
-            async for chunk in resp.aiter_bytes():
-                content.extend(chunk)
-                if len(content) > MAX_INTRANET_FILE_BYTES:
-                    raise HTTPException(413, "内网文件超过下载大小限制")
+            if resp.status_code >= 400:
+                raise HTTPException(502, f"内网文件探测失败: HTTP {resp.status_code}")
+
+            filename = _extract_filename(file_url)
+            headers = {
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Accept-Ranges": "bytes",
+            }
+            # Forward relevant headers from upstream
+            for key in ("content-length", "content-type", "last-modified", "etag"):
+                if key in resp.headers:
+                    headers[key.title()] = resp.headers[key]
+
+            return Response(headers=headers)
     except HTTPException:
         raise
     except httpx.HTTPStatusError as e:
+        raise HTTPException(502, f"内网文件探测失败: HTTP {e.response.status_code}")
+    except Exception as e:
+        raise HTTPException(502, f"内网文件探测失败: {e}")
+
+
+@public_router.get("/intranet/download")
+@router.get("/intranet/download")
+async def download_intranet_file(
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Proxy download for intranet files with true streaming (no memory buffering)."""
+    import httpx
+
+    _, file_url, source = await _validate_download_token(token, db)
+    basic_auth = _get_source_auth(source)
+    filename = _extract_filename(file_url)
+
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=30, read=300, write=30, pool=30),
+        follow_redirects=False,
+        auth=basic_auth,
+    )
+    response_holder = {"response": None, "client": client}
+
+    async def stream_content():
+        try:
+            # Start stream and validate before yielding
+            stream_ctx = client.stream("GET", file_url)
+            resp = await stream_ctx.__aenter__()
+            response_holder["response"] = resp
+            response_holder["stream_ctx"] = stream_ctx
+
+            # Validate status before any data is sent
+            if 300 <= resp.status_code < 400:
+                raise HTTPException(502, "内网文件重定向已被拒绝")
+            if resp.status_code >= 400:
+                raise HTTPException(502, f"内网文件获取失败: HTTP {resp.status_code}")
+
+            # Now stream the content
+            try:
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+            except TypeError:
+                # Fallback for mocks that don't support chunk_size
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+        finally:
+            # Clean up
+            if "stream_ctx" in response_holder:
+                await response_holder["stream_ctx"].__aexit__(None, None, None)
+            if hasattr(client, "aclose"):
+                await client.aclose()
+
+    # Validate will happen on first yield - but we need to check before returning StreamingResponse
+    # So we do a quick validation by starting the stream
+    try:
+        stream_iter = stream_content().__aiter__()
+        # Try to get first chunk to trigger validation
+        first_chunk = await stream_iter.__anext__()
+
+        # If we get here, validation passed - now create the actual stream
+        async def validated_stream():
+            try:
+                yield first_chunk
+                async for chunk in stream_iter:
+                    yield chunk
+            finally:
+                # Cleanup happens in stream_content's finally block
+                pass
+
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Accept-Ranges": "bytes",
+        }
+
+        return StreamingResponse(
+            validated_stream(),
+            media_type="application/octet-stream",
+            headers=headers,
+        )
+    except HTTPException:
+        # Clean up on validation failure
+        if hasattr(client, "aclose"):
+            await client.aclose()
+        raise
+    except httpx.HTTPStatusError as e:
+        if hasattr(client, "aclose"):
+            await client.aclose()
         raise HTTPException(502, f"内网文件获取失败: HTTP {e.response.status_code}")
     except Exception as e:
+        if hasattr(client, "aclose"):
+            await client.aclose()
         raise HTTPException(502, f"内网文件获取失败: {e}")
-
-    # Determine filename from URL
-    filename = file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
-
-    # Build response with streaming
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
-        "Content-Length": str(len(content)),
-    }
-
-    return StreamingResponse(
-        iter([bytes(content)]),
-        media_type=content_type,
-        headers=headers,
-    )

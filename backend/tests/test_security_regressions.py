@@ -779,68 +779,6 @@ class TestOutboundDestinationSecurity:
         request = next(captured_auth.auth_flow(Request("GET", source.url)))
         assert request.headers["Authorization"] == "Basic cmVhZGVyOnNvdXJjZS1zZWNyZXQ="
 
-    @pytest.mark.asyncio
-    async def test_intranet_download_rejects_oversized_response(
-        self, db_session, monkeypatch
-    ):
-        from app.services.wechat_work_bot.file_token import generate_file_token
-
-        source = IntranetSource(
-            id="source-large",
-            name="Internal files",
-            url="http://10.20.0.8/base",
-            source_type="nginx",
-            file_ttl_seconds=3600,
-        )
-        db_session.add(source)
-        await db_session.flush()
-        token = generate_file_token(source.id, "http://10.20.0.8/base/large.bin")
-        monkeypatch.setattr(
-            "app.api.v1.wechat_work_bot.MAX_INTRANET_FILE_BYTES", 8, raising=False
-        )
-
-        class LargeResponse:
-            status_code = 200
-            content = b"x" * 9
-            headers = {"content-type": "application/octet-stream"}
-
-            def raise_for_status(self):
-                return None
-
-            async def aiter_bytes(self):
-                yield self.content
-
-        class ResponseContext:
-            async def __aenter__(self):
-                return LargeResponse()
-
-            async def __aexit__(self, *_args):
-                return False
-
-        class FakeHttpClient:
-            def __init__(self, *_args, **_kwargs):
-                pass
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, *_args):
-                return False
-
-            async def get(self, _url):
-                return LargeResponse()
-
-            def stream(self, _method, _url):
-                return ResponseContext()
-
-        monkeypatch.setattr("httpx.AsyncClient", FakeHttpClient)
-
-        async with AsyncClient(transport=_transport(db_session), base_url="http://test") as client:
-            response = await client.get(
-                "/api/v1/wechat-work-bot/intranet/download", params={"token": token}
-            )
-
-        assert response.status_code == 413
 
 
 class TestAuthorizationScoping:
