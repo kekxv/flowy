@@ -4,6 +4,7 @@ import json
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
+from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
@@ -628,8 +629,18 @@ def _get_source_auth(source: IntranetSource) -> "httpx.BasicAuth | None":
 
 
 def _extract_filename(file_url: str) -> str:
-    """Extract filename from URL."""
-    return file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
+    """Extract filename from URL and URL-decode it."""
+    raw = file_url.rsplit("/", 1)[-1].split("?")[0] or "download"
+    return unquote(raw)
+
+
+def _content_disposition(filename: str) -> str:
+    """Build Content-Disposition header with RFC 5987 UTF-8 support."""
+    ascii_safe = filename.isascii() and '"' not in filename and "\\" not in filename
+    if ascii_safe:
+        return f'attachment; filename="{filename}"'
+    encoded = quote(filename, safe="")
+    return f"attachment; filename*=UTF-8''{encoded}"
 
 
 @public_router.head("/intranet/download")
@@ -658,7 +669,7 @@ async def head_intranet_file(
 
             filename = _extract_filename(file_url)
             headers = {
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": _content_disposition(filename),
                 "Accept-Ranges": "bytes",
             }
             # Forward relevant headers from upstream
@@ -742,7 +753,7 @@ async def download_intranet_file(
                 pass
 
         headers = {
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": _content_disposition(filename),
             "Accept-Ranges": "bytes",
         }
 
