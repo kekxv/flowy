@@ -6,6 +6,7 @@ import {
   FolderOpen, Server, Send,
 } from "lucide-react";
 import api from "../api/client";
+import CommandTestResult from "../components/CommandTestResult";
 import {
   buildIntranetSourcePayload,
   buildIntranetSourceTestPayload,
@@ -542,9 +543,7 @@ export default function WeChatWorkBotPage() {
               <div className="rounded-lg bg-red-50 px-4 py-2.5 text-[12px] text-red-600">{testError}</div>
             )}
             {testResponse && (
-              <div className="rounded-lg bg-[var(--bg-muted)] px-4 py-3 text-[12px] font-mono whitespace-pre-wrap break-words max-h-80 overflow-y-auto">
-                {testResponse}
-              </div>
+              <CommandTestResult content={testResponse} />
             )}
           </div>
         </div>
