@@ -3,11 +3,15 @@
 import json
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    import httpx
 
 from app.core.crypto import decrypt_token, encrypt_token
 from app.core.url_security import url_belongs_to_source, validate_http_url
