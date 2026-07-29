@@ -105,6 +105,34 @@ class IntranetSourceUpdate(BaseModel):
     clear_auth: bool = False
 
 
+class IntranetSourceTestRequest(BaseModel):
+    source_id: str | None = Field(default=None, max_length=128)
+    url: str
+    source_type: str = Field(default="json", pattern="^(json|nginx)$")
+    use_basic_auth: bool = False
+    auth_username: str = Field(default="", max_length=256)
+    auth_password: str = Field(default="", max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_test_credentials(self):
+        username = self.auth_username.strip()
+        if not self.use_basic_auth:
+            if username or self.auth_password:
+                raise ValueError("Basic Auth credentials require use_basic_auth")
+            return self
+        if not username:
+            raise ValueError("Basic Auth username is required")
+        if not self.auth_password and not self.source_id:
+            raise ValueError("Basic Auth password is required for a new source")
+        return self
+
+
+class IntranetSourceTestResponse(BaseModel):
+    ok: bool
+    message: str
+    total: int
+
+
 class IntranetSourceResponse(BaseModel):
     id: str
     name: str

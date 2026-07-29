@@ -8,6 +8,7 @@ import {
 import api from "../api/client";
 import {
   buildIntranetSourcePayload,
+  buildIntranetSourceTestPayload,
   formatFileSize,
   type IntranetSourceForm,
 } from "../utils/intranetSource";
@@ -116,6 +117,8 @@ export default function WeChatWorkBotPage() {
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [sourceForm, setSourceForm] = useState<IntranetSourceForm>(EMPTY_SOURCE_FORM);
   const [editingSourceHasAuth, setEditingSourceHasAuth] = useState(false);
+  const [sourceTestLoading, setSourceTestLoading] = useState(false);
+  const [sourceTestResult, setSourceTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [previewFiles, setPreviewFiles] = useState<{ name: string; url: string; size?: number | null }[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
@@ -162,6 +165,7 @@ export default function WeChatWorkBotPage() {
   useEffect(() => { if (tab === "users") fetchUsers(); }, [tab]);
   useEffect(() => { if (tab === "logs") fetchLogs(); }, [tab]);
   useEffect(() => { if (tab === "files") fetchIntranetSources(); }, [tab]);
+  useEffect(() => { setSourceTestResult(null); }, [sourceForm, editingSourceId]);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,6 +334,41 @@ export default function WeChatWorkBotPage() {
       flashSuccess(t("common.delete") + " ✓");
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
+    }
+  };
+
+  const handleTestSource = async () => {
+    if (!sourceForm.url.trim()) {
+      setSourceTestResult({ ok: false, message: "请先填写 URL" });
+      return;
+    }
+    if (sourceForm.use_basic_auth && !sourceForm.auth_username.trim()) {
+      setSourceTestResult({ ok: false, message: "请先填写 Basic Auth 用户名" });
+      return;
+    }
+    if (
+      sourceForm.use_basic_auth
+      && !sourceForm.auth_password
+      && (!editingSourceId || !editingSourceHasAuth)
+    ) {
+      setSourceTestResult({ ok: false, message: "请先填写 Basic Auth 密码" });
+      return;
+    }
+
+    setSourceTestResult(null);
+    setSourceTestLoading(true);
+    try {
+      const payload = buildIntranetSourceTestPayload(sourceForm, editingSourceId);
+      const res = await api.post("/wechat-work-bot/intranet-sources/test", payload);
+      setSourceTestResult({ ok: true, message: res.data.message });
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setSourceTestResult({
+        ok: false,
+        message: typeof detail === "string" ? detail : "测试连接失败，请检查填写内容",
+      });
+    } finally {
+      setSourceTestLoading(false);
     }
   };
 
@@ -605,7 +644,7 @@ export default function WeChatWorkBotPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => openEditUser(u)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"><Pencil size={13} /></button>
                       <button onClick={() => handleDeleteUser(u.id)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500"><Trash2 size={13} /></button>
                     </div>
@@ -817,7 +856,18 @@ export default function WeChatWorkBotPage() {
                       className="input mt-1 text-[13px]" min={1} max={24} step={1} />
                     <p className="text-[10px] text-[var(--text-muted)] mt-0.5">下载链接的有效时间，默认 1 小时</p>
                   </div>
+                  {sourceTestResult && (
+                    <div className={`rounded-lg px-3 py-2 text-[11px] flex items-center gap-1.5 ${sourceTestResult.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                      {sourceTestResult.ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                      {sourceTestResult.message}
+                    </div>
+                  )}
                   <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={handleTestSource} disabled={sourceTestLoading}
+                      className="btn btn-outline btn-sm">
+                      {sourceTestLoading && <Loader2 size={12} className="mr-1 animate-spin" />}
+                      {sourceTestLoading ? "测试中..." : "测试连接"}
+                    </button>
                     <button type="button" onClick={() => { setShowSourceForm(false); setEditingSourceId(null); }}
                       className="btn btn-outline btn-sm">{t("common.cancel")}</button>
                     <button type="submit" className="btn btn-primary btn-sm">
@@ -860,7 +910,7 @@ export default function WeChatWorkBotPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => handlePreviewSource(s.id)}
                         className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]" title="预览文件">
                         <Eye size={13} />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildIntranetSourcePayload,
+  buildIntranetSourceTestPayload,
   formatFileSize,
   type IntranetSourceForm,
 } from "./intranetSource"
@@ -27,6 +28,59 @@ describe("formatFileSize", () => {
   it("labels missing sizes as unknown", () => {
     expect(formatFileSize(null)).toBe("未知")
     expect(formatFileSize(undefined)).toBe("未知")
+  })
+})
+
+describe("buildIntranetSourceTestPayload", () => {
+  it("uses the unsaved URL, type, and temporary credentials", () => {
+    expect(
+      buildIntranetSourceTestPayload(
+        {
+          ...baseForm,
+          url: "http://10.20.0.9/private/",
+          source_type: "json",
+          use_basic_auth: true,
+          auth_username: " reader ",
+          auth_password: "temporary-secret",
+        },
+        null,
+      ),
+    ).toEqual({
+      url: "http://10.20.0.9/private/",
+      source_type: "json",
+      use_basic_auth: true,
+      auth_username: "reader",
+      auth_password: "temporary-secret",
+    })
+  })
+
+  it("does not include credentials when Basic Auth is disabled", () => {
+    expect(buildIntranetSourceTestPayload(baseForm, null)).toEqual({
+      url: "http://10.20.0.8/files/",
+      source_type: "nginx",
+      use_basic_auth: false,
+    })
+  })
+
+  it("identifies the edited source so an empty password can be reused", () => {
+    expect(
+      buildIntranetSourceTestPayload(
+        {
+          ...baseForm,
+          use_basic_auth: true,
+          auth_username: "reader",
+          auth_password: "",
+        },
+        "source-123",
+      ),
+    ).toEqual({
+      source_id: "source-123",
+      url: "http://10.20.0.8/files/",
+      source_type: "nginx",
+      use_basic_auth: true,
+      auth_username: "reader",
+      auth_password: "",
+    })
   })
 })
 

@@ -34,6 +34,8 @@ from app.schemas.wechat_work_bot import (
     IntranetPreviewResponse,
     IntranetSourceCreate,
     IntranetSourceResponse,
+    IntranetSourceTestRequest,
+    IntranetSourceTestResponse,
     IntranetSourceUpdate,
     TestCommandRequest,
     TestCommandResponse,
@@ -428,6 +430,49 @@ async def list_intranet_sources(
     result = await db.execute(query)
     sources = result.scalars().all()
     return [_source_response(source) for source in sources]
+
+
+@router.post("/intranet-sources/test", response_model=IntranetSourceTestResponse)
+async def test_intranet_source(
+    body: IntranetSourceTestRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin),
+):
+    """Test an unsaved source configuration without persisting it."""
+    from app.services.wechat_work_bot.intranet_parser import parse_source
+
+    try:
+        await validate_http_url(body.url, allow_private=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    auth: tuple[str, str] | None = None
+    if body.use_basic_auth:
+        password = body.auth_password
+        if not password:
+            source = await db.get(IntranetSource, body.source_id)
+            if not source:
+                raise HTTPException(404, "文件源不存在")
+            try:
+                stored_auth = get_source_credentials(source)
+            except Exception as exc:
+                raise HTTPException(502, "读取文件源认证信息失败") from exc
+            if not stored_auth:
+                raise HTTPException(422, "该文件源没有可复用的认证密码")
+            password = stored_auth[1]
+        auth = (body.auth_username.strip(), password)
+
+    try:
+        files = await parse_source(body.url, body.source_type, auth=auth)
+    except Exception as exc:
+        raise HTTPException(502, "测试连接失败，请检查地址、类型或认证信息") from exc
+
+    total = len(files)
+    return IntranetSourceTestResponse(
+        ok=True,
+        message=f"连接成功，共获取 {total} 个文件",
+        total=total,
+    )
 
 
 @router.post("/intranet-sources", response_model=IntranetSourceResponse)

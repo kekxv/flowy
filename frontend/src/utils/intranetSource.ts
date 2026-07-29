@@ -40,3 +40,20 @@ export function buildIntranetSourcePayload(
   }
   return payload
 }
+
+export function buildIntranetSourceTestPayload(
+  form: IntranetSourceForm,
+  editingSourceId: string | null,
+) {
+  const payload: Record<string, string | boolean> = {
+    url: form.url,
+    source_type: form.source_type,
+    use_basic_auth: form.use_basic_auth,
+  }
+  if (editingSourceId) payload.source_id = editingSourceId
+  if (form.use_basic_auth) {
+    payload.auth_username = form.auth_username.trim()
+    payload.auth_password = form.auth_password
+  }
+  return payload
+}

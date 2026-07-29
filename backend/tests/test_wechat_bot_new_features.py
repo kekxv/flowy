@@ -2,6 +2,7 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -384,6 +385,191 @@ class TestIntranetSourcesCRUD:
 
         result = await db_session.execute(select(IntranetSource).where(IntranetSource.id == "src-test-003"))
         assert result.scalar_one_or_none() is None
+
+
+class TestIntranetSourceConnection:
+    @pytest.mark.asyncio
+    async def test_tests_unsaved_source_without_persisting(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        await _setup_admin(db_session)
+        received = {}
+
+        async def parser(url, source_type, auth=None):
+            received.update(url=url, source_type=source_type, auth=auth)
+            return [{"name": "one.zip", "url": f"{url}one.zip", "size": 12}]
+
+        monkeypatch.setattr(
+            "app.services.wechat_work_bot.intranet_parser.parse_source", parser
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/test",
+                json={
+                    "url": "http://192.168.1.120/files/",
+                    "source_type": "nginx",
+                    "use_basic_auth": False,
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "ok": True,
+            "message": "连接成功，共获取 1 个文件",
+            "total": 1,
+        }
+        assert received == {
+            "url": "http://192.168.1.120/files/",
+            "source_type": "nginx",
+            "auth": None,
+        }
+        sources = (await db_session.execute(select(IntranetSource))).scalars().all()
+        assert sources == []
+
+    @pytest.mark.asyncio
+    async def test_uses_temporary_basic_auth(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        await _setup_admin(db_session)
+        received_auth = None
+
+        async def parser(_url, _source_type, auth=None):
+            nonlocal received_auth
+            received_auth = auth
+            return []
+
+        monkeypatch.setattr(
+            "app.services.wechat_work_bot.intranet_parser.parse_source", parser
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/test",
+                json={
+                    "url": "http://192.168.1.121/files/",
+                    "source_type": "json",
+                    "use_basic_auth": True,
+                    "auth_username": "reader",
+                    "auth_password": "temporary-secret",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        assert received_auth == ("reader", "temporary-secret")
+
+    @pytest.mark.asyncio
+    async def test_reuses_existing_password_for_edit(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        from cryptography.fernet import Fernet
+
+        from app.config import settings
+        from app.core.crypto import encrypt_token
+
+        monkeypatch.setattr(settings, "encryption_key", Fernet.generate_key().decode())
+        await _setup_admin(db_session)
+        source = IntranetSource(
+            id="source-reuse-password",
+            name="Protected source",
+            url="http://192.168.1.122/files/",
+            source_type="json",
+            file_ttl_seconds=3600,
+            auth_username="old-reader",
+            auth_password_encrypted=encrypt_token("stored-secret"),
+        )
+        db_session.add(source)
+        await db_session.flush()
+        received_auth = None
+
+        async def parser(_url, _source_type, auth=None):
+            nonlocal received_auth
+            received_auth = auth
+            return []
+
+        monkeypatch.setattr(
+            "app.services.wechat_work_bot.intranet_parser.parse_source", parser
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/test",
+                json={
+                    "source_id": source.id,
+                    "url": source.url,
+                    "source_type": source.source_type,
+                    "use_basic_auth": True,
+                    "auth_username": "new-reader",
+                    "auth_password": "",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        assert received_auth == ("new-reader", "stored-secret")
+
+    @pytest.mark.asyncio
+    async def test_requires_admin(self, db_session: AsyncSession):
+        import bcrypt
+
+        member = User(
+            id="source-test-member",
+            username="source-member",
+            email="source-member@test.com",
+            display_name="Source Member",
+            role="member",
+            password_hash=bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
+        )
+        db_session.add(member)
+        await db_session.flush()
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client, "source-member")
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/test",
+                json={
+                    "url": "http://192.168.1.123/files/",
+                    "source_type": "json",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_failure_does_not_expose_submitted_password(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        await _setup_admin(db_session)
+
+        async def parser(_url, _source_type, auth=None):
+            raise RuntimeError(f"upstream echoed password {auth[1]}")
+
+        monkeypatch.setattr(
+            "app.services.wechat_work_bot.intranet_parser.parse_source", parser
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            token = await _login_admin(client)
+            resp = await client.post(
+                "/api/v1/wechat-work-bot/intranet-sources/test",
+                json={
+                    "url": "http://192.168.1.124/files/",
+                    "source_type": "json",
+                    "use_basic_auth": True,
+                    "auth_username": "reader",
+                    "auth_password": "do-not-leak-this",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 502
+        assert "do-not-leak-this" not in resp.text
 
 
 # ─── Download Proxy ─────────────────────────────────────────────
