@@ -720,6 +720,9 @@ async def download_intranet_file(
             if resp.status_code >= 400:
                 raise HTTPException(502, f"内网文件获取失败: HTTP {resp.status_code}")
 
+            # Expose upstream Content-Length so clients can show download progress
+            response_holder["content_length"] = resp.headers.get("content-length")
+
             # Now stream the content
             try:
                 async for chunk in resp.aiter_bytes(chunk_size=65536):
@@ -756,6 +759,9 @@ async def download_intranet_file(
             "Content-Disposition": _content_disposition(filename),
             "Accept-Ranges": "bytes",
         }
+        # Forward Content-Length from upstream so clients can track download progress
+        if response_holder.get("content_length"):
+            headers["Content-Length"] = response_holder["content_length"]
 
         return StreamingResponse(
             validated_stream(),

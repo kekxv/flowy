@@ -43,6 +43,38 @@ def _format_file_size(size: int | None) -> str:
     return f"{rendered} {unit}"
 
 
+def _parse_search_terms(text: str) -> list[str]:
+    """Split a search string into terms, respecting quoted phrases.
+
+    Unlike shlex, backslashes are kept verbatim so regex patterns like ``\\.pdf$``
+    survive intact. Quotes only serve to group words containing spaces.
+
+    Examples::
+
+        >>> _parse_search_terms('foo bar')
+        ['foo', 'bar']
+        >>> _parse_search_terms('"service tmri" pdf')
+        ['service tmri', 'pdf']
+        >>> _parse_search_terms(r'\\.pdf$')
+        ['\\\\.pdf$']
+    """
+    terms: list[str] = []
+    current: list[str] = []
+    in_quotes = False
+    for char in text:
+        if char == '"':
+            in_quotes = not in_quotes
+        elif char in (" ", "\t") and not in_quotes:
+            if current:
+                terms.append("".join(current))
+                current = []
+        else:
+            current.append(char)
+    if current:
+        terms.append("".join(current))
+    return terms
+
+
 class CommandHandlers:
     """Handles all bot commands. Each handler returns a markdown string."""
 
@@ -1569,9 +1601,15 @@ class CommandHandlers:
         Results sorted by modification time (newest first), max 10 shown.
         """
         if not args:
-            return "❌ 用法: `/file 关键词`\n\n支持正则表达式，如 `/file \\.pdf$`\n\n搜索管理员配置的内网文件源"
+            return "❌ 用法: `/file 关键词1 关键词2 ...`\n\n支持多个关键词 OR 搜索（匹配任一即可）\n用引号包裹含空格的短语，如 `/file \"service tmri\" pdf`\n支持正则表达式，如 `/file \\.pdf$`\n\n搜索管理员配置的内网文件源"
 
-        keyword = " ".join(args).strip()
+        # Parse keywords: quoted phrases stay as a single term (e.g. "service tmri").
+        # Uses a custom splitter (not shlex) so backslashes in regex like \.pdf$ are preserved.
+        keywords = _parse_search_terms(" ".join(args))
+        keywords = [kw for kw in keywords if kw]
+
+        if not keywords:
+            return "❌ 用法: `/file 关键词1 关键词2 ...`"
 
         # Load configured intranet sources
         from app.models.wechat_work_bot import IntranetSource
@@ -1586,19 +1624,25 @@ class CommandHandlers:
         if not sources:
             return "❌ 暂无内网文件源\n\n请联系管理员配置内网文件地址"
 
-        # Build matcher: try regex first, fallback to substring
-        is_regex = False
-        pattern = None
-        try:
-            pattern = re.compile(keyword, re.IGNORECASE)
-            is_regex = True
-        except re.error:
-            pass
+        # Build matchers: each keyword tries regex first, falls back to substring.
+        # A file matches if ANY keyword matches (OR logic).
+        term_matchers: list[tuple[str, re.Pattern | None]] = []
+        for kw in keywords:
+            try:
+                term_matchers.append((kw, re.compile(kw, re.IGNORECASE)))
+            except re.error:
+                term_matchers.append((kw, None))
 
         def matches(name: str) -> bool:
-            if is_regex and pattern:
-                return bool(pattern.search(name))
-            return keyword.lower() in name.lower()
+            name_lower = name.lower()
+            for kw, pat in term_matchers:
+                if pat is not None:
+                    if pat.search(name):
+                        return True
+                else:
+                    if kw.lower() in name_lower:
+                        return True
+            return False
 
         # Search across all sources
         all_matches: list[dict] = []
@@ -1627,9 +1671,11 @@ class CommandHandlers:
             reverse=True,
         )
 
+        keyword_display = " / ".join(keywords)
+
         if not all_matches:
             error_hint = f"\n\n_部分源获取失败: {', '.join(errors)}_" if errors else ""
-            return f"❌ 未找到与「{keyword}」匹配的文件{error_hint}"
+            return f"❌ 未找到与「{keyword_display}」匹配的文件{error_hint}"
 
         # Get frontend URL for download links
         try:
@@ -1640,7 +1686,7 @@ class CommandHandlers:
         # Build markdown response
         total = len(all_matches)
         shown = all_matches[:10]
-        lines = [f"📁 找到 **{total}** 个匹配「{keyword}」的文件：\n"]
+        lines = [f"📁 找到 **{total}** 个匹配「{keyword_display}」的文件：\n"]
 
         for index, m in enumerate(shown, 1):
             if frontend_url:
@@ -1648,8 +1694,6 @@ class CommandHandlers:
             else:
                 dl_url = f"/api/v1/intranet/download?token={m['token']}"
             name = m["name"]
-            if len(name) > 40:
-                name = name[:37] + "..."
             lines.extend(
                 [
                     f"{index}. **{name}**",
