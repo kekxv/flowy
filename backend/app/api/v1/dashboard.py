@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,6 +118,59 @@ async def get_dashboard(
         await db.execute(select(func.count(Issue.id)).where(Issue.reporter_id == user.id))
     ).scalar() or 0
 
+    # Status breakdown (for donut chart)
+    status_rows = (
+        await db.execute(
+            select(Issue.status, func.count(Issue.id)).group_by(Issue.status)
+        )
+    ).all()
+    by_status = {s: c for s, c in status_rows}
+
+    # Priority breakdown (for bar chart)
+    priority_rows = (
+        await db.execute(
+            select(Issue.priority, func.count(Issue.id)).group_by(Issue.priority)
+        )
+    ).all()
+    by_priority = {p: c for p, c in priority_rows}
+
+    # Type breakdown
+    type_rows = (
+        await db.execute(
+            select(Issue.issue_type, func.count(Issue.id)).group_by(Issue.issue_type)
+        )
+    ).all()
+    by_type = {t: c for t, c in type_rows}
+
+    # Overdue milestones count (open/published + has due_date + past due)
+    today = datetime.now().date().isoformat()
+    overdue_count = (
+        await db.execute(
+            select(func.count(Milestone.id)).where(
+                Milestone.status.in_(["open", "published"]),
+                Milestone.due_date.isnot(None),
+                Milestone.due_date != "",
+                Milestone.due_date < today,
+            )
+        )
+    ).scalar() or 0
+
+    # Recent activity: issue creation counts for last 7 days
+    recent_activity = []
+    for i in range(6, -1, -1):
+        day = (datetime.now() - timedelta(days=i)).date()
+        day_str = day.isoformat()
+        next_day_str = (day + timedelta(days=1)).isoformat()
+        count = (
+            await db.execute(
+                select(func.count(Issue.id)).where(
+                    Issue.created_at >= day_str,
+                    Issue.created_at < next_day_str,
+                )
+            )
+        ).scalar() or 0
+        recent_activity.append({"date": day_str, "count": count})
+
     # Active milestones
     ml_result = await db.execute(
         select(Milestone)
@@ -160,6 +215,12 @@ async def get_dashboard(
             "open_issues": open_issues,
             "closed_issues": closed_issues,
             "my_reported": my_reported,
+            "bug_count": by_type.get("bug", 0),
+            "feature_count": by_type.get("feature", 0),
+            "overdue_milestones": overdue_count,
+            "by_status": by_status,
+            "by_priority": by_priority,
+            "recent_activity": recent_activity,
         },
         "milestones": milestones_data,
     }

@@ -61,9 +61,9 @@ export async function deleteConnection(id: string): Promise<void> {
   await api.delete(`/external/connections/${id}`);
 }
 
-export async function testConnection(id: string): Promise<boolean> {
+export async function testConnection(id: string): Promise<{ ok: boolean; error?: string }> {
   const res = await api.post(`/external/connections/${id}/test`);
-  return res.data.ok;
+  return res.data;
 }
 
 export async function listConnectionRepos(connectionId: string): Promise<ExternalRepo[]> {

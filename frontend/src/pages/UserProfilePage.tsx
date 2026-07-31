@@ -71,7 +71,10 @@ export default function UserProfilePage() {
     try { await connectViaPat({provider:patProvider,token,instance_url:instanceUrl||undefined}); setToken(""); setInstanceUrl(""); setShowPatForm(false); fetch(); }
     catch(err:any){ setError(err?.message||"Connection failed"); } finally { setSub(false); } };
   const remove = async (id:string) => { if(!confirm(t("common.confirm")+"?"))return; await deleteConnection(id); fetch(); };
-  const test = async (id:string) => { const ok=await testConnection(id); alert(ok?t("settings.test_ok","OK"):t("settings.test_fail","Failed")); };
+  const test = async (id:string) => {
+    const res = await testConnection(id);
+    alert(res.ok ? t("settings.test_ok","OK") : `${t("settings.test_fail","Failed")}: ${res.error || "unknown"}`);
+  };
 
   if (loading) return <Loader />;
 

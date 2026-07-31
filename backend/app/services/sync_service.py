@@ -6,13 +6,12 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 
 from app.config import settings
-from app.core.crypto import decrypt_token
 from app.core.dispatcher import dispatch
 from app.database import async_session
 from app.models.external import ExternalConnection, ExternalIssue
 from app.models.issue import Issue
 from app.models.tracking import IssueAssigneeLog
-from app.services.connection_service import resolve_instance_url
+from app.services.connection_service import get_valid_token, resolve_instance_url
 from app.services.external import get_client
 from app.services.notifications.base import NotificationEvent
 from app.utils.settings import get_frontend_url
@@ -71,8 +70,7 @@ class SyncService:
                     conn = await db.get(ExternalConnection, link.connection_id)
                     if not conn:
                         continue
-                    encrypted = conn.pat_token or conn.oauth_token
-                    if not encrypted:
+                    if not (conn.pat_token or conn.oauth_token):
                         continue
                     await resolve_instance_url(db, conn.provider, conn.instance_url)
 
@@ -85,7 +83,7 @@ class SyncService:
                         except ValueError:
                             pass
 
-                    token = decrypt_token(encrypted)
+                    token = await get_valid_token(conn, db)
                     client = get_client(conn.provider, token, conn.instance_url)
                     results = await client.search_issues(link.external_repo, link.external_id)
                     if results:

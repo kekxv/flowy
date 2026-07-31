@@ -170,11 +170,11 @@ async def _exchange_and_save_oauth(
     if not access_token:
         raise HTTPException(status_code=400, detail="No access_token in response")
 
-    # Calculate expiry time
-    expires_in = token_data.get("expires_in", 0)
-    expires_at = None
-    if expires_in:
-        expires_at = (datetime.now() + timedelta(seconds=int(expires_in))).isoformat()
+    # Calculate expiry time — always set, default to 1h when provider omits expires_in
+    expires_in = int(token_data.get("expires_in") or 0)
+    expires_at = (
+        datetime.now() + timedelta(seconds=expires_in if expires_in > 0 else 3600)
+    ).isoformat()
 
     # Get remote username
     ext_client = get_client(provider, access_token, instance_url)
@@ -228,80 +228,13 @@ async def _exchange_and_save_oauth(
 
 
 async def _get_valid_token(conn: ExternalConnection, db: AsyncSession) -> str:
-    """Get a valid access token, refreshing if expired."""
+    """Get a valid access token, refreshing if expired. Wraps service-level function."""
     try:
-        await connection_service.resolve_instance_url(db, conn.provider, conn.instance_url)
+        return await connection_service.get_valid_token(conn, db)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    token = decrypt_token(conn.oauth_token or conn.pat_token or "")
-
-    # Check expiry and refresh if needed
-    if conn.oauth_token and conn.refresh_token and conn.token_expires_at:
-        try:
-            expires_at = datetime.fromisoformat(conn.token_expires_at)
-            if datetime.now() >= expires_at:
-                refresh = decrypt_token(conn.refresh_token)
-                cfg = OAUTH_CONFIGS.get(conn.provider, {})
-                base = (conn.instance_url or "https://gitea.com").rstrip("/")
-                if conn.provider == "gitea":
-                    token_url = cfg.get("token_url", "{instance}/login/oauth/access_token").replace(
-                        "{instance}", base
-                    )
-                else:
-                    token_url = cfg.get("token_url", "https://github.com/login/oauth/access_token")
-
-                # Fallback to DB-stored client credentials
-                db_settings = {}
-                sr = await db.execute(select(AppSetting))
-                for s in sr.scalars().all():
-                    db_settings[s.key] = s.value
-                cid = db_settings.get(f"{conn.provider}_client_id") or cfg.get("client_id", "")
-                csec = db_settings.get(f"{conn.provider}_client_secret") or cfg.get(
-                    "client_secret", ""
-                )
-
-                payload = {
-                    "client_id": cid,
-                    "client_secret": csec,
-                    "refresh_token": refresh,
-                    "grant_type": "refresh_token",
-                }
-                async with httpx.AsyncClient(timeout=15, verify=not conn.instance_url) as client:
-                    resp = await client.post(
-                        token_url, data=payload, headers={"Accept": "application/json"}
-                    )
-                    if resp.status_code < 400:
-                        data = resp.json()
-                        new_token = data.get("access_token")
-                        if new_token:
-                            conn.oauth_token = encrypt_token(new_token)
-                            conn.refresh_token = (
-                                encrypt_token(data.get("refresh_token"))
-                                if data.get("refresh_token")
-                                else conn.refresh_token
-                            )
-                            expires_in = data.get("expires_in", 0)
-                            if expires_in:
-                                conn.token_expires_at = (
-                                    datetime.now() + timedelta(seconds=int(expires_in))
-                                ).isoformat()
-                            await db.commit()
-                            return new_token
-                # Refresh failed — token is expired, don't silently use it
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"OAuth token expired and refresh failed for {conn.provider}",
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning("Failed to refresh OAuth token for %s: %s", conn.provider, e)
-            raise HTTPException(
-                status_code=400,
-                detail=f"OAuth token refresh error: {e}",
-            ) from e
-
-    return token
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/oauth/callback")
@@ -408,8 +341,8 @@ async def test_connection(
     conn = await db.get(ExternalConnection, connection_id)
     if not conn or conn.user_id != user.id:
         raise HTTPException(status_code=404, detail="Connection not found")
-    ok = await connection_service.test_connection(db, connection_id)
-    return {"ok": ok}
+    ok, error = await connection_service.test_connection(db, connection_id)
+    return {"ok": ok, "error": error}
 
 
 @router.get("/{connection_id}/repos", response_model=list[ExternalRepoResponse])
