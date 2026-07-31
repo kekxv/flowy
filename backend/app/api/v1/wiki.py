@@ -25,9 +25,23 @@ logger = logging.getLogger("uvicorn")
 
 router = APIRouter(prefix="/wiki", tags=["wiki"])
 
-MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
+DEFAULT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB fallback
 ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
 ALLOWED_FILE_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md", ".csv", ".zip", ".rar"}
+
+
+async def _get_upload_limit(db: AsyncSession) -> int:
+    """Read wiki_upload_max_mb from settings, fall back to 5MB."""
+    from app.models.settings import AppSetting
+    setting = await db.get(AppSetting, "wiki_upload_max_mb")
+    if setting and setting.value:
+        try:
+            mb = float(setting.value)
+            if mb > 0:
+                return int(mb * 1024 * 1024)
+        except (ValueError, TypeError):
+            pass
+    return DEFAULT_UPLOAD_SIZE
 
 
 def _page_to_response(page) -> WikiPageResponse:
@@ -214,19 +228,29 @@ def _get_wiki_attachments_dir() -> str:
     return os.path.join(base, "wiki_attachments")
 
 
+@router.get("/upload-limit")
+async def get_upload_limit(db: AsyncSession = Depends(get_db)):
+    """Return the current wiki upload size limit in bytes (public)."""
+    limit = await _get_upload_limit(db)
+    return {"limit": limit, "limit_mb": round(limit / 1024 / 1024, 1)}
+
+
 @router.post("/upload")
 async def upload_wiki_file(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
-    """Upload a file (image or document) for wiki content. Max 5MB."""
+    """Upload a file (image or document) for wiki content. Limit is configurable by admin."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
-    # Check file size
+    # Check file size against dynamic limit
+    max_size = await _get_upload_limit(db)
+    max_mb = round(max_size / 1024 / 1024, 1)
     content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="File size exceeds 5MB limit")
+    if len(content) > max_size:
+        raise HTTPException(status_code=413, detail=f"File size exceeds {max_mb}MB limit")
 
     # Check extension
     ext = os.path.splitext(file.filename)[1].lower()

@@ -256,7 +256,9 @@
     "users_label": "Users",
     "connections_label": "Connections",
     "registration": "Registration",
-    "registration_hint": "Allow new users to create accounts"
+    "registration_hint": "Allow new users to create accounts",
+    "wiki_upload_limit": "Wiki Upload Size Limit",
+    "wiki_upload_limit_hint": "Maximum file size for wiki image/file uploads (MB)"
   },
   "external": {
     "linked_issues": "Linked Issues",
@@ -321,12 +323,12 @@
     "weight": "Weight",
     "weight_hint": "Higher weight = higher priority in listings and search",
     "upload_image": "Upload Image",
-    "upload_file": "Upload File (max 5MB)",
+    "upload_file": "Upload File (max {{mb}}MB)",
     "uploading": "Uploading...",
     "uploaded": "Uploaded",
-    "file_too_large": "File size exceeds 5MB limit",
+    "file_too_large": "File size exceeds {{mb}}MB limit",
     "upload_failed": "Upload failed",
-    "max_5mb": "Max 5MB",
+    "max_size": "Max {{mb}}MB",
     "edit_mode": "Edit",
     "preview_mode": "Preview",
     "no_content_preview": "No content to preview"

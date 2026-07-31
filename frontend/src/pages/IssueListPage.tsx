@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Search, X, UserPlus, Flag, Filter, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, X, UserPlus, Flag, Filter, ChevronDown } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { listIssues, type IssueData } from "../api/issues";
@@ -130,10 +130,7 @@ export default function IssueListPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[18px] font-semibold tracking-tight">{t("issues.title")}</h1>
-          {total > 0 && <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{total} issues</p>}
-        </div>
+        <h1 className="text-[18px] font-semibold tracking-tight">{t("issues.title")}</h1>
         <Link to="/issues/new" className="btn btn-primary btn-sm">
           <svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M7.5 3v9M3 7.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           {t("issues.new_issue")}
@@ -193,70 +190,93 @@ export default function IssueListPage() {
               const isFeature = (issue as any).issue_type === "feature";
               const assignees = (issue as any).assignees || [];
               const milestoneIds = (issue as any).milestone_ids || [];
+              const borderColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
               return (
-                <Link to={`/issues/${issue.id}`} key={issue.id} className="group block border-l-[3px] transition-colors hover:bg-[#f9fafb]" style={{ borderLeftColor: issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb" }}>
-                  {/* Title row */}
-                  <div className="flex items-center gap-2 px-4 pt-2.5">
-                    {/* Type badge */}
-                    <span className={`shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold ${isFeature ? "bg-violet-50 text-violet-600" : "bg-amber-50 text-amber-600"}`}>
-                      {isFeature ? "需求" : "问题"}
-                    </span>
-                    {/* Title */}
-                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors">{issue.title}</span>
-                    {/* Milestone flag — always show */}
+                <Link to={`/issues/${issue.id}`} key={issue.id} className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-muted)]">
+                  {/* Left: status indicator + type initial */}
+                  <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                    <div className="w-[3px] shrink-0 self-stretch rounded-full" style={{ backgroundColor: borderColor }} />
+                    <div className={`w-[26px] h-[26px] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] font-bold ${isFeature ? "bg-violet-50 text-violet-500" : "bg-amber-50 text-amber-500"}`}>
+                      {isFeature ? "需" : "问"}
+                    </div>
+                  </div>
+
+                  {/* Center: title + meta */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {/* Title row */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors truncate">{issue.title}</span>
+                      <span className="mono shrink-0 text-[10px] text-[var(--text-faint)]">#{issue.id.slice(0, 8)}</span>
+                    </div>
+
+                    {/* Meta row */}
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--text-faint)]">
+                      <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "status" }); }}
+                        className={`status-${issue.status} text-[11px] transition-transform hover:scale-105`}>
+                        {t(`issues.status.${issue.status}`)}
+                      </button>
+                      <span className="text-[var(--border)]">·</span>
+                      <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "priority" }); }}
+                        className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium transition-transform hover:scale-105`}>
+                        {t(`issues.priority.${issue.priority}`)}
+                      </button>
+                      <span className="text-[var(--border)]">·</span>
+                      <span>{issue.reporter?.display_name || issue.reporter?.username}</span>
+                      <span className="text-[var(--border)]">·</span>
+                      <span>{timeAgo(issue.created_at)}</span>
+
+                      {assignees.length > 0 && (
+                        <>
+                          <span className="text-[var(--border)]">·</span>
+                          {assignees.slice(0, 2).map((a: any) => (
+                            <span key={`${a.id}-${a.role}`} className="rounded-[4px] bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a.display_name || a.username}</span>
+                          ))}
+                          {assignees.length > 2 && <span className="text-[var(--text-faint)]">+{assignees.length - 2}</span>}
+                        </>
+                      )}
+
+                      {milestoneIds.length > 0 && (
+                        <>
+                          <span className="text-[var(--border)]">·</span>
+                          {milestoneIds.map((mid: string) => {
+                            const m = milestones.find(x => x.id === mid);
+                            return m ? <span key={mid} className="flex items-center gap-0.5 text-violet-500"><Flag size={10} />{m.name}</span> : null;
+                          })}
+                        </>
+                      )}
+
+                      {issue.labels?.slice(0, 2).map((l: any) => (
+                        <span key={l.id} className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: l.color + "0a", color: l.color }}>
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />{l.name}
+                        </span>
+                      ))}
+
+                      {activeTimerIds.has(issue.id) && (
+                        <span className="flex items-center gap-1 text-red-500">
+                          <span className="flex h-1.5 w-1.5"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
+                          计时中
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: actions */}
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); setMsPopup({ issue }); }}
-                      className={`flex items-center gap-0.5 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0 ${milestoneIds.length > 0 ? "bg-violet-50 text-violet-600" : "text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-50"}`}>
-                      <Flag size={10} />{milestoneIds.length > 0 ? milestoneIds.length : ""}
+                      className={`rounded p-1 transition-colors ${milestoneIds.length > 0 ? "text-violet-400 hover:text-violet-600 hover:bg-violet-50" : "text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-50"}`}
+                      title={t("issues.milestones", "里程碑")}>
+                      <Flag size={13} />
                     </button>
-                    {/* Priority — popup */}
-                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "priority" }); }}
-                      className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-transform hover:scale-105 shrink-0`}>
-                      {t(`issues.priority.${issue.priority}`)}
-                    </button>
-                    {/* Status — popup */}
-                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); setPopup({ issue, type: "status" }); }}
-                      className={`status-${issue.status} text-[11px] cursor-pointer transition-transform hover:scale-105 shrink-0 hidden sm:inline-flex`}>
-                      {t(`issues.status.${issue.status}`)}
-                    </button>
-                    {/* Label */}
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); setLabelPopup(issue); }}
-                      className="shrink-0 rounded p-1 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)] transition-all hidden sm:flex">
+                      className="rounded p-1 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+                      title={t("common.labels")}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     </button>
-                    {/* Claim */}
                     <button onClick={e => { e.stopPropagation(); e.preventDefault(); openClaim(issue.id); }}
-                      className="shrink-0 rounded p-1 text-[var(--text-faint)] hover:bg-[var(--primary-subtle)] hover:text-[var(--primary)] transition-all opacity-0 group-hover:opacity-100 hidden sm:flex">
+                      className="rounded p-1 text-[var(--text-faint)] hover:text-[var(--primary)] hover:bg-[var(--primary-subtle)] transition-colors"
+                      title={t("common.claim", "认领")}>
                       <UserPlus size={13} />
                     </button>
-                    <ChevronRight size={14} className="hidden sm:block shrink-0 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all" />
-                  </div>
-                  {/* Meta row */}
-                  <div className="flex items-center gap-2 px-4 pb-2.5 pl-[52px] flex-wrap text-[11px] text-[var(--text-faint)]">
-                    <span className="mono">#{issue.id.slice(0, 8)}</span>
-                    <span>{issue.reporter?.display_name || issue.reporter?.username}</span>
-                    <span>{timeAgo(issue.created_at)}</span>
-                    {assignees.length > 0 && (
-                      <>
-                        <span className="text-[var(--border)]">·</span>
-                        {assignees.slice(0, 3).map((a: any) => (
-                          <span key={`${a.id}-${a.role}`} className="rounded-[4px] bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a.display_name || a.username}</span>
-                        ))}
-                        {assignees.length > 3 && <span className="text-[var(--text-faint)]">+{assignees.length - 3}</span>}
-                      </>
-                    )}
-                    {issue.labels?.slice(0, 2).map((l: any) => (
-                      <span key={l.id} className="rounded-[4px] border px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: l.color + "0a", color: l.color, borderColor: l.color + "25" }}>{l.name}</span>
-                    ))}
-                    {milestoneIds.map((mid: string) => {
-                      const m = milestones.find(x => x.id === mid);
-                      return m ? <span key={mid} className="rounded-[4px] bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600"><Flag size={8} className="inline -mt-0.5 mr-0.5" />{m.name}</span> : null;
-                    })}
-                    {activeTimerIds.has(issue.id) && (
-                      <span className="flex items-center gap-1 text-red-500">
-                        <span className="flex h-1.5 w-1.5"><span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                        计时中
-                      </span>
-                    )}
                   </div>
                 </Link>
               );

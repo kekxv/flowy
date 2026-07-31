@@ -1,9 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Globe, Lock, Image, Paperclip, Eye, Edit3 } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
-import { createWikiPage, uploadWikiFile } from "../api/wiki";
+import { createWikiPage, uploadWikiFile, getWikiUploadLimit } from "../api/wiki";
+
+const DEFAULT_LIMIT_MB = 5;
 
 export default function WikiCreatePage() {
   const { t } = useTranslation();
@@ -16,9 +18,14 @@ export default function WikiCreatePage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [uploadLimitMb, setUploadLimitMb] = useState(DEFAULT_LIMIT_MB);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    getWikiUploadLimit().then(d => setUploadLimitMb(d.limit_mb)).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -53,8 +60,8 @@ export default function WikiCreatePage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t("wiki.file_too_large", "File size exceeds 5MB limit"));
+    if (file.size > uploadLimitMb * 1024 * 1024) {
+      alert(t("wiki.file_too_large", `File size exceeds {{mb}}MB limit`, { mb: uploadLimitMb }));
       return;
     }
     setUploading(true);
@@ -142,7 +149,7 @@ export default function WikiCreatePage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors disabled:opacity-50"
-                title={t("wiki.upload_file", "Upload File (max 5MB)")}
+                title={t("wiki.upload_file", `Upload File (max {{mb}}MB)`, { mb: uploadLimitMb })}
               >
                 <Paperclip size={15} />
               </button>
@@ -153,7 +160,7 @@ export default function WikiCreatePage() {
               )}
               <div className="flex-1" />
               <span className="text-[10px] text-[var(--text-muted)]">
-                {t("wiki.max_5mb", "Max 5MB")}
+                {t("wiki.max_size", `Max {{mb}}MB`, { mb: uploadLimitMb })}
               </span>
               <div className="ml-2 flex rounded-md border border-[var(--border)] overflow-hidden">
                 <button

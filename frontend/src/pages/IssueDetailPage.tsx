@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Edit3, Plus, X, Check, Play, Square, ChevronDown, ExternalLink, Link2, Globe, Code2, Search, Unlink, RefreshCw, AlertCircle, GitPullRequest, CheckCircle2, UserPlus } from "lucide-react";
+import { ArrowLeft, Edit3, Plus, X, Check, Play, Square, ChevronDown, ExternalLink, Globe, Code2, Search, Unlink, RefreshCw, AlertCircle, GitPullRequest, CheckCircle2, UserPlus, Flag } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
@@ -110,200 +110,256 @@ export default function IssueDetailPage() {
 
   if(loading)return <Loader />;
   if(!issue)return <div className="text-center pt-24 text-[var(--text-muted)]">Not found.</div>;
-
   return (
-    <div className="mx-auto max-w-4xl space-y-4 page-enter">
-      {/* Error toast */}
-      {errMsg && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{errMsg}</div>}
+    <div className="mx-auto max-w-5xl space-y-4 page-enter">
+      {errMsg && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-[8px] bg-red-50 border border-red-100 px-3 py-2 text-[12px] text-red-600 shadow-sm">{errMsg}</div>}
 
-      {/* Top nav */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Nav */}
+      <div className="flex items-center justify-between">
         <Link to="/issues" className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
-        {canFullEdit && <Link to={`/issues/${issue.id}/edit`} className="btn btn-outline btn-sm"><Edit3 size={12}/>{t("common.edit")}</Link>}
-        <button onClick={openClaim} className="btn btn-outline btn-sm"><UserPlus size={12} className="mr-1"/>{t("roles.title","Claim")}</button>
-      </div>
-
-      {/* Main card */}
-      <div className="card rounded-xl">
-        {/* Header */}
-        <div className="border-b border-[var(--border-light)] px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${issue.issue_type==="feature"?"bg-violet-50 text-violet-700":"bg-amber-50 text-amber-700"}`}>
-                  {t(`issues.type.${issue.issue_type||"bug"}`)}
-                </span>
-                <h1 className="text-lg font-bold tracking-tight">{issue.title}</h1>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-[12px] text-[var(--text-muted)]">
-                <span className="font-mono">#{issue.id.slice(0,8)}</span>
-                <span>{issue.reporter?.display_name||issue.reporter?.username}</span>
-                <span>{new Date(issue.created_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {/* Status */}
-              <div className="relative">
-                {canFullEdit ? (
-                  <button onClick={()=>setEs(!es)} className={`status-${issue.status} cursor-pointer transition-transform hover:scale-105`}>
-                    {t(`issues.status.${issue.status}`)} <ChevronDown size={10} className="ml-0.5 inline opacity-50"/></button>
-                ) : (
-                  <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
-                )}
-                {canFullEdit && es && <div className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--border)] bg-white py-1.5  ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{STAT.map(s=>
-                  <button key={s} onClick={()=>{qu("status",s);setEs(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${s===issue.status?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
-                    <span className={`status-${s}`} style={{fontSize:11}}>{t(`issues.status.${s}`)}</span>
-                    {s===issue.status&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
-                  </button>)}</div>}
-              </div>
-              {/* Priority */}
-              <div className="relative">
-                {canFullEdit ? (
-                  <button onClick={()=>setEp(!ep)} className={`priority-${issue.priority} rounded-md px-2 py-0.5 text-[11px] font-medium cursor-pointer transition-transform hover:scale-105`}>
-                    {t(`issues.priority.${issue.priority}`)} <ChevronDown size={10} className="ml-0.5 inline opacity-50"/></button>
-                ) : (
-                  <span className={`priority-${issue.priority} rounded-md px-2 py-0.5 text-[11px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
-                )}
-                {canFullEdit && ep && <div className="absolute right-0 top-full z-10 mt-2 w-34 rounded-xl border border-[var(--border)] bg-white py-1.5  ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden">{PRIS.map(p=>
-                  <button key={p} onClick={()=>{qu("priority",p);setEp(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${p===issue.priority?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
-                    <span className={`priority-${p} w-1.5 h-1.5 rounded-full`} style={{display:"inline-block"}}/>
-                    {t(`issues.priority.${p}`)}
-                    {p===issue.priority&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
-                  </button>)}</div>}
-              </div>
-            </div>
-          </div>
-
-          {/* Labels bar */}
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {(issue.labels||[]).map((l:any)=>
-              canFullEdit
-                ? <button key={l.id} onClick={()=>tl(l.id)} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium hover:opacity-80 transition-opacity" style={{backgroundColor:l.color+"14",color:l.color,borderColor:l.color+"30"}}>{l.name} <X size={9}/></button>
-                : <span key={l.id} className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium" style={{backgroundColor:l.color+"14",color:l.color,borderColor:l.color+"30"}}>{l.name}</span>
-            )}
-            {canFullEdit && <button onClick={()=>setModal("label")} className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all">
-              <Plus size={10}/> {t("common.label")}</button>}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
-          {/* Assignees */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(issue.assignees||[]).map((a:any)=><span key={`${a.id}-${a.role}`} className={`role-badge role-${a.role} border border-[var(--border-light)]`}>
-              {a.display_name||a.username}<span className="opacity-60 ml-0.5">·{t(`roles.${a.role}`)}</span>
-              {canFullEdit && <button onClick={()=>ra(a.id,a.role)} className="ml-0.5 rounded-full p-0.5 hover:bg-red-100 transition-colors"><X size={9}/></button>}</span>)}
-            {canFullEdit && <button onClick={()=>{setSr("");setModal("role");}} className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"><Plus size={10}/> {t("roles.role")}</button>}
-          </div>
-
-          {/* Milestones + Timer */}
-          <div className="flex flex-wrap items-center gap-2">
-            {canFullEdit && <TimerW issueId={issue.id}/>}
-            {mls.map((mid:string)=>{const m=milestones.find(x=>x.id===mid);return canFullEdit
-              ? <button key={mid} onClick={()=>tm(mid)} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 transition-colors">{m?.name||mid}<X size={9}/></button>
-              : <span key={mid} className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700">{m?.name||mid}</span>;})}
-            {canFullEdit && <button onClick={()=>setModal("milestone")} className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"><Plus size={10}/> {t("issues.milestone")}</button>}
-          </div>
-
-          {/* Description */}
-          <div>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.description")}</h3>
-            <div className="rounded-lg bg-[var(--bg)] p-4 text-[13px] leading-relaxed text-[var(--text-secondary)] prose prose-sm max-w-none">
-              <MarkdownContent>{issue.description||"—"}</MarkdownContent></div>
-          </div>
+        <div className="flex items-center gap-2">
+          {canFullEdit && <Link to={`/issues/${issue.id}/edit`} className="btn btn-outline btn-sm"><Edit3 size={12}/>{t("common.edit")}</Link>}
+          <button onClick={openClaim} className="btn btn-outline btn-sm"><UserPlus size={12} className="mr-1"/>{t("roles.title","Claim")}</button>
         </div>
       </div>
 
-      {/* External Links */}
-      <div className="card rounded-xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("external.linked_issues","Linked Issues")} ({extLinks.length})</h3>
-          {canFullEdit && <button onClick={openLinkModal} disabled={conns.length===0}
-            className="btn btn-outline btn-sm" title={conns.length===0?"No connected accounts":""}><Link2 size={12} className="mr-1"/>{t("external.link_issue","Link Issue")}</button>}
-        </div>
-        {extLinks.length===0?<p className="text-[12px] text-[var(--text-muted)] py-2">{t("common.no_data")}</p>
-        :<div className="space-y-1.5">{extLinks.map(l=>{
-          const isPR = l.link_type === "pull_request";
-          const isMerged = l.status === "merged";
-          return (
-          <div key={l.id} className="group flex items-center justify-between rounded-lg border border-[var(--border-light)] px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors">
-            <div className="flex items-center gap-2 min-w-0">
-              {isPR ? <GitPullRequest size={14} className={`shrink-0 ${isMerged?"text-violet-500":"text-cyan-500"}`}/>
-                : <AlertCircle size={14} className={`shrink-0 ${l.status==="closed"?"text-red-400":"text-emerald-500"}`}/>}
-              <div className="min-w-0">
-                <div className="text-[13px] font-medium truncate">{l.title||l.external_id}</div>
-                <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
-                  <span className="font-mono">{l.external_repo}</span>
-                  <span>#{l.external_id}</span>
-                  {isPR && <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-medium text-cyan-600">PR</span>}
-                  {l.status&&<span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${isMerged?"bg-violet-50 text-violet-600":l.status==="closed"?"bg-red-50 text-red-600":"bg-emerald-50 text-emerald-600"}`}>{l.status}</span>}
-                  {l.last_synced_at&&<span className="text-[9px] opacity-50">synced {new Date(l.last_synced_at).toLocaleTimeString()}</span>}
+      {/* Two-column layout */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_240px]">
+        {/* Left: content */}
+        <div className="space-y-4 min-w-0">
+          {/* Title card */}
+          <div className="card rounded-[8px] p-5">
+            <div className="flex items-start gap-3">
+              <div className={`w-[26px] h-[26px] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] font-bold mt-0.5 ${issue.issue_type==="feature"?"bg-violet-50 text-violet-500":"bg-amber-50 text-amber-500"}`}>
+                {issue.issue_type==="feature"?"需":"问"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[18px] font-semibold tracking-tight leading-snug">{issue.title}</h1>
+                <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
+                  <span className="mono">#{issue.id.slice(0,8)}</span>
+                  <span className="text-[var(--border)]">·</span>
+                  <span>{issue.reporter?.display_name||issue.reporter?.username}</span>
+                  <span className="text-[var(--border)]">·</span>
+                  <span>{new Date(issue.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              {canFullEdit && <button onClick={()=>doRefresh(l.id)} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]" title="Sync status"><RefreshCw size={12}/></button>}
-              <a href={l.external_url} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><ExternalLink size={12}/></a>
-              {canFullEdit && <button onClick={()=>doUnlink(l.id)} className="rounded p-1 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500"><Unlink size={12}/></button>}
+          </div>
+
+          {/* Description */}
+          <div className="card rounded-[8px] p-5">
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.description")}</h3>
+            <div className="text-[13px] leading-relaxed text-[var(--text-secondary)] prose prose-sm max-w-none">
+              <MarkdownContent>{issue.description||"—"}</MarkdownContent>
             </div>
-          </div>)})}</div>
-        }
+          </div>
+
+          {/* Comments */}
+          <div className="card rounded-[8px] p-5 space-y-4">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("issues.comments")} ({comments.length})</h3>
+            {comments.map((c:any)=><Cm key={c.id} c={c} issueId={issue.id} roles={(issue.assignees||[]).filter((a:any)=>a.id===c.author?.id).map((a:any)=>a.role)} canEdit={canFullEdit} curUserId={curUser?.id} onReply={setReplyTo} onRefresh={fc} t={t}/>)}
+            {replyTo&&<div className="ml-8 rounded-[6px] border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-600">{t("comment.replying","Replying")} <button onClick={()=>setReplyTo(null)} className="ml-2 hover:text-blue-800 font-medium">✕</button></div>}
+            <form onSubmit={hc} className="space-y-2">
+              <textarea rows={3} value={comment} onChange={e=>setComment(e.target.value)} placeholder={t("issues.write_comment")} className="input resize-none"/>
+              <button type="submit" disabled={sub||!comment.trim()} className="btn btn-primary btn-sm">{t("issues.comment")}</button>
+            </form>
+          </div>
+        </div>
+
+        {/* Right: metadata sidebar */}
+        <div className="space-y-0 lg:sticky lg:top-4 lg:self-start">
+          <div className="card rounded-[8px] overflow-hidden divide-y divide-[var(--border-light)]">
+            {/* Status */}
+            <div className="relative px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("common.status")}</div>
+              {canFullEdit ? (
+                <button onClick={()=>setEs(!es)} className={`status-${issue.status} cursor-pointer transition-transform hover:scale-105`}>
+                  {t(`issues.status.${issue.status}`)} {canFullEdit && <ChevronDown size={10} className="ml-0.5 inline opacity-50"/>}
+                </button>
+              ) : (
+                <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
+              )}
+              {canFullEdit && es && <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-[8px] border border-[var(--border)] bg-white py-1.5 ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden shadow-[var(--shadow-md)]">{STAT.map(s=>
+                <button key={s} onClick={()=>{qu("status",s);setEs(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${s===issue.status?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
+                  <span className={`status-${s}`} style={{fontSize:11}}>{t(`issues.status.${s}`)}</span>
+                  {s===issue.status&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
+                </button>)}</div>}
+            </div>
+
+            {/* Priority */}
+            <div className="relative px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("common.priority")}</div>
+              {canFullEdit ? (
+                <button onClick={()=>setEp(!ep)} className={`priority-${issue.priority} rounded-[4px] px-2 py-0.5 text-[11px] font-medium cursor-pointer transition-transform hover:scale-105`}>
+                  {t(`issues.priority.${issue.priority}`)} <ChevronDown size={10} className="ml-0.5 inline opacity-50"/>
+                </button>
+              ) : (
+                <span className={`priority-${issue.priority} rounded-[4px] px-2 py-0.5 text-[11px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
+              )}
+              {canFullEdit && ep && <div className="absolute left-0 top-full z-10 mt-1 w-34 rounded-[8px] border border-[var(--border)] bg-white py-1.5 ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden shadow-[var(--shadow-md)]">{PRIS.map(p=>
+                <button key={p} onClick={()=>{qu("priority",p);setEp(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${p===issue.priority?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
+                  <span className={`priority-${p} w-1.5 h-1.5 rounded-full`} style={{display:"inline-block"}}/>
+                  {t(`issues.priority.${p}`)}
+                  {p===issue.priority&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
+                </button>)}</div>}
+            </div>
+
+            {/* Assignees */}
+            <div className="px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("roles.assignees","Assignees")}</div>
+              <div className="space-y-1">
+                {(issue.assignees||[]).map((a:any)=>(
+                  <div key={`${a.id}-${a.role}`} className="group flex items-center gap-1.5">
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[9px] font-semibold text-[var(--primary)]">{(a.display_name||a.username||"?")[0].toUpperCase()}</div>
+                    <span className="text-[12px] text-[var(--text-secondary)] truncate flex-1">{a.display_name||a.username}</span>
+                    <span className={`role-badge role-${a.role} text-[9px] shrink-0`}>{t(`roles.${a.role}`)}</span>
+                    {canFullEdit && <button onClick={()=>ra(a.id,a.role)} className="shrink-0 rounded p-0.5 text-[var(--text-faint)] hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"><X size={10}/></button>}
+                  </div>
+                ))}
+              </div>
+              {canFullEdit && <button onClick={()=>{setSr("");setModal("role");}} className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"><Plus size={10}/>{t("roles.role")}</button>}
+            </div>
+
+            {/* Labels */}
+            <div className="px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("common.labels")}</div>
+              <div className="flex flex-wrap gap-1">
+                {(issue.labels||[]).map((l:any)=>(
+                  canFullEdit
+                    ? <button key={l.id} onClick={()=>tl(l.id)} className="group/l inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium hover:opacity-70 transition-opacity" style={{backgroundColor:l.color+"0a",color:l.color}}>
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{backgroundColor:l.color}}/>{l.name}<X size={8} className="opacity-0 group-hover/l:opacity-100 transition-opacity"/>
+                      </button>
+                    : <span key={l.id} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{backgroundColor:l.color+"0a",color:l.color}}>
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{backgroundColor:l.color}}/>{l.name}
+                      </span>
+                ))}
+              </div>
+              {canFullEdit && <button onClick={()=>setModal("label")} className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"><Plus size={10}/>{t("common.label")}</button>}
+            </div>
+
+            {/* Milestones */}
+            <div className="px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("issues.milestone")}</div>
+              <div className="space-y-1">
+                {mls.map((mid:string)=>{const m=milestones.find(x=>x.id===mid);return(
+                  <div key={mid} className="group flex items-center gap-1.5">
+                    <Flag size={12} className="text-violet-400 shrink-0"/>
+                    <span className="text-[12px] text-violet-600 truncate flex-1">{m?.name||mid}</span>
+                    {canFullEdit && <button onClick={()=>tm(mid)} className="shrink-0 rounded p-0.5 text-[var(--text-faint)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={10}/></button>}
+                  </div>
+                )})}
+              </div>
+              {canFullEdit && <button onClick={()=>setModal("milestone")} className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"><Plus size={10}/>{t("issues.milestone")}</button>}
+            </div>
+          </div>
+
+          {/* Timer */}
+          {canFullEdit && (
+            <div className="card rounded-[8px] px-4 py-3 mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2">{t("timer.title","Timer")}</div>
+              <TimerW issueId={issue.id}/>
+            </div>
+          )}
+
+          {/* External links */}
+          <div className="card rounded-[8px] overflow-hidden mt-3">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">{t("external.linked_issues","Linked")} ({extLinks.length})</span>
+              {canFullEdit && conns.length>0 && <button onClick={openLinkModal} className="rounded p-0.5 text-[var(--text-faint)] hover:text-[var(--primary)] transition-colors"><Plus size={12}/></button>}
+            </div>
+            {extLinks.length===0
+              ? <div className="px-4 py-3 text-[11px] text-[var(--text-faint)]">{t("common.no_data")}</div>
+              : <div className="divide-y divide-[var(--border-light)]">{extLinks.map(l=>{
+                  const isPR = l.link_type === "pull_request";
+                  const isMerged = l.status === "merged";
+                  return (
+                  <div key={l.id} className="group flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--bg-muted)] transition-colors">
+                    {isPR ? <GitPullRequest size={13} className={`shrink-0 ${isMerged?"text-violet-500":"text-cyan-500"}`}/>
+                      : <AlertCircle size={13} className={`shrink-0 ${l.status==="closed"?"text-red-400":"text-emerald-500"}`}/>}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-medium truncate">{l.title||l.external_id}</div>
+                      <div className="text-[10px] text-[var(--text-faint)] flex items-center gap-1 mt-0.5">
+                        <span className="font-mono">{l.external_repo}</span>
+                        <span>#{l.external_id}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {canFullEdit && <button onClick={()=>doRefresh(l.id)} className="rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)]"><RefreshCw size={11}/></button>}
+                      <a href={l.external_url} target="_blank" rel="noopener noreferrer" className="rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)]"><ExternalLink size={11}/></a>
+                      {canFullEdit && <button onClick={()=>doUnlink(l.id)} className="rounded p-0.5 text-[var(--text-faint)] hover:text-red-500 hover:bg-red-50"><Unlink size={11}/></button>}
+                    </div>
+                  </div>
+                )})}</div>
+            }
+          </div>
+
+          {/* Activity */}
+          {activityLogs.length>0 && (
+            <div className="card rounded-[8px] p-4 mt-3">
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">{t("activity.title","Activity")}</h3>
+              <div className="max-h-36 space-y-0.5 overflow-y-auto">{activityLogs.slice(0,10).map((l:any)=>(
+                <div key={l.id} className="flex items-center gap-1.5 text-[10px]">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium shrink-0 ${
+                    l.raw_action==="status_changed"?"bg-blue-50 text-blue-700":
+                    l.raw_action==="priority_changed"?"bg-amber-50 text-amber-700":
+                    l.raw_action==="milestone_added"||l.raw_action==="milestone_removed"?"bg-violet-50 text-violet-700":
+                    l.raw_action==="label_added"||l.raw_action==="label_removed"?"bg-cyan-50 text-cyan-700":
+                    l.raw_action==="timer_started"?"bg-emerald-50 text-emerald-700":
+                    l.raw_action==="timer_stopped"?"bg-orange-50 text-orange-700":
+                    l.raw_action==="added"?"bg-emerald-50 text-emerald-700":
+                    l.raw_action==="removed"?"bg-red-50 text-red-700":
+                    "bg-gray-50 text-gray-600"}`}>
+                    {l.raw_action==="status_changed"?t(`issues.status.${l.role}`):
+                     l.raw_action==="priority_changed"?t(`issues.priority.${l.role}`):
+                     l.raw_action==="added"?`+ ${t(`roles.${l.role}`)}`:
+                     l.raw_action==="removed"?`− ${t(`roles.${l.role}`)}`:
+                     l.action}</span>
+                  <span className="text-[var(--text-faint)] truncate">{l.raw_action==="added"||l.raw_action==="removed"?l.user_name:l.changed_by_name}</span>
+                  <span className="ml-auto text-[var(--text-faint)]/60 shrink-0">{new Date(l.created_at).toLocaleTimeString()}</span>
+                </div>))}</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Activity log */}
-      {activityLogs.length>0 && <div className="card rounded-xl p-4">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("activity.title","Activity")}</h3>
-        <div className="max-h-40 space-y-0.5 overflow-y-auto">{activityLogs.slice(0,10).map((l:any)=>(
-          <div key={l.id} className="flex items-center gap-2 text-[11px]">
-            {/* Action badge */}
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-              l.raw_action==="status_changed"?"bg-blue-50 text-blue-700":
-              l.raw_action==="priority_changed"?"bg-amber-50 text-amber-700":
-              l.raw_action==="milestone_added"?"bg-violet-50 text-violet-700":
-              l.raw_action==="milestone_removed"?"bg-violet-50 text-violet-700":
-              l.raw_action==="label_added"?"bg-cyan-50 text-cyan-700":
-              l.raw_action==="label_removed"?"bg-cyan-50 text-cyan-700":
-              l.raw_action==="timer_started"?"bg-emerald-50 text-emerald-700":
-              l.raw_action==="timer_stopped"?"bg-orange-50 text-orange-700":
-              l.raw_action==="added"?"bg-emerald-50 text-emerald-700":
-              l.raw_action==="removed"?"bg-red-50 text-red-700":
-              "bg-gray-50 text-gray-600"}`}>
-              {l.raw_action==="status_changed"?t(`issues.status.${l.role}`):
-               l.raw_action==="priority_changed"?t(`issues.priority.${l.role}`):
-               l.raw_action==="added"?`+ ${t(`roles.${l.role}`)}`:
-               l.raw_action==="removed"?`− ${t(`roles.${l.role}`)}`:
-               l.action}</span>
-            {/* Content */}
-            <span className="text-[var(--text-muted)]">
-              {l.raw_action==="added"||l.raw_action==="removed"?l.user_name:l.changed_by_name}
-            </span>
-            <span className="ml-auto text-[var(--text-muted)]/50">{new Date(l.created_at).toLocaleTimeString()}</span></div>))}</div>
-      </div>}
+      {/* Claim role modal */}
+      {claimOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setClaimOpen(false); setClaimRoles([]); }}>
+          <div className="card w-72 rounded-[8px] p-5 animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
+              <button onClick={() => { setClaimOpen(false); setClaimRoles([]); }} className="rounded-[8px] p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
+            </div>
+            <div className="space-y-0.5 mb-4">
+              {myRoles.map((r: string) => (
+                <label key={r}
+                  className={`flex items-center gap-2 rounded-[6px] px-2 py-2 text-[12px] cursor-pointer transition-colors ${
+                    claimRoles.includes(r) ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                  }`}>
+                  <input type="checkbox" checked={claimRoles.includes(r)} onChange={() => toggleClaimRole(r)} className="rounded accent-[var(--primary)]"/>
+                  <span className={`role-badge role-${r}`}>{t(`roles.${r}`)}</span>
+                </label>
+              ))}
+            </div>
+            <button onClick={doClaim} disabled={claimRoles.length===0} className="btn btn-primary btn-sm w-full">{t("common.confirm")}</button>
+          </div>
+        </div>
+      )}
 
-      {/* Comments */}
-      <div className="card rounded-xl p-5 space-y-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("issues.comments")} ({comments.length})</h3>
-        {comments.map((c:any)=><Cm key={c.id} c={c} issueId={issue.id} roles={(issue.assignees||[]).filter((a:any)=>a.id===c.author?.id).map((a:any)=>a.role)} canEdit={canFullEdit} curUserId={curUser?.id} onReply={setReplyTo} onRefresh={fc} t={t}/>)}
-        {replyTo&&<div className="ml-8 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-600">{t("comment.replying","Replying")} <button onClick={()=>setReplyTo(null)} className="ml-2 hover:text-blue-800 font-medium">✕</button></div>}
-        <form onSubmit={hc} className="space-y-2">
-          <textarea rows={3} value={comment} onChange={e=>setComment(e.target.value)} placeholder={t("issues.write_comment")} className="input resize-none"/>
-          <button type="submit" disabled={sub||!comment.trim()} className="btn btn-primary btn-sm">{t("issues.comment")}</button>
-        </form>
-      </div>
-
+      {/* Modals */}
       {modal&&modal!=="link"&&<Modal onClose={()=>setModal(null)} wide={modal==="role"} title={modal==="milestone"?t("issues.milestone"):modal==="label"?t("common.labels"):t("roles.title")}>
-        {modal==="milestone"&&<div className="max-h-60 space-y-1 overflow-y-auto">{milestones.map(m=>{const a=mls.includes(m.id);return <button key={m.id} onClick={()=>tm(m.id)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${a?"bg-violet-50 text-violet-700":"hover:bg-[var(--bg-hover)]"}`}>{m.name}{a&&<Check size={14}/>}</button>})}</div>}
-        {modal==="label"&&<div className="max-h-60 space-y-1 overflow-y-auto">{labels.map(l=>{const a=(issue.labels||[]).some((il:any)=>il.id===l.id);return <button key={l.id} onClick={()=>tl(l.id)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${a?"bg-[var(--primary-light)] text-[var(--primary)]":"hover:bg-[var(--bg-hover)]"}`}><span className="h-3 w-3 rounded-full" style={{backgroundColor:l.color}}/>{l.name}{a&&<Check size={14} className="ml-auto"/>}</button>})}</div>}
+        {modal==="milestone"&&<div className="max-h-60 space-y-1 overflow-y-auto">{milestones.map(m=>{const a=mls.includes(m.id);return <button key={m.id} onClick={()=>tm(m.id)} className={`flex w-full items-center justify-between rounded-[8px] px-3 py-2 text-left text-[13px] transition-colors ${a?"bg-violet-50 text-violet-700":"hover:bg-[var(--bg-hover)]"}`}>{m.name}{a&&<Check size={14}/>}</button>})}</div>}
+        {modal==="label"&&<div className="max-h-60 space-y-1 overflow-y-auto">{labels.map(l=>{const a=(issue.labels||[]).some((il:any)=>il.id===l.id);return <button key={l.id} onClick={()=>tl(l.id)} className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-[13px] transition-colors ${a?"bg-[var(--primary-light)] text-[var(--primary)]":"hover:bg-[var(--bg-hover)]"}`}><span className="h-3 w-3 rounded-full" style={{backgroundColor:l.color}}/>{l.name}{a&&<Check size={14} className="ml-auto"/>}</button>})}</div>}
         {modal==="role"&&(
           <div className="max-h-80 space-y-1.5 overflow-y-auto">
             {ALL_ROLES.map(r=>{
               const assigned = (issue.assignees||[]).filter((a:any)=>a.role===r);
               return (
-                <div key={r} className="rounded-xl border border-[var(--border-light)] overflow-hidden">
+                <div key={r} className="rounded-[8px] border border-[var(--border-light)] overflow-hidden">
                   <button onClick={()=>setSr(sr===r?"":r)}
                     className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors ${sr===r?"bg-[var(--bg-muted)]":""}`}>
                     <div className="flex items-center gap-2.5">
-                      <span className={`role-badge role-${r} rounded-md px-2 py-0.5 text-[11px] font-medium`}>{t(`roles.${r}`)}</span>
+                      <span className={`role-badge role-${r} rounded-[6px] px-2 py-0.5 text-[11px] font-medium`}>{t(`roles.${r}`)}</span>
                       <span className="text-[11px] text-[var(--text-muted)]">
                         {assigned.length>0 ? assigned.map((a:any)=><span key={a.id} className="mr-1">{a.display_name||a.username}</span>) : <span className="italic opacity-50">{t("common.none","none")}</span>}
                       </span>
@@ -317,7 +373,7 @@ export default function IssueDetailPage() {
                           const isAssigned = assigned.some((a:any)=>a.id===u.id);
                           return (
                             <button key={u.id} onClick={()=>ar(u.id,r)}
-                              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] transition-colors ${isAssigned?"bg-emerald-50 text-emerald-700 font-medium":"hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"}`}>
+                              className={`flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12px] transition-colors ${isAssigned?"bg-emerald-50 text-emerald-700 font-medium":"hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"}`}>
                               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[9px] font-semibold text-[var(--primary)] shrink-0">
                                 {(u.display_name||u.username).slice(0,1).toUpperCase()}
                               </div>
@@ -336,31 +392,6 @@ export default function IssueDetailPage() {
         )}
       </Modal>}
 
-      {/* Link external issue modal */}
-      {/* Claim role modal */}
-      {claimOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setClaimOpen(false); setClaimRoles([]); }}>
-          <div className="card w-72 rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
-              <button onClick={() => { setClaimOpen(false); setClaimRoles([]); }} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
-            </div>
-            <div className="space-y-0.5 mb-4">
-              {myRoles.map((r: string) => (
-                <label key={r}
-                  className={`flex items-center gap-2 rounded-md px-2 py-2 text-[12px] cursor-pointer transition-colors ${
-                    claimRoles.includes(r) ? "bg-[var(--primary-light)] text-[var(--primary)] font-medium" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                  }`}>
-                  <input type="checkbox" checked={claimRoles.includes(r)} onChange={() => toggleClaimRole(r)} className="rounded accent-[var(--primary)]"/>
-                  <span className={`role-badge role-${r}`}>{t(`roles.${r}`)}</span>
-                </label>
-              ))}
-            </div>
-            <button onClick={doClaim} disabled={claimRoles.length===0} className="btn btn-primary btn-sm w-full">{t("common.confirm")}</button>
-          </div>
-        </div>
-      )}
-
       {modal==="link"&&<Modal onClose={()=>{setModal(null);setCreateTitle("");setCreateBody("");}} title={t("external.link_issue","Link External Issue")} wide>
         <div className="space-y-4">
           {conns.length===0?(
@@ -370,12 +401,11 @@ export default function IssueDetailPage() {
               <p className="text-[11px] mt-0.5">{t("settings.connect_hint","Connect GitHub or Gitea to link external issues.")}</p>
             </div>
           ):<>
-            {/* Account selector - segmented control */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Account</label>
-              <div className="flex rounded-lg bg-[var(--bg-muted)] p-0.5">{conns.map(c=>(
+              <div className="flex rounded-[8px] bg-[var(--bg-muted)] p-0.5">{conns.map(c=>(
                 <button key={c.id} onClick={()=>loadRepos(c.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-[6px] px-3 py-1.5 text-[11px] font-medium transition-all ${
                     linkConnId===c.id
                       ? "bg-white text-[var(--text)] shadow-sm"
                       : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -385,8 +415,6 @@ export default function IssueDetailPage() {
                 </button>
               ))}</div>
             </div>
-
-            {/* Repo selector */}
             {linkRepos.length>0 && (
               <div>
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Repository</label>
@@ -397,8 +425,6 @@ export default function IssueDetailPage() {
                 </select>
               </div>
             )}
-
-            {/* Browse or Create (mutually exclusive) */}
             {linkRepo && linkMode==="browse" && <>
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"/>
@@ -414,8 +440,8 @@ export default function IssueDetailPage() {
                     const isMerged = r.status === "merged";
                     return (
                     <button key={r.external_id} onClick={()=>doLink(r.external_id,r.external_url,r.title,r.status,r.link_type)}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left border border-[var(--border-light)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-light)] transition-all group">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-left border border-[var(--border-light)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-light)] transition-all group">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${
                         isMerged ? "bg-violet-50" : isPR ? "bg-cyan-50" : r.status==="closed" ? "bg-red-50" : "bg-emerald-50"}`}>
                         {isPR ? <GitPullRequest size={14} className={isMerged?"text-violet-500":"text-cyan-500"}/>
                           : r.status==="closed" ? <CheckCircle2 size={14} className="text-red-500"/> : <AlertCircle size={14} className="text-emerald-500"/>}
@@ -431,7 +457,7 @@ export default function IssueDetailPage() {
                           ))}
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-lg bg-[var(--primary)] px-2.5 py-1 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity">Link</span>
+                      <span className="shrink-0 rounded-[8px] bg-[var(--primary)] px-2.5 py-1 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity">Link</span>
                     </button>
                   )})}
                 </div>
@@ -443,12 +469,11 @@ export default function IssueDetailPage() {
               )}
               <div className="border-t border-[var(--border-light)] pt-2.5">
                 <button onClick={switchToCreate}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors">
+                  className="flex w-full items-center justify-center gap-2 rounded-[8px] py-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors">
                   <Plus size={13}/> {t("issues.create_external","Create New Issue")}
                 </button>
               </div>
             </>}
-
             {linkRepo && linkMode==="create" && <>
               <button onClick={()=>{setLinkMode("browse");setCreateTitle("");setCreateBody("");}}
                 className="text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors mb-2">&larr; {t("common.back")} to browse</button>
@@ -462,29 +487,24 @@ export default function IssueDetailPage() {
               <button onClick={doCreateAndLink} disabled={!createTitle.trim()}
                 className="btn btn-primary btn-sm w-full">{t("common.create")} & {t("external.link_issue","Link")}</button>
             </>}
-
-            {/* No repo selected prompt */}
             {!linkRepo && linkRepos.length>0 && (
               <div className="flex flex-col items-center py-10 text-[var(--text-muted)]">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-muted)] mb-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[var(--bg-muted)] mb-3">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z"/></svg>
                 </div>
                 <p className="text-[12px] font-medium mb-0.5">Choose a repository</p>
                 <p className="text-[10px]">Select a repo above to browse its issues</p>
               </div>
             )}
-
-            {/* Loading repos */}
             {linkRepos.length===0 && linkConnId && (
               <div className="flex flex-col items-center py-8 text-[var(--text-muted)]">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent mb-2"/>
                 <p className="text-[11px]">Loading repositories...</p>
               </div>
             )}
-            {/* No account selected yet */}
             {!linkConnId && (
               <div className="flex flex-col items-center py-10 text-[var(--text-muted)]">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-muted)] mb-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[var(--bg-muted)] mb-3">
                   <Globe size={20} className="opacity-30"/>
                 </div>
                 <p className="text-[12px] font-medium mb-0.5">Select an account</p>
@@ -496,11 +516,12 @@ export default function IssueDetailPage() {
       </Modal>}
     </div>
   );
+
 }
 
 function Modal({children,onClose,title,wide}:{children:React.ReactNode;onClose:()=>void;title:string;wide?:boolean}){
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-    <div className={`card rounded-xl p-5  animate-[fadeInUp_.2s_ease-out] ${wide?"w-[480px]":"w-80"}`} onClick={e=>e.stopPropagation()}>
+    <div className={`card rounded-[8px] p-5 animate-[fadeInUp_.2s_ease-out] ${wide?"w-[480px]":"w-80"}`} onClick={e=>e.stopPropagation()}>
       <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold">{title}</h3><button onClick={onClose} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button></div>
       {children}</div></div>;}
 

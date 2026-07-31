@@ -16,13 +16,17 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats|null>(null);
   const [loading, setLoading] = useState(true);
   const [oauthConfig, setOauthConfig] = useState<Record<string,string>>({});
+  const [wikiMaxMb, setWikiMaxMb] = useState("5");
+  const [wikiSaved, setWikiSaved] = useState(false);
 
   const fetch = async () => {
     const [u, s, oc] = await Promise.all([
       api.get("/users"), api.get("/admin/stats"),
       api.get("/system/settings").catch(()=>({data:{}})),
     ]);
-    setUsers(u.data); setStats(s.data); setOauthConfig(oc.data); setLoading(false);
+    setUsers(u.data); setStats(s.data); setOauthConfig(oc.data);
+    setWikiMaxMb(oc.data.wiki_upload_max_mb || "5");
+    setLoading(false);
   };
   useEffect(()=>{fetch();},[]);
 
@@ -127,6 +131,45 @@ export default function AdminPage() {
               className={`relative w-11 h-6 rounded-full transition-colors ${oauthConfig["registration_enabled"] === "true" ? "bg-[var(--primary)]" : "bg-[var(--border)]"}`}>
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${oauthConfig["registration_enabled"] === "true" ? "translate-x-5" : "translate-x-0"}`}/>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Wiki Settings */}
+      <div className="card rounded-xl overflow-hidden">
+        <div className="border-b border-[var(--border-light)] px-5 py-3.5">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <Settings2 size={14}/>Wiki {t("settings.config","Configuration")}
+          </h2>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-start gap-6">
+            <div className="flex-1">
+              <div className="text-[13px] font-medium text-[var(--text)]">{t("admin.wiki_upload_limit","Upload file size limit")}</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("admin.wiki_upload_limit_hint","Maximum file size for wiki image/file uploads (MB)")}</div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={wikiMaxMb}
+                onChange={e => { setWikiMaxMb(e.target.value); setWikiSaved(false); }}
+                className="input w-20 text-center text-[13px]"
+              />
+              <span className="text-[12px] text-[var(--text-muted)]">MB</span>
+              <button
+                onClick={async () => {
+                  const mb = parseFloat(wikiMaxMb);
+                  if (!mb || mb <= 0) return;
+                  await api.put("/system/settings", { wiki_upload_max_mb: String(mb) });
+                  setWikiSaved(true);
+                  setTimeout(() => setWikiSaved(false), 2000);
+                }}
+                className={`btn btn-sm ${wikiSaved ? "btn-primary" : "btn-outline"}`}>
+                {wikiSaved ? "✓" : t("common.save")}
+              </button>
+            </div>
           </div>
         </div>
       </div>

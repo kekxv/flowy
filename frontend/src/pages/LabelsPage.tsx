@@ -39,15 +39,12 @@ export default function LabelsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5 page-enter">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("common.labels")}</h1>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{labels.length} labels</p>
-        </div>
-        {isAdmin && <button onClick={()=>{reset();setShowForm(true);}} className="btn btn-primary"><Plus size={15}/>{t("common.create")}</button>}
+        <h1 className="text-[18px] font-semibold tracking-tight">{t("common.labels")}</h1>
+        {isAdmin && <button onClick={()=>{reset();setShowForm(true);}} className="btn btn-primary btn-sm"><Plus size={13}/>{t("common.create")}</button>}
       </div>
 
       {showForm&&(
-        <div className="card rounded-xl p-5 animate-[fadeInUp_.15s_ease-out]">
+        <div className="card rounded-[8px] p-5 animate-[fadeInUp_.15s_ease-out]">
           <form onSubmit={submit} className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-1"><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.name","Name")}</label><input required value={name} onChange={e=>setName(e.target.value)} placeholder="bug" className="input"/></div>
@@ -67,29 +64,33 @@ export default function LabelsPage() {
       )}
 
       {labels.length===0?(
-        <div className="card flex flex-col items-center justify-center py-16 rounded-xl text-[var(--text-muted)]">
-          <TagsIcon/><p className="mt-3 text-sm">{t("issues.no_issues")}</p>
+        <div className="card flex flex-col items-center justify-center py-16 rounded-[8px] text-[var(--text-muted)]">
+          <TagsIcon/><p className="mt-3 text-[13px]">{t("issues.no_issues")}</p>
         </div>
       ):(
-        <div className="card rounded-xl overflow-hidden divide-y divide-[var(--border-light)]">
+        <div className="card overflow-hidden rounded-[8px] divide-y divide-[var(--border-light)]">
           {labels.map(l=>(
-            <div key={l.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-hover)] transition-all group ">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{backgroundColor:l.color+"14",borderColor:l.color+"30"}}>
-                <span className="h-4 w-4 rounded-full" style={{backgroundColor:l.color}}/>
+            <div key={l.id} className="group flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-muted)] transition-colors">
+              {/* Left: color indicator */}
+              <div className="w-[26px] h-[26px] shrink-0 rounded-[6px]" style={{backgroundColor:l.color+"18"}}>
+                <span className="flex h-full w-full items-center justify-center">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:l.color}}/>
+                </span>
               </div>
+              {/* Center: name + description */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{l.name}</span>
-                  <span className="font-mono text-[10px] text-[var(--text-muted)]">{l.color}</span>
+                  <span className="text-[14px] font-medium text-[var(--text)] truncate">{l.name}</span>
+                  <span className="flex h-[18px] items-center rounded-full px-1.5 text-[10px] font-medium" style={{backgroundColor:l.color+"0a",color:l.color}}>
+                    <span className="h-1.5 w-1.5 rounded-full mr-1" style={{backgroundColor:l.color}}/>{l.color}
+                  </span>
                 </div>
-                {l.description&&<p className="mt-0.5 text-[12px] text-[var(--text-muted)] truncate">{l.description}</p>}
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium border" style={{backgroundColor:l.color+"10",color:l.color,borderColor:l.color+"30"}}>Label preview</span>
-                </div>
+                {l.description&&<p className="mt-0.5 text-[11px] text-[var(--text-muted)] truncate">{l.description}</p>}
               </div>
-              {isAdmin && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={()=>edit(l)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--primary)] transition-colors"><Edit3 size={14}/></button>
-                <button onClick={()=>remove(l.id)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+              {/* Right: actions */}
+              {isAdmin && <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={()=>edit(l)} className="rounded p-1 text-[var(--text-faint)] hover:text-[var(--primary)] hover:bg-[var(--primary-subtle)] transition-colors" title={t("common.edit")}><Edit3 size={14}/></button>
+                <button onClick={()=>remove(l.id)} className="rounded p-1 text-[var(--text-faint)] hover:text-red-500 hover:bg-red-50 transition-colors" title={t("common.delete")}><Trash2 size={14}/></button>
               </div>}
             </div>
           ))}

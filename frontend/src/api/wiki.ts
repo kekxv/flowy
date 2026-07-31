@@ -80,6 +80,11 @@ export async function uploadWikiFile(file: File): Promise<WikiUploadResult> {
   return res.data;
 }
 
+export async function getWikiUploadLimit(): Promise<{ limit: number; limit_mb: number }> {
+  const res = await api.get("/wiki/upload-limit");
+  return res.data;
+}
+
 export async function listCollaborators(pageId: string): Promise<WikiCollaboratorData[]> {
   const res = await api.get(`/wiki/${pageId}/collaborators`);
   return res.data;

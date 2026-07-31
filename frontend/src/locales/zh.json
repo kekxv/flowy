@@ -253,7 +253,9 @@
     "connections_label": "连接数",
     "connections": "外部连接",
     "registration": "注册开关",
-    "registration_hint": "允许新用户自行注册账号"
+    "registration_hint": "允许新用户自行注册账号",
+    "wiki_upload_limit": "Wiki 上传大小限制",
+    "wiki_upload_limit_hint": "知识库图片和文件的最大上传大小（MB）"
   },
   "external": {
     "linked_issues": "关联的外部 Issue",
@@ -318,12 +320,12 @@
     "weight": "权重",
     "weight_hint": "权重越高，在列表和搜索中排名越靠前",
     "upload_image": "上传图片",
-    "upload_file": "上传文件（最大 5MB）",
+    "upload_file": "上传文件（最大 {{mb}}MB）",
     "uploading": "上传中...",
     "uploaded": "已上传",
-    "file_too_large": "文件大小超过 5MB 限制",
+    "file_too_large": "文件大小超过 {{mb}}MB 限制",
     "upload_failed": "上传失败",
-    "max_5mb": "最大 5MB",
+    "max_size": "最大 {{mb}}MB",
     "edit_mode": "编辑",
     "preview_mode": "预览",
     "no_content_preview": "暂无内容可预览"

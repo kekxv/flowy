@@ -25,6 +25,7 @@ import {
   addCollaborator,
   removeCollaborator,
   uploadWikiFile,
+  getWikiUploadLimit,
   type WikiPageData,
   type WikiCollaboratorData,
 } from "../api/wiki";
@@ -55,9 +56,14 @@ export default function WikiDetailPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [uploadLimitMb, setUploadLimitMb] = useState(5);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    getWikiUploadLimit().then(d => setUploadLimitMb(d.limit_mb)).catch(() => {});
+  }, []);
 
   // Collaborator state
   const [collaborators, setCollaborators] = useState<WikiCollaboratorData[]>([]);
@@ -179,8 +185,8 @@ export default function WikiDetailPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t("wiki.file_too_large", "File size exceeds 5MB limit"));
+    if (file.size > uploadLimitMb * 1024 * 1024) {
+      alert(t("wiki.file_too_large", `File size exceeds {{mb}}MB limit`, { mb: uploadLimitMb }));
       return;
     }
     setUploading(true);
@@ -346,7 +352,7 @@ export default function WikiDetailPage() {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--primary)] transition-colors disabled:opacity-50"
-                    title={t("wiki.upload_file", "Upload File (max 5MB)")}
+                    title={t("wiki.upload_file", `Upload File (max {{mb}}MB)`, { mb: uploadLimitMb })}
                   >
                     <Paperclip size={15} />
                   </button>
@@ -357,7 +363,7 @@ export default function WikiDetailPage() {
                   )}
                   <div className="flex-1" />
                   <span className="text-[10px] text-[var(--text-muted)]">
-                    {t("wiki.max_5mb", "Max 5MB")}
+                    {t("wiki.max_size", `Max {{mb}}MB`, { mb: uploadLimitMb })}
                   </span>
                   <div className="ml-2 flex rounded-md border border-[var(--border)] overflow-hidden">
                     <button

@@ -62,12 +62,12 @@ export default function MilestoneDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 page-enter">
-      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-[13px] text-red-700 shadow-lg animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
+      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-[8px] bg-red-50 border border-red-100 px-3 py-2 text-[12px] text-red-600 shadow-sm animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
 
       <Link to="/milestones" className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
 
       {/* Header card */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="card rounded-[8px] overflow-hidden">
         <div className="px-6 py-5 border-b border-[var(--border-light)]">
           {edit ? (
             <div className="space-y-3">
@@ -83,7 +83,7 @@ export default function MilestoneDetailPage() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold">{milestone.name}</h1>
+                  <h1 className="text-[18px] font-bold tracking-tight">{milestone.name}</h1>
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                     milestone.status==="open"?"bg-emerald-50 text-emerald-700":milestone.status==="published"?"bg-blue-50 text-blue-700":"bg-slate-100 text-slate-500"}`}>
                     {milestone.status==="published"?"🚀 ":""}{t(`milestone.status.${milestone.status}`,milestone.status)}
@@ -132,35 +132,43 @@ export default function MilestoneDetailPage() {
       </div>
 
       {/* Issue list */}
-      <div className="card rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+      <div className="card rounded-[8px] overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[var(--border-light)] px-4 py-3">
+          <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             {t("issues.title")}
             <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-muted)]">{issues.length}</span>
           </h2>
         </div>
         {issues.length===0 ? (
-          <div className="py-12 text-center text-sm text-[var(--text-muted)]">{t("issues.no_issues")}</div>
+          <div className="py-12 text-center text-[13px] text-[var(--text-muted)]">{t("issues.no_issues")}</div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
-            {issues.map((issue, idx) => {
-              const statusL = (s:string) => ({ open:"border-l-[#1a6ff5]", in_progress:"border-l-amber-400", resolved:"border-l-emerald-400", closed:"border-l-[var(--border)]", cancelled:"border-l-red-400", proposed:"border-l-purple-400", accepted:"border-l-emerald-400", rejected:"border-l-red-400" })[s]||"";
+            {issues.map(issue => {
+              const isFeature = (issue as any).issue_type === "feature";
+              const borderColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
               return (
               <Link key={issue.id} to={`/issues/${issue.id}`}
-                className={`flex items-center gap-3 border-l-[3px] px-5 py-3 transition-colors hover:bg-[var(--bg-hover)] ${statusL(issue.status)} ${idx%2?"bg-[var(--bg)]/40":""}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase ${(issue as any).issue_type==="feature"?"bg-violet-50 text-violet-600":"bg-amber-50 text-amber-600"}`}>{t(`issues.type.${(issue as any).issue_type||"bug"}`)}</span>
-                    <span className="truncate text-[13px] font-medium hover:text-[var(--primary)]">{issue.title}</span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-x-2 text-[10px] text-[var(--text-muted)]">
-                    <span className="font-mono">#{issue.id.slice(0,8)}</span>
-                    <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+                className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-muted)]">
+                {/* Left: status indicator + type initial */}
+                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+                  <div className="w-[3px] shrink-0 self-stretch rounded-full" style={{ backgroundColor: borderColor }} />
+                  <div className={`w-[26px] h-[26px] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] font-bold ${isFeature ? "bg-violet-50 text-violet-500" : "bg-amber-50 text-amber-500"}`}>
+                    {isFeature ? "需" : "问"}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`priority-${issue.priority} rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
-                  <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
+                {/* Center: title + meta */}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors truncate">{issue.title}</span>
+                    <span className="mono shrink-0 text-[10px] text-[var(--text-faint)]">#{issue.id.slice(0, 8)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--text-faint)]">
+                    <span className={`status-${issue.status} text-[11px]`}>{t(`issues.status.${issue.status}`)}</span>
+                    <span className="text-[var(--border)]">·</span>
+                    <span className="priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium">{t(`issues.priority.${issue.priority}`)}</span>
+                    <span className="text-[var(--border)]">·</span>
+                    <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
               </Link>
             )})}
