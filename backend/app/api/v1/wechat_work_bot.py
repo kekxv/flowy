@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote, urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -651,7 +651,6 @@ def _content_disposition(filename: str) -> str:
 @public_router.get("/intranet/download/confirm", response_class=HTMLResponse)
 @router.get("/intranet/download/confirm", response_class=HTMLResponse)
 async def confirm_intranet_file_download(
-    request: Request,
     token: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -661,10 +660,7 @@ async def confirm_intranet_file_download(
     file_url = payload["url"]
     filename = payload.get("filename") or _extract_filename(file_url)
     size = payload.get("size")
-    direct_path = request.url.path.removesuffix("/confirm")
-    direct_url = str(
-        request.url.replace(path=direct_path, query=urlencode({"token": token}))
-    )
+    direct_url = f"../download?{urlencode({'token': token})}"
     return HTMLResponse(
         render_download_confirmation(filename, size, source.name, direct_url)
     )

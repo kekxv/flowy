@@ -653,7 +653,7 @@ class TestDownloadProxy:
         assert "1.5 KB" in response.text
         assert "研发文件库" in response.text
         assert "确认下载" in response.text
-        assert f"/api/v1/intranet/download?token={token}" in response.text
+        assert f'href="../download?token={token}"' in response.text
 
 
 # ─── More handle_file Tests ─────────────────────────────────────
