@@ -113,6 +113,35 @@ def test_file_token_rejects_signature_tampering(monkeypatch):
     assert verify_file_token(tampered) is None
 
 
+def test_file_token_preserves_signed_display_metadata(monkeypatch):
+    monkeypatch.setattr("app.services.wechat_work_bot.file_token.settings.app_secret_key", "s" * 32)
+
+    token = generate_file_token(
+        "source-1",
+        "http://files.local/base/report.pdf",
+        filename="项目 报告.pdf",
+        size=1536,
+    )
+
+    assert verify_file_token(token) == {
+        "sid": "source-1",
+        "url": "http://files.local/base/report.pdf",
+        "filename": "项目 报告.pdf",
+        "size": 1536,
+    }
+
+
+def test_content_disposition_sanitizes_path_and_header_controls():
+    from app.api.v1.wechat_work_bot import _content_disposition
+
+    value = _content_disposition("../reports/quarterly\r\nX-Injected: yes.txt")
+
+    assert "\r" not in value
+    assert "\n" not in value
+    assert "../" not in value
+    assert "quarterly__X-Injected: yes.txt" in value
+
+
 def test_bind_token_uses_full_sha256_hmac(monkeypatch):
     monkeypatch.setattr("app.services.wechat_work_bot.bind_token.settings.app_secret_key", "s" * 32)
 

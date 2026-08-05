@@ -1,9 +1,11 @@
 """Comprehensive tests for WeChat Work bot command handlers."""
 
+import re
 import uuid
 from datetime import datetime
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -623,9 +625,10 @@ class TestBotComment:
         assert issue.description == "原始描述\n\n## 复现步骤\n\n- 点击保存"
 
     @pytest.mark.asyncio
-    async def test_attachment_uses_full_uuid_capability_name(
+    async def test_attachment_uses_base62_name_and_restores_original_download_name(
         self, db_session: AsyncSession, tmp_path, monkeypatch
     ):
+        from app.main import app
         from app.models.issue import Comment
 
         user = User(
@@ -639,7 +642,7 @@ class TestBotComment:
 
         class FakeWebSocketClient:
             async def download_file(self, _url, _aes_key):
-                return b"image-data", "photo.png"
+                return b"image-data", "项目 报告.png"
 
         class FakeBotClient:
             _ws_client = FakeWebSocketClient()
@@ -657,7 +660,26 @@ class TestBotComment:
         assert "已评论" in result
         comment = (await db_session.execute(select(Comment))).scalars().one()
         filename = comment.body.split("attachment:", 1)[1].split(")", 1)[0]
-        assert len(filename.removesuffix(".png")) == 32
+        assert re.fullmatch(r"[0-9A-Za-z]+", filename)
+
+        alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        number = 0
+        for character in filename:
+            number = number * 62 + alphabet.index(character)
+        payload = number.to_bytes((number.bit_length() + 7) // 8, "big")
+        assert payload[0] == 1
+        assert len(payload[1:17]) == 16
+        assert payload[17:].decode("utf-8") == "项目 报告.png"
+
+        transport = ASGITransport(app=app, raise_app_exceptions=True)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(f"/api/v1/bot-attachments/{filename}")
+
+        assert response.status_code == 200
+        assert response.headers["content-disposition"] == (
+            "attachment; filename*=utf-8''%E9%A1%B9%E7%9B%AE%20%E6%8A%A5%E5%91%8A.png"
+        )
+        assert response.headers["content-type"].startswith("image/png")
 
 
 # ── TestBotMilestone ──────────────────────────────────────────────────────────
@@ -1498,6 +1520,8 @@ class TestBotFileCommand:
         assert "大小：1.5 KB" in result
         assert "unknown.bin" in result
         assert "大小：未知" in result
+        assert result.count("/api/v1/intranet/download/confirm?token=") == 2
+        assert "/api/v1/intranet/download?token=" not in result
 
     @pytest.mark.asyncio
     async def test_file_regex_match(self, db_session: AsyncSession):

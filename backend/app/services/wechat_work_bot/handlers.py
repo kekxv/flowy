@@ -21,6 +21,10 @@ from app.models.issue import (
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
+from app.services.wechat_work_bot.attachment_names import (
+    encode_attachment_name,
+    normalize_attachment_name,
+)
 from app.services.wechat_work_bot.bind_token import verify_bind_token
 
 logger = logging.getLogger("uvicorn")
@@ -926,17 +930,22 @@ class CommandHandlers:
                         else:
                             attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
                         os.makedirs(attachments_dir, exist_ok=True)
-                        # Generate unique filename
-                        ext = filename_hint.rsplit(".", 1)[-1] if filename_hint and "." in filename_hint else "bin"
-                        local_filename = f"{uuid.uuid4().hex}.{ext}"
+                        original_filename = normalize_attachment_name(
+                            filename_hint or media_type
+                        )
+                        local_filename = encode_attachment_name(original_filename)
                         local_path = os.path.join(attachments_dir, local_filename)
                         with open(local_path, "wb") as f:
                             f.write(data)
                         # Use relative URL with appropriate markdown syntax
                         if media_type == "image":
-                            body_parts.append(f"![image](attachment:{local_filename})")
+                            body_parts.append(
+                                f"![{original_filename}](attachment:{local_filename})"
+                            )
                         else:
-                            body_parts.append(f"[{filename_hint or media_type}](attachment:{local_filename})")
+                            body_parts.append(
+                                f"[{original_filename}](attachment:{local_filename})"
+                            )
                     except Exception as e:
                         logger.error(f"Failed to process {media_type}: {e}")
                         body_parts.append(f"[{media_type}]({media_url})")
@@ -1682,7 +1691,13 @@ class CommandHandlers:
                 )
                 matched = [f for f in files if matches(f["name"])]
                 for m in matched:
-                    token = generate_file_token(source.id, m["url"], source.file_ttl_seconds)
+                    token = generate_file_token(
+                        source.id,
+                        m["url"],
+                        source.file_ttl_seconds,
+                        filename=m.get("name"),
+                        size=m.get("size"),
+                    )
                     m["source_name"] = source.name
                     m["token"] = token
                 all_matches.extend(matched)
@@ -1715,9 +1730,11 @@ class CommandHandlers:
 
         for index, m in enumerate(shown, 1):
             if frontend_url:
-                dl_url = f"{frontend_url}/api/v1/intranet/download?token={m['token']}"
+                dl_url = (
+                    f"{frontend_url}/api/v1/intranet/download/confirm?token={m['token']}"
+                )
             else:
-                dl_url = f"/api/v1/intranet/download?token={m['token']}"
+                dl_url = f"/api/v1/intranet/download/confirm?token={m['token']}"
             name = m["name"]
             lines.extend(
                 [

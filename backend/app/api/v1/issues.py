@@ -421,9 +421,10 @@ async def delete_comment(
         raise HTTPException(status_code=403, detail="Cannot delete this comment")
     # Clean up attachment files from disk
     if comment.body:
-        attachments_dir = os.path.join(os.environ.get("STATIC_DIR", "static"), "bot_attachments")
+        storage_root = os.environ.get("UPLOAD_DIR") or os.environ.get("STATIC_DIR", "static")
+        attachments_dir = os.path.join(storage_root, "bot_attachments")
         real_dir = os.path.realpath(attachments_dir)
-        filenames = set(re.findall(r'attachment:([a-f0-9]+\.\w+)', comment.body))
+        filenames = set(re.findall(r"attachment:([0-9A-Za-z._-]+)", comment.body))
         for fn in filenames:
             fp = os.path.realpath(os.path.join(attachments_dir, fn))
             if fp.startswith(real_dir + os.sep) and os.path.exists(fp):

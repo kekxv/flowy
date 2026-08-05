@@ -14,23 +14,36 @@ def _sign(payload: str) -> str:
     return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()
 
 
-def generate_file_token(source_id: str, file_url: str, ttl_seconds: int = 3600) -> str:
+def generate_file_token(
+    source_id: str,
+    file_url: str,
+    ttl_seconds: int = 3600,
+    *,
+    filename: str | None = None,
+    size: int | None = None,
+) -> str:
     """Generate a time-limited download token.
 
-    Format: base64(json({sid, url, exp}) + '.' + signature)
+    Format: base64(json({sid, url, exp, filename?, size?}) + '.' + signature)
     """
     exp = int(time.time()) + ttl_seconds
-    payload = json.dumps(
-        {"sid": source_id, "url": file_url, "exp": exp},
-        separators=(",", ":"),
-    )
+    token_data: dict[str, str | int] = {
+        "sid": source_id,
+        "url": file_url,
+        "exp": exp,
+    }
+    if isinstance(filename, str) and filename:
+        token_data["filename"] = filename
+    if isinstance(size, int) and not isinstance(size, bool) and size >= 0:
+        token_data["size"] = size
+    payload = json.dumps(token_data, ensure_ascii=False, separators=(",", ":"))
     sig = _sign(payload)
     raw = f"{payload}.{sig}"
     return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
 
 
 def verify_file_token(token: str) -> dict | None:
-    """Verify a file download token. Returns {sid, url} or None if invalid/expired."""
+    """Return verified source/URL and optional display metadata, or ``None``."""
     try:
         padded = token + "=" * (4 - len(token) % 4) if len(token) % 4 else token
         raw = base64.urlsafe_b64decode(padded).decode()
@@ -46,7 +59,13 @@ def verify_file_token(token: str) -> dict | None:
         if payload.get("exp", 0) < time.time():
             return None
 
-        return {"sid": payload["sid"], "url": payload["url"]}
+        result = {"sid": payload["sid"], "url": payload["url"]}
+        if isinstance(payload.get("filename"), str) and payload["filename"]:
+            result["filename"] = payload["filename"]
+        size = payload.get("size")
+        if isinstance(size, int) and not isinstance(size, bool) and size >= 0:
+            result["size"] = size
+        return result
 
     except Exception:
         return None

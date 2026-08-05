@@ -162,6 +162,38 @@ class TestIssueAPI:
         assert data["body"] == "This is a test comment"
 
     @pytest.mark.asyncio
+    async def test_delete_comment_removes_base62_attachment(
+        self, db_session, test_user, tmp_path, monkeypatch
+    ):
+        """Deleting a comment also removes its Base62-named attachment."""
+        monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+        attachments_dir = tmp_path / "bot_attachments"
+        attachments_dir.mkdir()
+        attachment_path = attachments_dir / "AbC123xyz"
+        attachment_path.write_bytes(b"attachment")
+
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            create_resp = await client.post(
+                "/api/v1/issues", json={"title": "Attachment cleanup"}, headers=headers
+            )
+            issue_id = create_resp.json()["id"]
+            comment_resp = await client.post(
+                f"/api/v1/issues/{issue_id}/comments",
+                json={"body": "[项目 报告.txt](attachment:AbC123xyz)"},
+                headers=headers,
+            )
+            comment_id = comment_resp.json()["id"]
+            response = await client.delete(
+                f"/api/v1/issues/{issue_id}/comments/{comment_id}",
+                headers=headers,
+            )
+
+        assert response.status_code == 204
+        assert not attachment_path.exists()
+
+    @pytest.mark.asyncio
     async def test_assignee_logs_endpoint(self, db_session, test_user):
         """Get assignee activity log for an issue."""
         transport = _build_transport(db_session)

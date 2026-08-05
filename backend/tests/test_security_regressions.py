@@ -731,7 +731,12 @@ class TestOutboundDestinationSecurity:
         )
         db_session.add(source)
         await db_session.flush()
-        token = generate_file_token(source.id, "http://10.20.0.8/base/file.txt")
+        token = generate_file_token(
+            source.id,
+            "http://10.20.0.8/base/file.txt",
+            filename="原始报告.txt",
+            size=4,
+        )
         captured_auth = None
 
         class FileResponse:
@@ -775,6 +780,9 @@ class TestOutboundDestinationSecurity:
 
         assert response.status_code == 200
         assert response.content == b"data"
+        assert response.headers["content-disposition"] == (
+            "attachment; filename*=UTF-8''%E5%8E%9F%E5%A7%8B%E6%8A%A5%E5%91%8A.txt"
+        )
         assert isinstance(captured_auth, BasicAuth)
         request = next(captured_auth.auth_flow(Request("GET", source.url)))
         assert request.headers["Authorization"] == "Basic cmVhZGVyOnNvdXJjZS1zZWNyZXQ="

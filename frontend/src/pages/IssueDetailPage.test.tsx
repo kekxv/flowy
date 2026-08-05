@@ -78,4 +78,64 @@ describe("IssueDetailPage", () => {
       expect(screen.getByRole("heading", { name: "评论标题" })).toBeInTheDocument()
     })
   })
+
+  it("shows and deletes Base62 attachments using their original labels", async () => {
+    apiMocks.delete.mockReset()
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === "/issues/issue-0001") {
+        return Promise.resolve({
+          data: {
+            assignees: [],
+            created_at: "2026-08-05T00:00:00",
+            description: "已有描述",
+            id: "issue-0001",
+            issue_type: "bug",
+            labels: [],
+            milestone_ids: [],
+            priority: "medium",
+            reporter: { display_name: "Reporter" },
+            status: "open",
+            title: "附件名称",
+          },
+        })
+      }
+      if (url.endsWith("/comments")) {
+        return Promise.resolve({
+          data: [
+            {
+              author: { id: "viewer", display_name: "Viewer" },
+              body: "[项目 报告.txt](attachment:AbC123xyz)",
+              created_at: "2026-08-05T00:00:00",
+              id: "comment-1",
+              replies: [],
+              status: "valid",
+            },
+          ],
+        })
+      }
+      return Promise.resolve({ data: [] })
+    })
+    vi.stubGlobal("confirm", vi.fn(() => true))
+
+    render(
+      <MemoryRouter initialEntries={["/issues/issue-0001"]}>
+        <Routes>
+          <Route path="/issues/:id" element={<IssueDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const attachmentLinks = await screen.findAllByRole("link", { name: "项目 报告.txt" })
+    expect(attachmentLinks).toHaveLength(2)
+    expect(attachmentLinks[1]).toHaveAttribute(
+      "href",
+      "api/v1/bot-attachments/AbC123xyz",
+    )
+
+    fireEvent.click(screen.getByTitle("Delete"))
+    await waitFor(() => {
+      expect(apiMocks.delete).toHaveBeenCalledWith("/bot-attachments/AbC123xyz")
+    })
+    vi.unstubAllGlobals()
+  })
 })

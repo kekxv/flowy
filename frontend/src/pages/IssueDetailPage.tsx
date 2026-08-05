@@ -9,6 +9,7 @@ import { listExternalLinks, linkExternalIssue, unlinkExternalIssue, refreshExter
 import { ALL_ROLES, STAT, PRIS } from "../constants";
 import Loader from "../components/Loader";
 import MarkdownEditor from "../components/MarkdownEditor";
+import { extractCommentAttachments } from "../utils/commentAttachments";
 
 export default function IssueDetailPage() {
   const {id}=useParams<{id:string}>(); const {t}=useTranslation();
@@ -541,12 +542,10 @@ const STAT_LBLS:Record<string,string>={invalid:"Invalid",outdated:"Outdated",dup
 function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any){
   const[ss,setSs]=useState(false);const hidden=c.status!=="valid";
   const canDeleteAttachment=canEdit||c.author?.id===curUserId;
-  // Extract attachment filenames from comment body
-  const attachments = (c.body || "").match(/attachment:([a-f0-9]+\.\w+)/g)?.map((s: string) => s.replace('attachment:', '')) || [];
-  const uniqueAttachments = [...new Set(attachments)];
-  const handleDelete = async (filename: string) => {
-    if (!confirm(`Delete ${filename}?`)) return;
-    await api.delete(`/bot-attachments/${filename}`);
+  const attachments = extractCommentAttachments(c.body || "");
+  const handleDelete = async (storageName: string, displayName: string) => {
+    if (!confirm(`Delete ${displayName}?`)) return;
+    await api.delete(`/bot-attachments/${storageName}`);
     onRefresh?.();
   };
   return <div className={depth>0?"ml-8 border-l-2 border-[var(--border-light)] pl-3":""}>
@@ -566,14 +565,14 @@ function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any)
               className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{STAT_LBLS[s]||s}</button>)}</div>}</div>}
       </div>
       <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><MarkdownContent>{c.body}</MarkdownContent></div>
-      {uniqueAttachments.length > 0 && (
+      {attachments.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {(uniqueAttachments as string[]).map((filename: string) => {
-            const url = `api/v1/bot-attachments/${filename}`;
+          {attachments.map(({storageName, displayName}) => {
+            const url = `api/v1/bot-attachments/${storageName}`;
             return (
-              <div key={filename} className="flex items-center gap-1.5 rounded bg-[var(--bg)] px-2 py-1 text-[11px]">
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline"> {filename}</a>
-                {canDeleteAttachment && <button onClick={() => handleDelete(filename)} className="cursor-pointer text-red-400 hover:text-red-600 ml-1 transition-colors" title="Delete"><X size={14} /></button>}
+              <div key={storageName} className="flex items-center gap-1.5 rounded bg-[var(--bg)] px-2 py-1 text-[11px]">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline"> {displayName}</a>
+                {canDeleteAttachment && <button onClick={() => handleDelete(storageName, displayName)} className="cursor-pointer text-red-400 hover:text-red-600 ml-1 transition-colors" title="Delete"><X size={14} /></button>}
               </div>
             );
           })}

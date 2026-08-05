@@ -1,7 +1,7 @@
 """Bot attachment file management API."""
 
+import mimetypes
 import os
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +13,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.issue import Comment
 from app.models.user import User
+from app.services.wechat_work_bot.attachment_names import decode_attachment_name
 
 router = APIRouter(prefix="/bot-attachments", tags=["bot-attachments"])
 
@@ -44,7 +45,9 @@ async def download_attachment(filename: str):
     filepath = _safe_filepath(filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "File not found")
-    return FileResponse(filepath, filename=filename)
+    original_name = decode_attachment_name(filename) or filename
+    media_type = mimetypes.guess_type(original_name)[0] or "application/octet-stream"
+    return FileResponse(filepath, filename=original_name, media_type=media_type)
 
 
 @router.delete("/{filename}")
@@ -91,6 +94,7 @@ async def list_attachments(
             stat = os.stat(filepath)
             files.append({
                 "filename": f,
+                "original_filename": decode_attachment_name(f) or f,
                 "size": stat.st_size,
                 "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
             })

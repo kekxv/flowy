@@ -616,6 +616,45 @@ class TestDownloadProxy:
             resp = await client.get(f"/api/v1/wechat-work-bot/intranet/download?token={token}")
         assert resp.status_code == 404
 
+    @pytest.mark.asyncio
+    async def test_confirmation_page_shows_safe_mobile_file_information(
+        self, db_session: AsyncSession
+    ):
+        """The confirmation page is responsive and escapes signed display metadata."""
+        from app.services.wechat_work_bot.file_token import generate_file_token
+
+        source = IntranetSource(
+            id="src-confirm-001",
+            name="研发文件库",
+            url="http://10.20.0.8/files/",
+            source_type="json",
+            file_ttl_seconds=3600,
+        )
+        db_session.add(source)
+        await db_session.flush()
+        token = generate_file_token(
+            source.id,
+            "http://10.20.0.8/files/report.pdf",
+            filename='<script>alert("x")</script>项目 报告.pdf',
+            size=1536,
+        )
+
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/intranet/download/confirm", params={"token": token}
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/html")
+        assert '<meta name="viewport"' in response.text
+        assert "&lt;script&gt;" in response.text
+        assert "<script>alert" not in response.text
+        assert "1.5 KB" in response.text
+        assert "研发文件库" in response.text
+        assert "确认下载" in response.text
+        assert f"/api/v1/intranet/download?token={token}" in response.text
+
 
 # ─── More handle_file Tests ─────────────────────────────────────
 

@@ -4,10 +4,10 @@ import json
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -594,8 +594,8 @@ async def preview_intranet_source(
 
 async def _validate_download_token(
     token: str, db: AsyncSession
-) -> tuple[str, str, IntranetSource]:
-    """Validate download token and return (source_id, file_url, source)."""
+) -> tuple[dict, IntranetSource]:
+    """Validate a download token and return its signed payload and source."""
     from app.services.wechat_work_bot.file_token import verify_file_token
 
     payload = verify_file_token(token)
@@ -617,7 +617,7 @@ async def _validate_download_token(
     if not url_belongs_to_source(file_url, source.url):
         raise HTTPException(403, "文件地址不在配置的源范围内")
 
-    return source_id, file_url, source
+    return payload, source
 
 
 def _get_source_auth(source: IntranetSource) -> "httpx.BasicAuth | None":
@@ -636,11 +636,38 @@ def _extract_filename(file_url: str) -> str:
 
 def _content_disposition(filename: str) -> str:
     """Build Content-Disposition header with RFC 5987 UTF-8 support."""
+    filename = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    filename = "".join(
+        character if ord(character) >= 32 and ord(character) != 127 else "_"
+        for character in filename
+    ).strip() or "download"
     ascii_safe = filename.isascii() and '"' not in filename and "\\" not in filename
     if ascii_safe:
         return f'attachment; filename="{filename}"'
     encoded = quote(filename, safe="")
     return f"attachment; filename*=UTF-8''{encoded}"
+
+
+@public_router.get("/intranet/download/confirm", response_class=HTMLResponse)
+@router.get("/intranet/download/confirm", response_class=HTMLResponse)
+async def confirm_intranet_file_download(
+    request: Request,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Show trusted file information before starting the proxied download."""
+    from app.services.wechat_work_bot.download_page import render_download_confirmation
+    payload, source = await _validate_download_token(token, db)
+    file_url = payload["url"]
+    filename = payload.get("filename") or _extract_filename(file_url)
+    size = payload.get("size")
+    direct_path = request.url.path.removesuffix("/confirm")
+    direct_url = str(
+        request.url.replace(path=direct_path, query=urlencode({"token": token}))
+    )
+    return HTMLResponse(
+        render_download_confirmation(filename, size, source.name, direct_url)
+    )
 
 
 @public_router.head("/intranet/download")
@@ -652,7 +679,8 @@ async def head_intranet_file(
     """Get file metadata without downloading. Returns headers like Content-Length, Content-Type."""
     import httpx
 
-    _, file_url, source = await _validate_download_token(token, db)
+    payload, source = await _validate_download_token(token, db)
+    file_url = payload["url"]
     basic_auth = _get_source_auth(source)
 
     try:
@@ -667,7 +695,7 @@ async def head_intranet_file(
             if resp.status_code >= 400:
                 raise HTTPException(502, f"内网文件探测失败: HTTP {resp.status_code}")
 
-            filename = _extract_filename(file_url)
+            filename = payload.get("filename") or _extract_filename(file_url)
             headers = {
                 "Content-Disposition": _content_disposition(filename),
                 "Accept-Ranges": "bytes",
@@ -695,9 +723,10 @@ async def download_intranet_file(
     """Proxy download for intranet files with true streaming (no memory buffering)."""
     import httpx
 
-    _, file_url, source = await _validate_download_token(token, db)
+    payload, source = await _validate_download_token(token, db)
+    file_url = payload["url"]
     basic_auth = _get_source_auth(source)
-    filename = _extract_filename(file_url)
+    filename = payload.get("filename") or _extract_filename(file_url)
 
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(connect=30, read=300, write=30, pool=30),
