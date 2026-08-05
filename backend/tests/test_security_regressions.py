@@ -791,6 +791,40 @@ class TestOutboundDestinationSecurity:
 
 class TestAuthorizationScoping:
     @pytest.mark.asyncio
+    async def test_admin_can_view_and_edit_private_wiki_page(
+        self, db_session, test_user, test_admin
+    ):
+        """An admin can update a private page they do not own or collaborate on."""
+        page = WikiPage(
+            id="admin-edit-private-wiki-page",
+            owner_id=test_user.id,
+            title="Private page",
+            slug="private-page",
+            content="original",
+            is_public=False,
+        )
+        db_session.add(page)
+        await db_session.flush()
+
+        async with AsyncClient(transport=_transport(db_session), base_url="http://test") as client:
+            headers = await _login(client, "admin")
+            list_response = await client.get("/api/v1/wiki", headers=headers)
+            get_response = await client.get(f"/api/v1/wiki/{page.id}", headers=headers)
+            update_response = await client.put(
+                f"/api/v1/wiki/{page.id}",
+                json={"content": "updated by admin"},
+                headers=headers,
+            )
+
+        assert list_response.status_code == 200
+        assert page.id in {item["id"] for item in list_response.json()["data"]}
+        assert get_response.status_code == 200
+        assert update_response.status_code == 200
+        assert update_response.json()["content"] == "updated by admin"
+        await db_session.refresh(page)
+        assert page.content == "updated by admin"
+
+    @pytest.mark.asyncio
     async def test_viewer_collaborator_cannot_edit_wiki_page(
         self, db_session, test_user, test_admin
     ):

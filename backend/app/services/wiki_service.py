@@ -69,6 +69,7 @@ async def create_page(
 async def get_visible_pages(
     db: AsyncSession,
     user_id: str,
+    is_admin: bool = False,
     q: str | None = None,
     tab: str = "all",  # all | mine | collab | public
     limit: int = 50,
@@ -77,7 +78,7 @@ async def get_visible_pages(
     """Get wiki pages visible to the user, with optional search.
 
     Tab filters:
-    - all: own + collaborated + public
+    - all: own + collaborated + public (all pages for administrators)
     - mine: only own pages
     - collab: only collaborated pages (not own)
     - public: only public pages (not own)
@@ -91,7 +92,9 @@ async def get_visible_pages(
     )
     public_filter = WikiPage.is_public == True  # noqa: E712
 
-    if tab == "mine":
+    if is_admin and tab == "all":
+        visibility = True
+    elif tab == "mine":
         visibility = own_filter
     elif tab == "collab":
         visibility = collab_filter
@@ -156,6 +159,7 @@ async def get_page_for_user(
     db: AsyncSession,
     page_id: str,
     user_id: str,
+    is_admin: bool = False,
 ) -> WikiPage | None:
     """Get a wiki page if visible to the given user."""
     result = await db.execute(
@@ -166,7 +170,7 @@ async def get_page_for_user(
     page = result.scalar_one_or_none()
     if not page:
         return None
-    if not _can_view(page, user_id):
+    if not is_admin and not _can_view(page, user_id):
         return None
     return page
 

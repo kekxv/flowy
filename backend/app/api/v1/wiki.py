@@ -76,7 +76,13 @@ async def list_wiki_pages(
     """List wiki pages visible to the current user."""
     pagination = PaginationParams(page=page, per_page=per_page)
     pages, total = await wiki_service.get_visible_pages(
-        db, user.id, q=q, tab=tab, limit=pagination.per_page, offset=pagination.offset
+        db,
+        user.id,
+        is_admin=user.role == "admin",
+        q=q,
+        tab=tab,
+        limit=pagination.per_page,
+        offset=pagination.offset,
     )
     data = [_page_to_response(p) for p in pages]
     return paginated_response(data, total, pagination)
@@ -110,7 +116,9 @@ async def get_wiki_page(
     user: User = Depends(get_current_user),
 ):
     """Get a wiki page by ID (must be visible to user)."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
     return _page_to_response(page)
@@ -124,10 +132,12 @@ async def update_wiki_page(
     user: User = Depends(get_current_user),
 ):
     """Update a wiki page (owner or collaborator)."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
-    if not await wiki_service.can_edit(db, page, user.id):
+    if user.role != "admin" and not await wiki_service.can_edit(db, page, user.id):
         raise HTTPException(status_code=403, detail="No permission to edit this wiki page")
 
     page = await wiki_service.update_page(
@@ -151,7 +161,9 @@ async def delete_wiki_page(
     user: User = Depends(get_current_user),
 ):
     """Delete a wiki page (owner only)."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
     if not wiki_service.is_owner(page, user.id):
@@ -169,7 +181,9 @@ async def list_collaborators(
     user: User = Depends(get_current_user),
 ):
     """List collaborators of a wiki page."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
     collabs = await wiki_service.get_collaborators(db, page)
@@ -184,7 +198,9 @@ async def add_collaborator(
     user: User = Depends(get_current_user),
 ):
     """Add a collaborator to a wiki page (owner only)."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
     if not wiki_service.is_owner(page, user.id):
@@ -211,7 +227,9 @@ async def remove_collaborator(
     user: User = Depends(get_current_user),
 ):
     """Remove a collaborator from a wiki page (owner only)."""
-    page = await wiki_service.get_page_for_user(db, page_id, user.id)
+    page = await wiki_service.get_page_for_user(
+        db, page_id, user.id, is_admin=user.role == "admin"
+    )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
     if not wiki_service.is_owner(page, user.id):

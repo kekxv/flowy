@@ -97,7 +97,8 @@ export default function WikiDetailPage() {
   const isOwner = page && currentUser && page.owner_id === currentUser.id;
   const isCollaborator =
     page && currentUser && page.collaborator_ids.includes(currentUser.id);
-  const canEdit = isOwner || isCollaborator;
+  const isAdmin = currentUser?.role === "admin";
+  const canEdit = isAdmin || isOwner || isCollaborator;
 
   const handleSave = async () => {
     if (!page) return;
