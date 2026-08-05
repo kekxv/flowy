@@ -8,6 +8,7 @@ import { useAuthStore } from "../store/authStore";
 import { listExternalLinks, linkExternalIssue, unlinkExternalIssue, refreshExternalLink, createExternalIssue, listConnections, listConnectionRepos, searchExternalIssues, type ExternalLink as ExtLink, type ConnectionData, type ExternalRepo, type ExternalIssueResult } from "../api/connections";
 import { ALL_ROLES, STAT, PRIS } from "../constants";
 import Loader from "../components/Loader";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function IssueDetailPage() {
   const {id}=useParams<{id:string}>(); const {t}=useTranslation();
@@ -160,7 +161,7 @@ export default function IssueDetailPage() {
             {comments.map((c:any)=><Cm key={c.id} c={c} issueId={issue.id} roles={(issue.assignees||[]).filter((a:any)=>a.id===c.author?.id).map((a:any)=>a.role)} canEdit={canFullEdit} curUserId={curUser?.id} onReply={setReplyTo} onRefresh={fc} t={t}/>)}
             {replyTo&&<div className="ml-8 rounded-[6px] border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-600">{t("comment.replying","Replying")} <button onClick={()=>setReplyTo(null)} className="ml-2 hover:text-blue-800 font-medium">✕</button></div>}
             <form onSubmit={hc} className="space-y-2">
-              <textarea rows={3} value={comment} onChange={e=>setComment(e.target.value)} placeholder={t("issues.write_comment")} className="input resize-none"/>
+              <MarkdownEditor id="issue-comment" value={comment} onChange={setComment} rows={3} placeholder={t("issues.write_comment")}/>
               <button type="submit" disabled={sub||!comment.trim()} className="btn btn-primary btn-sm">{t("issues.comment")}</button>
             </form>
           </div>

@@ -5,6 +5,7 @@ import { X, Plus, ChevronDown } from "lucide-react";
 import { createIssue } from "../api/issues";
 import api from "../api/client";
 import { ALL_ROLES } from "../constants";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function IssueCreatePage() {
   const navigate = useNavigate(); const { t } = useTranslation();
@@ -74,8 +75,12 @@ export default function IssueCreatePage() {
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
             {t("common.description")} <span className="font-normal lowercase text-[var(--text-muted)]">(Markdown)</span>
           </label>
-          <textarea rows={6} value={desc} onChange={e => setDesc(e.target.value)}
-            className="input text-sm resize-y min-h-[100px]" placeholder="## Summary&#10;&#10;Describe..."/>
+          <MarkdownEditor
+            value={desc}
+            onChange={setDesc}
+            rows={6}
+            placeholder={"## Summary\n\nDescribe..."}
+          />
         </div>
 
         {/* Assignees */}

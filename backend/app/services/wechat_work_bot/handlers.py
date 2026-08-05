@@ -212,7 +212,7 @@ class CommandHandlers:
 | `/resolve` `/解决` <id> [说明] | 解决问题 |
 | `/assign` `/指派` <id> <用户名> | 指派问题 |
 | `/priority` `/优先级` <id> <级别> | 调整优先级 |
-| `/comment` `/评论` <id> [内容] | 评论问题 |
+| `/comment` `/评论` <id> [内容] | 评论问题；`追加 <内容>` 写入描述 |
 | `/wiki add` `<标题> \| <内容>` | 快速添加知识库页面 |
 
 ### 🎯 里程碑
@@ -481,12 +481,14 @@ class CommandHandlers:
         desc_parts: list[str] = []
         if len(args) > 1:
             desc_parts.append(" ".join(args[1:]))
-        # Quoted content appends to description
-        quoted = self._normalize_quoted_text(
-            quote.get("multiline_body", "") or quote.get("quoted_content", "")
-        )
-        if quoted:
-            desc_parts.append(quoted)
+        # Command multi-line text and quoted content both belong in the description.
+        for extra_description in (
+            quote.get("multiline_body", ""),
+            quote.get("quoted_content", ""),
+        ):
+            normalized = self._normalize_quoted_text(extra_description)
+            if normalized:
+                desc_parts.append(normalized)
         description = "\n\n".join(desc_parts)
 
         now = datetime.now().isoformat()
@@ -851,6 +853,10 @@ class CommandHandlers:
             return f" 找不到问题: {issue_id}" if resolved == "not_found" else resolved
         issue = resolved
 
+        is_append = bool(args) and args[0].lower() in {"追加", "append"}
+        if is_append:
+            args = args[1:]
+
         # Build comment body
         body_parts = []
 
@@ -858,10 +864,14 @@ class CommandHandlers:
         if args:
             body_parts.append(" ".join(args))
 
-        # Quoted text content — normalize newlines and wrap as blockquote.
+        # Quoted text content — regular comments retain their blockquote format,
+        # while append mode writes the quoted source directly into the description.
         if quote.get("quoted_content"):
             normalized = self._normalize_quoted_text(quote["quoted_content"])
-            body_parts.append("> " + normalized.replace("\n", "\n> "))
+            if is_append:
+                body_parts.append(normalized)
+            else:
+                body_parts.append("> " + normalized.replace("\n", "\n> "))
 
         # Media from main message or quoted content (image, file, video)
         body = frame.get("body", {}) if frame else {}
@@ -929,6 +939,8 @@ class CommandHandlers:
                     body_parts.append(f"[{media_type}]({media_url})")
 
         if not body_parts:
+            if is_append:
+                return "❌ 用法: `/comment <id或标题> 追加 <内容>`，也可引用内容后发送"
             return " 请提供评论内容或引用消息"
 
         comment_body = "\n\n".join(body_parts)
@@ -936,6 +948,14 @@ class CommandHandlers:
         # Check if user has flowy_user_id (required for comments)
         if not self.bot_user or not self.bot_user.flowy_user_id:
             return " 评论功能需要绑定 Flowy 账号，请先联系管理员绑定"
+
+        if is_append:
+            issue.description = "\n\n".join(
+                part for part in [issue.description, comment_body] if part
+            )
+            issue.updated_at = datetime.now().isoformat()
+            await self.db.commit()
+            return f"✅ 已追加到 #{issue.id[:8]} 的描述"
 
         # Create comment
         now = datetime.now().isoformat()

@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.issue import Issue, issue_assignees, issue_milestones_table
+from app.models.issue import Comment, Issue, issue_assignees, issue_milestones_table
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
@@ -111,6 +111,7 @@ class TestBotHelp:
         assert "stats" in result or "统计" in result
         assert "close" in result or "关闭" in result
         assert "resolve" in result or "解决" in result
+        assert "追加" in result
 
 
 # ── TestBotList ──────────────────────────────────────────────────────────────
@@ -212,6 +213,37 @@ class TestBotCreate:
         issue_q = await db_session.execute(select(Issue).where(Issue.reporter_id == user.id))
         issue = issue_q.scalar_one()
         assert "Error 500" in issue.description
+
+    @pytest.mark.asyncio
+    async def test_create_keeps_command_and_quoted_description(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cr6", username="creator6", email="cr6@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        await handlers.handle_create(
+            ["需求", "导出", "支持 CSV"], {"quoted_content": "还要支持 Excel"}
+        )
+
+        issue_q = await db_session.execute(select(Issue).where(Issue.reporter_id == user.id))
+        issue = issue_q.scalar_one()
+        assert issue.description == "支持 CSV\n\n还要支持 Excel"
+
+    @pytest.mark.asyncio
+    async def test_create_keeps_multiline_and_quoted_description(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cr7", username="creator7", email="cr7@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        await handlers.handle_create(
+            ["需求", "导出"],
+            {"multiline_body": "支持 CSV", "quoted_content": "还要支持 Excel"},
+        )
+
+        issue_q = await db_session.execute(select(Issue).where(Issue.reporter_id == user.id))
+        issue = issue_q.scalar_one()
+        assert issue.description == "支持 CSV\n\n还要支持 Excel"
 
     @pytest.mark.asyncio
     async def test_create_requires_binding(self, db_session: AsyncSession):
@@ -530,6 +562,28 @@ class TestBotComment:
 
         result = await handlers.handle_comment(["数据库连接超时", "已排查到慢查询"], {})
         assert "已评论" in result
+
+    @pytest.mark.asyncio
+    async def test_comment_append_extends_description_without_creating_comment(
+        self, db_session: AsyncSession
+    ):
+        user = User(**_make_user_kwargs(id="user-cm5", username="commenter5", email="cm5@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(
+            db_session, "Append test", user.id, description="原始描述"
+        )
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_comment(
+            [_id(issue), "追加", "复现步骤"], {"quoted_content": "日志 A"}
+        )
+
+        await db_session.refresh(issue)
+        comments = (await db_session.execute(select(Comment))).scalars().all()
+        assert issue.description == "原始描述\n\n复现步骤\n\n日志 A"
+        assert comments == []
+        assert "已追加" in result
 
     @pytest.mark.asyncio
     async def test_attachment_uses_full_uuid_capability_name(

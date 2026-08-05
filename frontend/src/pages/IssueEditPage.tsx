@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getIssue, updateIssue } from "../api/issues";
 import { STAT, PRIS } from "../constants";
 import Loader from "../components/Loader";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function IssueEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,8 +36,7 @@ export default function IssueEditPage() {
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
             {t("common.description")} <span className="font-normal lowercase text-[var(--text-muted)]">(Markdown)</span>
           </label>
-          <textarea rows={8} value={desc} onChange={e => setDesc(e.target.value)}
-            className="input text-sm resize-y min-h-[120px]"/>
+          <MarkdownEditor value={desc} onChange={setDesc} rows={8} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
