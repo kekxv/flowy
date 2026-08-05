@@ -655,8 +655,18 @@ async def confirm_intranet_file_download(
     db: AsyncSession = Depends(get_db),
 ):
     """Show trusted file information before starting the proxied download."""
-    from app.services.wechat_work_bot.download_page import render_download_confirmation
-    payload, source = await _validate_download_token(token, db)
+    from app.services.wechat_work_bot.download_page import (
+        render_download_confirmation,
+        render_download_link_expired,
+    )
+
+    try:
+        payload, source = await _validate_download_token(token, db)
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return HTMLResponse(render_download_link_expired(), status_code=410)
+        raise
+
     file_url = payload["url"]
     filename = payload.get("filename") or _extract_filename(file_url)
     size = payload.get("size")

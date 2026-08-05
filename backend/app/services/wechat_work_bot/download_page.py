@@ -246,3 +246,54 @@ def render_download_confirmation(
   </main>
 </body>
 </html>"""
+
+
+def render_download_link_expired() -> str:
+    """Render a mobile-friendly explanation for invalid or expired download links."""
+    return """<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>链接已过期 · Flowy</title>
+  <style>
+    :root { color-scheme: light; --ink: #162033; --muted: #68758a; --surface: rgba(255,255,255,.92); }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100svh; display: grid; place-items: center;
+      padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+               max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+      color: var(--ink); font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 12% 14%, rgba(59,130,246,.16), transparent 34%),
+        radial-gradient(circle at 90% 85%, rgba(14,165,233,.12), transparent 30%),
+        linear-gradient(145deg, #f8fafc 0%, #eef4fb 52%, #f7f9fc 100%);
+    }
+    main { width: min(100%, 500px); }
+    .brand { margin: 0 0 18px; text-align: center; color: #53627a; font-size: 13px; font-weight: 650; }
+    .card { padding: 36px; border: 1px solid rgba(255,255,255,.85); border-radius: 28px;
+      background: var(--surface); box-shadow: 0 28px 80px rgba(30,55,90,.13), 0 3px 12px rgba(30,55,90,.06); }
+    .icon { width: 76px; height: 76px; display: grid; place-items: center; margin: 0 auto 21px;
+      border-radius: 24px; color: #c2410c; background: linear-gradient(145deg, #fff7ed, #ffedd5); }
+    h1 { margin: 0; text-align: center; font-size: clamp(21px, 5vw, 27px); line-height: 1.28; letter-spacing: -.025em; }
+    p { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .tip { margin-top: 23px; padding: 14px 16px; border-radius: 16px; background: #f8fafc; color: #526176; font-size: 13px; }
+    @media (max-width: 560px) { body { place-items: start center; padding-top: max(28px, env(safe-area-inset-top)); }
+      .card { padding: 27px 21px 24px; border-radius: 23px; } .icon { width: 68px; height: 68px; border-radius: 21px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">Flowy 安全下载</div>
+    <section class="card" aria-labelledby="expired-title">
+      <div class="icon" aria-hidden="true">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      </div>
+      <h1 id="expired-title">下载链接已过期或无效</h1>
+      <p>为保障文件安全，此下载链接已不能继续使用。</p>
+      <p class="tip">请返回企业微信，重新执行文件查询并打开新的下载链接。</p>
+    </section>
+  </main>
+</body>
+</html>"""

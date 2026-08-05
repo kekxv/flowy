@@ -655,6 +655,30 @@ class TestDownloadProxy:
         assert "确认下载" in response.text
         assert f'href="../download?token={token}"' in response.text
 
+    @pytest.mark.asyncio
+    async def test_expired_confirmation_link_shows_html_expiration_page(
+        self, db_session: AsyncSession
+    ):
+        """An expired confirmation link renders a useful HTML page instead of API JSON."""
+        from app.services.wechat_work_bot.file_token import generate_file_token
+
+        token = generate_file_token(
+            "src-expired-confirm",
+            "http://10.20.0.8/files/report.pdf",
+            ttl_seconds=-10,
+        )
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/intranet/download/confirm", params={"token": token}
+            )
+
+        assert response.status_code == 410
+        assert response.headers["content-type"].startswith("text/html")
+        assert '<meta name="viewport"' in response.text
+        assert "下载链接已过期或无效" in response.text
+        assert '"detail"' not in response.text
+
 
 # ─── More handle_file Tests ─────────────────────────────────────
 
