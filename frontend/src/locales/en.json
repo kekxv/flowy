@@ -296,6 +296,10 @@
     "role_helper": "Helper",
     "role_viewer": "Viewer"
   },
+  "markdown_editor": {
+    "edit": "Edit",
+    "preview": "Markdown preview"
+  },
   "wiki": {
     "title": "Knowledge Base",
     "pages_count": "pages",

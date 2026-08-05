@@ -856,6 +856,8 @@ class CommandHandlers:
         is_append = bool(args) and args[0].lower() in {"追加", "append"}
         if is_append:
             args = args[1:]
+            if not self.bot_user or self.bot_user.role not in {"helper", "admin"}:
+                return "⚠️ 追加描述需要协助人员或管理员权限"
 
         # Build comment body
         body_parts = []
@@ -863,6 +865,9 @@ class CommandHandlers:
         # Text from args
         if args:
             body_parts.append(" ".join(args))
+
+        if is_append and quote.get("multiline_body"):
+            body_parts.append(self._normalize_quoted_text(quote["multiline_body"]))
 
         # Quoted text content — regular comments retain their blockquote format,
         # while append mode writes the quoted source directly into the description.

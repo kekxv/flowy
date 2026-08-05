@@ -293,6 +293,10 @@
     "role_helper": "协助人员",
     "role_viewer": "查看者"
   },
+  "markdown_editor": {
+    "edit": "编辑",
+    "preview": "Markdown 预览"
+  },
   "wiki": {
     "title": "知识库",
     "pages_count": "个页面",

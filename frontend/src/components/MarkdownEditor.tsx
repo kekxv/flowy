@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import MarkdownContent from "./MarkdownContent";
 
@@ -19,6 +20,7 @@ export default function MarkdownEditor({
   id,
   className = "",
 }: MarkdownEditorProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"edit" | "preview">("edit");
 
   return (
@@ -30,7 +32,7 @@ export default function MarkdownEditor({
           onClick={() => setMode("edit")}
           className={`rounded px-2 py-1 text-[11px] transition-colors ${mode === "edit" ? "bg-white font-medium text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
         >
-          编辑
+          {t("markdown_editor.edit", "编辑")}
         </button>
         <button
           type="button"
@@ -38,7 +40,7 @@ export default function MarkdownEditor({
           onClick={() => setMode("preview")}
           className={`rounded px-2 py-1 text-[11px] transition-colors ${mode === "preview" ? "bg-white font-medium text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
         >
-          Markdown 预览
+          {t("markdown_editor.preview", "Markdown 预览")}
         </button>
       </div>
       {mode === "edit" ? (

@@ -586,6 +586,43 @@ class TestBotComment:
         assert "已追加" in result
 
     @pytest.mark.asyncio
+    async def test_viewer_cannot_append_to_issue_description(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cm6", username="commenter6", email="cm6@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(
+            db_session, "Viewer append test", user.id, description="原始描述"
+        )
+        handlers = await _make_handlers(
+            db_session, flowy_user_id=user.id, bot_role="viewer"
+        )
+
+        result = await handlers.handle_comment([_id(issue), "追加", "无权内容"], {})
+
+        await db_session.refresh(issue)
+        assert "权限" in result
+        assert issue.description == "原始描述"
+
+    @pytest.mark.asyncio
+    async def test_comment_append_keeps_multiline_markdown(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-cm7", username="commenter7", email="cm7@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(
+            db_session, "Multiline append test", user.id, description="原始描述"
+        )
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+
+        result = await handlers.handle_comment(
+            [_id(issue), "追加"],
+            {"multiline_body": "## 复现步骤\n\n- 点击保存"},
+        )
+
+        await db_session.refresh(issue)
+        assert "已追加" in result
+        assert issue.description == "原始描述\n\n## 复现步骤\n\n- 点击保存"
+
+    @pytest.mark.asyncio
     async def test_attachment_uses_full_uuid_capability_name(
         self, db_session: AsyncSession, tmp_path, monkeypatch
     ):

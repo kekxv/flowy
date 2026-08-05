@@ -1,12 +1,29 @@
 import { fireEvent, render, screen } from "@testing-library/react"
+import i18n from "i18next"
+import { I18nextProvider } from "react-i18next"
 import { describe, expect, it, vi } from "vitest"
 
+import en from "../locales/en.json"
+import zh from "../locales/zh.json"
 import MarkdownEditor from "./MarkdownEditor"
 
+async function renderMarkdownEditor(
+  ui: React.ReactElement,
+  language: "en" | "zh" = "zh",
+) {
+  const instance = i18n.createInstance()
+  await instance.init({
+    lng: language,
+    fallbackLng: false,
+    resources: { en: { translation: en }, zh: { translation: zh } },
+  })
+  return render(<I18nextProvider i18n={instance}>{ui}</I18nextProvider>)
+}
+
 describe("MarkdownEditor", () => {
-  it("renders the source editor first and switches to rendered Markdown preview", () => {
+  it("renders the source editor first and switches to rendered Markdown preview", async () => {
     const onChange = vi.fn()
-    render(<MarkdownEditor value={"# 标题\n\n**正文**"} onChange={onChange} />)
+    await renderMarkdownEditor(<MarkdownEditor value={"# 标题\n\n**正文**"} onChange={onChange} />)
 
     expect(screen.getByRole("textbox")).toHaveValue("# 标题\n\n**正文**")
     expect(screen.queryByRole("heading", { name: "标题" })).not.toBeInTheDocument()
@@ -26,8 +43,8 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("更新内容")
   })
 
-  it("forwards placeholder, rows, and id to the editable textarea", () => {
-    render(
+  it("forwards placeholder, rows, and id to the editable textarea", async () => {
+    await renderMarkdownEditor(
       <MarkdownEditor
         id="issue-comment"
         value=""
@@ -40,5 +57,12 @@ describe("MarkdownEditor", () => {
     expect(screen.getByRole("textbox")).toHaveAttribute("id", "issue-comment")
     expect(screen.getByRole("textbox")).toHaveAttribute("rows", "3")
     expect(screen.getByRole("textbox")).toHaveAttribute("placeholder", "写评论...")
+  })
+
+  it("uses the active locale for source and preview controls", async () => {
+    await renderMarkdownEditor(<MarkdownEditor value="" onChange={vi.fn()} />, "en")
+
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Markdown preview" })).toBeInTheDocument()
   })
 })
