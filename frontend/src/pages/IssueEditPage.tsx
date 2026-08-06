@@ -20,13 +20,13 @@ export default function IssueEditPage() {
   if (loading) return <Loader />;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 page-enter">
+    <div className="mx-auto max-w-5xl space-y-6 page-enter">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("issues.edit_issue")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)] font-mono">#{id?.slice(0,8)}</p>
       </div>
 
-      <form onSubmit={handle} className="card rounded-xl p-6 space-y-4">
+      <form onSubmit={handle} className="card rounded-xl p-7 space-y-5">
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.title")} *</label>
           <input required value={title} onChange={e => setTitle(e.target.value)} className="input text-sm"/>
@@ -36,7 +36,7 @@ export default function IssueEditPage() {
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
             {t("common.description")} <span className="font-normal lowercase text-[var(--text-muted)]">(Markdown)</span>
           </label>
-          <MarkdownEditor value={desc} onChange={setDesc} rows={8} />
+          <MarkdownEditor value={desc} onChange={setDesc} rows={14} className="min-h-[360px]" />
         </div>
 
         <div className="grid grid-cols-2 gap-4">

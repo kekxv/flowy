@@ -298,7 +298,13 @@
   },
   "markdown_editor": {
     "edit": "Edit",
-    "preview": "Markdown preview"
+    "preview": "Markdown preview",
+    "upload_image": "Upload image",
+    "upload_file": "Upload file",
+    "uploading": "Uploading...",
+    "file_too_large": "File size exceeds {{mb}}MB limit",
+    "upload_failed": "Upload failed",
+    "max_size": "Max {{mb}}MB"
   },
   "wiki": {
     "title": "Knowledge Base",

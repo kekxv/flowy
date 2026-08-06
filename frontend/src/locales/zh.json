@@ -295,7 +295,13 @@
   },
   "markdown_editor": {
     "edit": "编辑",
-    "preview": "Markdown 预览"
+    "preview": "Markdown 预览",
+    "upload_image": "上传图片",
+    "upload_file": "上传文件",
+    "uploading": "上传中...",
+    "file_too_large": "文件大小超过 {{mb}}MB 限制",
+    "upload_failed": "上传失败",
+    "max_size": "最大 {{mb}}MB"
   },
   "wiki": {
     "title": "知识库",

@@ -43,13 +43,13 @@ export default function IssueCreatePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 page-enter">
+    <div className="mx-auto max-w-5xl space-y-6 page-enter">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("issues.new_issue")}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("issues.create_desc","Create a new issue in the project.")}</p>
       </div>
 
-      <form onSubmit={handle} className="card rounded-xl p-6 space-y-4">
+      <form onSubmit={handle} className="card rounded-xl p-7 space-y-5">
         {/* Type */}
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Type</label>
@@ -78,7 +78,8 @@ export default function IssueCreatePage() {
           <MarkdownEditor
             value={desc}
             onChange={setDesc}
-            rows={6}
+            rows={14}
+            className="min-h-[360px]"
             placeholder={"## Summary\n\nDescribe..."}
           />
         </div>

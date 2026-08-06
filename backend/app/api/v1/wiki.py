@@ -1,8 +1,8 @@
 """Wiki / Knowledge Base API endpoints."""
 
 import logging
+import mimetypes
 import os
-import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
@@ -20,16 +20,18 @@ from app.schemas.wiki import (
     WikiPageUpdate,
 )
 from app.services import wiki_service
+from app.services.wechat_work_bot.attachment_names import (
+    STORAGE_SUFFIX,
+    decode_attachment_name,
+    encode_attachment_name,
+    normalize_attachment_name,
+)
 
 logger = logging.getLogger("uvicorn")
 
 router = APIRouter(prefix="/wiki", tags=["wiki"])
 
 DEFAULT_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB fallback
-ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
-ALLOWED_FILE_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md", ".csv", ".zip", ".rar"}
-
-
 async def _get_upload_limit(db: AsyncSession) -> int:
     """Read wiki_upload_max_mb from settings, fall back to 5MB."""
     from app.models.settings import AppSetting
@@ -270,17 +272,8 @@ async def upload_wiki_file(
     if len(content) > max_size:
         raise HTTPException(status_code=413, detail=f"File size exceeds {max_mb}MB limit")
 
-    # Check extension
-    ext = os.path.splitext(file.filename)[1].lower()
-    allowed = ALLOWED_IMAGE_EXTS | ALLOWED_FILE_EXTS
-    if ext not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed. Allowed: {', '.join(sorted(allowed))}"
-        )
-
-    # Generate unique filename
-    local_filename = f"{uuid.uuid4().hex}{ext}"
+    original_name = normalize_attachment_name(file.filename)
+    local_filename = f"{encode_attachment_name(original_name)}{STORAGE_SUFFIX}"
     attachments_dir = _get_wiki_attachments_dir()
     os.makedirs(attachments_dir, exist_ok=True)
     local_path = os.path.join(attachments_dir, local_filename)
@@ -288,13 +281,14 @@ async def upload_wiki_file(
     with open(local_path, "wb") as f:
         f.write(content)
 
-    is_image = ext in ALLOWED_IMAGE_EXTS
+    guessed_type = mimetypes.guess_type(original_name)[0] or ""
+    is_image = (file.content_type or "").startswith("image/") or guessed_type.startswith("image/")
     return {
         "filename": local_filename,
-        "original_name": file.filename,
+        "original_name": original_name,
         "url": f"/api/v1/wiki/files/{local_filename}",
         "is_image": is_image,
-        "markdown": f"![{file.filename}](/api/v1/wiki/files/{local_filename})" if is_image else f"[{file.filename}](/api/v1/wiki/files/{local_filename})",
+        "markdown": f"![{original_name}](/api/v1/wiki/files/{local_filename})" if is_image else f"[{original_name}](/api/v1/wiki/files/{local_filename})",
     }
 
 
@@ -308,4 +302,6 @@ async def get_wiki_file(filename: str):
         raise HTTPException(status_code=400, detail="Invalid filename")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(filepath, filename=filename)
+    original_name = decode_attachment_name(filename) or filename
+    media_type = mimetypes.guess_type(original_name)[0] or "application/octet-stream"
+    return FileResponse(filepath, filename=original_name, media_type=media_type)

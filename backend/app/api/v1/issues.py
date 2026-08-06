@@ -425,6 +425,7 @@ async def delete_comment(
         attachments_dir = os.path.join(storage_root, "bot_attachments")
         real_dir = os.path.realpath(attachments_dir)
         filenames = set(re.findall(r"attachment:([0-9A-Za-z._-]+)", comment.body))
+        filenames.update(re.findall(r"/api/v1/bot-attachments/([0-9A-Za-z._-]+)", comment.body))
         for fn in filenames:
             fp = os.path.realpath(os.path.join(attachments_dir, fn))
             if fp.startswith(real_dir + os.sep) and os.path.exists(fp):

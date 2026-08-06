@@ -4,7 +4,7 @@ import mimetypes
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,12 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.issue import Comment
 from app.models.user import User
-from app.services.wechat_work_bot.attachment_names import decode_attachment_name
+from app.services.wechat_work_bot.attachment_names import (
+    STORAGE_SUFFIX,
+    decode_attachment_name,
+    encode_attachment_name,
+    normalize_attachment_name,
+)
 
 router = APIRouter(prefix="/bot-attachments", tags=["bot-attachments"])
 
@@ -48,6 +53,42 @@ async def download_attachment(filename: str):
     original_name = decode_attachment_name(filename) or filename
     media_type = mimetypes.guess_type(original_name)[0] or "application/octet-stream"
     return FileResponse(filepath, filename=original_name, media_type=media_type)
+
+
+@router.post("/upload")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """Upload a file for issue descriptions or comments under Wiki's configured limit."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    from app.api.v1.wiki import _get_upload_limit
+
+    content = await file.read()
+    max_size = await _get_upload_limit(db)
+    if len(content) > max_size:
+        max_mb = round(max_size / 1024 / 1024, 1)
+        raise HTTPException(status_code=413, detail=f"File size exceeds {max_mb}MB limit")
+
+    original_name = normalize_attachment_name(file.filename)
+    local_filename = f"{encode_attachment_name(original_name)}{STORAGE_SUFFIX}"
+    _ensure_dir()
+    with open(_safe_filepath(local_filename), "wb") as attachment:
+        attachment.write(content)
+
+    guessed_type = mimetypes.guess_type(original_name)[0] or ""
+    is_image = (file.content_type or "").startswith("image/") or guessed_type.startswith("image/")
+    url = f"/api/v1/bot-attachments/{local_filename}"
+    return {
+        "filename": local_filename,
+        "original_name": original_name,
+        "url": url,
+        "is_image": is_image,
+        "markdown": f"![{original_name}]({url})" if is_image else f"[{original_name}]({url})",
+    }
 
 
 @router.delete("/{filename}")

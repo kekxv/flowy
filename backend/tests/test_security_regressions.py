@@ -955,7 +955,7 @@ class TestAuthorizationScoping:
         assert response.json()["meta"]["total"] == 1
 
     @pytest.mark.asyncio
-    async def test_wiki_upload_uses_full_uuid_capability_name(
+    async def test_wiki_upload_uses_base62_bin_name_and_restores_original_download_name(
         self, db_session, test_user, tmp_path, monkeypatch
     ):
         monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
@@ -964,9 +964,14 @@ class TestAuthorizationScoping:
             headers = await _login(client, "testuser")
             response = await client.post(
                 "/api/v1/wiki/upload",
-                files={"file": ("diagram.png", b"image-data", "image/png")},
+                files={"file": ("report.unknown", b"file-data", "application/octet-stream")},
                 headers=headers,
             )
+            assert response.status_code == 200
+            data = response.json()
+            download = await client.get(data["url"])
 
-        assert response.status_code == 200
-        assert len(response.json()["filename"].removesuffix(".png")) == 32
+        assert data["filename"].endswith(".bin")
+        assert data["filename"].removesuffix(".bin").isalnum()
+        assert download.content == b"file-data"
+        assert download.headers["content-disposition"] == 'attachment; filename="report.unknown"'

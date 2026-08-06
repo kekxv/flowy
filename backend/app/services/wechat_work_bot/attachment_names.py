@@ -6,6 +6,7 @@ BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 _BASE62_VALUES = {character: index for index, character in enumerate(BASE62_ALPHABET)}
 _FORMAT_VERSION = 1
 _CAPABILITY_BYTES = 16
+STORAGE_SUFFIX = ".bin"
 
 
 def normalize_attachment_name(original_name: str) -> str:
@@ -49,6 +50,7 @@ def encode_attachment_name(original_name: str) -> str:
 
 def decode_attachment_name(storage_name: str) -> str | None:
     """Recover an original filename, returning ``None`` for legacy/invalid names."""
+    storage_name = storage_name.removesuffix(STORAGE_SUFFIX)
     payload = _base62_decode(storage_name)
     prefix_length = 1 + _CAPABILITY_BYTES
     if not payload or len(payload) <= prefix_length or payload[0] != _FORMAT_VERSION:

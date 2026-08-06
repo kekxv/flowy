@@ -1,5 +1,7 @@
 """Tests for issue API endpoints."""
 
+from urllib.parse import quote
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -192,6 +194,53 @@ class TestIssueAPI:
 
         assert response.status_code == 204
         assert not attachment_path.exists()
+
+    @pytest.mark.asyncio
+    async def test_upload_comment_attachment_uses_wiki_limit_and_inserts_image_markdown(
+        self, db_session, test_user, tmp_path, monkeypatch
+    ):
+        """Issue/comment uploads share Wiki's limit and use opaque .bin storage."""
+        monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+        transport = _build_transport(db_session)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            response = await client.post(
+                "/api/v1/bot-attachments/upload",
+                files={"file": ("截图.any", b"image-data", "image/png")},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            data = response.json()
+            download = await client.get(data["url"])
+
+        assert data["filename"].endswith(".bin")
+        assert data["filename"].removesuffix(".bin").isalnum()
+        assert data["markdown"] == f"![截图.any]({data['url']})"
+        assert download.content == b"image-data"
+        assert quote("截图.any") in download.headers["content-disposition"]
+
+    @pytest.mark.asyncio
+    async def test_upload_comment_attachment_rejects_file_over_wiki_limit(
+        self, db_session, test_user, tmp_path, monkeypatch
+    ):
+        """The configurable Wiki upload limit also applies to comment attachments."""
+        from app.models.settings import AppSetting
+
+        monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+        db_session.add(AppSetting(key="wiki_upload_max_mb", value="0.000001"))
+        await db_session.flush()
+        transport = _build_transport(db_session)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            response = await client.post(
+                "/api/v1/bot-attachments/upload",
+                files={"file": ("note.unsupported", b"too large", "application/octet-stream")},
+                headers=headers,
+            )
+
+        assert response.status_code == 413
 
     @pytest.mark.asyncio
     async def test_assignee_logs_endpoint(self, db_session, test_user):
