@@ -328,7 +328,6 @@ export default function WikiDetailPage() {
                   <input
                     ref={imageInputRef}
                     type="file"
-                    accept="image/*"
                     className="hidden"
                     onChange={(e) => handleFileUpload(e)}
                   />
@@ -344,7 +343,6 @@ export default function WikiDetailPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.zip,.rar"
                     className="hidden"
                     onChange={(e) => handleFileUpload(e)}
                   />
