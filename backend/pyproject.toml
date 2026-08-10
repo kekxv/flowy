@@ -5,7 +5,7 @@ description = "Lightweight issue tracking platform"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.140.11",
-    "uvicorn[standard]>=0.32.0",
+    "uvicorn[standard]>=0.52.1",
     "sqlalchemy[asyncio]>=2.0.36",
     "aiosqlite>=0.20.0",
     "PyJWT[crypto]>=2.10.1",
