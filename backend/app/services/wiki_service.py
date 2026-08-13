@@ -114,7 +114,7 @@ async def get_visible_pages(
         tokens = tokenize(q)
         if not tokens:
             return [], 0
-        search_filter = _title_or_tag_filter(tokens)
+        search_filter = _searchable_wiki_metadata_filter(tokens)
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
@@ -328,10 +328,14 @@ def can_view(page: WikiPage, user_id: str) -> bool:
 _MIN_SCORE = 30
 
 
-def _title_or_tag_filter(tokens: list[str]):
-    """Build the shared Wiki search predicate from title and tags only."""
+def _searchable_wiki_metadata_filter(tokens: list[str]):
+    """Build the shared predicate for title, tags, and Markdown summary."""
     return or_(*[
-        or_(WikiPage.title.ilike(f"%{token}%"), WikiPage.tags.ilike(f"%{token}%"))
+        or_(
+            WikiPage.title.ilike(f"%{token}%"),
+            WikiPage.tags.ilike(f"%{token}%"),
+            WikiPage.summary.ilike(f"%{token}%"),
+        )
         for token in tokens
     ])
 
@@ -343,6 +347,7 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     - Title exact match (all tokens): 100
     - Title contains token: 50
     - Tags contain token: 30
+    - Summary contains token: 20
 
     Bonus:
     - Match ratio: matched_tokens / total_tokens * 50  (encourages multi-token hits)
@@ -352,6 +357,7 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     matched = 0
     title_lower = page.title.lower()
     tags_lower = (page.tags or "").lower()
+    summary_lower = (page.summary or "").lower()
 
     for token in tokens:
         token_lower = token.lower()
@@ -367,6 +373,9 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
             hit = True
         if token_lower in tags_lower:
             score += 30 * weight // 5
+            hit = True
+        if token_lower in summary_lower:
+            score += 20 * weight // 5
             hit = True
         if hit:
             matched += 1
@@ -389,8 +398,8 @@ async def fuzzy_search(
 ) -> list[WikiPage]:
     """Fuzzy search wiki pages, ranked by relevance.
 
-    Searches both related users' wiki and public wiki by title and tags.
-    Returns pages sorted by relevance score (title match > tags).
+    Searches both related users' wiki and public wiki by title, tags, and summary.
+    Returns pages sorted by relevance score (title match > tags > summary).
     """
     if not keyword or not keyword.strip():
         return []
@@ -416,7 +425,7 @@ async def fuzzy_search(
     visibility = or_(*visibility_conditions)
 
     # Build search filter: any token matches any field
-    search_filter = _title_or_tag_filter(tokens)
+    search_filter = _searchable_wiki_metadata_filter(tokens)
 
     # Fetch all matching pages
     result = await db.execute(
@@ -453,7 +462,7 @@ async def search_for_bot(
 ) -> dict:
     """Search wiki for bot with priority: related users' wiki > public wiki.
 
-    Segments *keyword* with jieba and matches any token in title or tags.
+    Segments *keyword* with jieba and matches any token in title, tags, or summary.
     Returns dict with keys:
     - related: list of pages from related users
     - public: list of public pages
@@ -462,7 +471,7 @@ async def search_for_bot(
     if not tokens:
         return {"related": [], "public": []}
 
-    search_filter = _title_or_tag_filter(tokens)
+    search_filter = _searchable_wiki_metadata_filter(tokens)
 
     related_pages: list[WikiPage] = []
     public_pages: list[WikiPage] = []

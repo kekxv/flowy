@@ -142,12 +142,37 @@ class TestFuzzySearch:
         assert result == []
 
     @pytest.mark.asyncio
+    async def test_summary_match_is_returned(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="summary-search-user", username="summary-search", email="summary-search@example.com")
+        await _create_wiki_page(
+            db_session,
+            user.id,
+            "Deployment runbook",
+            summary="How to roll back a Docker deployment",
+            is_public=True,
+        )
+
+        result = await wiki_service.fuzzy_search(db_session, "Docker", user.id)
+
+        assert [page.title for page in result] == ["Deployment runbook"]
+
+    @pytest.mark.asyncio
     async def test_web_search_excludes_content_only_matches(self, db_session: AsyncSession):
         user = await _create_user(db_session, id="web-search-user", username="web-search", email="web-search@example.com")
         await _create_wiki_page(db_session, user.id, "Release notes", content="Docker migration instructions")
         pages, total = await wiki_service.get_visible_pages(db_session, user.id, q="Docker")
         assert pages == []
         assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_web_search_returns_summary_only_matches(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="web-summary-user", username="web-summary", email="web-summary@example.com")
+        await _create_wiki_page(db_session, user.id, "Release notes", summary="Docker migration instructions")
+
+        pages, total = await wiki_service.get_visible_pages(db_session, user.id, q="Docker")
+
+        assert [page.title for page in pages] == ["Release notes"]
+        assert total == 1
 
     @pytest.mark.asyncio
     async def test_tag_match(self, db_session: AsyncSession):
