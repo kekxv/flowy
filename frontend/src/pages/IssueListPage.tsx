@@ -125,12 +125,12 @@ export default function IssueListPage() {
   const hasFilters = status !== "all" || priority !== "all" || labelId || issueType !== "all";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 page-enter">
+    <div className="mx-auto max-w-6xl space-y-5 page-enter">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-[8px] bg-red-50 border border-red-100 px-3 py-2 text-[12px] text-red-600 shadow-sm">{toast}</div>}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-[18px] font-semibold tracking-tight">{t("issues.title")}</h1>
+      <div className="flex items-end justify-between">
+        <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--primary)]">Work queue</p><h1 className="mt-1 text-[26px] font-bold tracking-tight">{t("issues.title")}</h1><p className="mt-1 text-[13px] text-[var(--text-muted)]">Prioritize, assign and move work forward.</p></div>
         <Link to="/issues/new" className="btn btn-primary btn-sm">
           <svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M7.5 3v9M3 7.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           {t("issues.new_issue")}
@@ -138,7 +138,7 @@ export default function IssueListPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="card rounded-[8px] px-3 py-2.5">
+      <div className="card rounded-2xl px-4 py-3 shadow-[var(--shadow-sm)]">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-[160px]">
@@ -185,17 +185,17 @@ export default function IssueListPage() {
             <p className="text-[13px]">{t("issues.no_issues")}</p>
           </div>
         ) : (
-          <div className="card overflow-hidden rounded-[8px] divide-y divide-[var(--border-light)]">
+          <div className="card overflow-hidden rounded-2xl divide-y divide-[var(--border-light)] shadow-[var(--shadow-sm)]">
             {issues.map((issue) => {
               const isFeature = (issue as any).issue_type === "feature";
               const assignees = (issue as any).assignees || [];
               const milestoneIds = (issue as any).milestone_ids || [];
               const borderColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
               return (
-                <Link to={`/issues/${issue.id}`} key={issue.id} className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-muted)]">
+                <Link to={`/issues/${issue.id}`} key={issue.id} className="group flex items-start gap-3 px-5 py-4 transition-all hover:bg-[var(--primary-subtle)]">
                   {/* Left: status indicator + type initial */}
                   <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
-                    <div className="w-[3px] shrink-0 self-stretch rounded-full" style={{ backgroundColor: borderColor }} />
+                    <div className="w-[4px] shrink-0 self-stretch rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: borderColor, color: borderColor }} />
                     <div className={`w-[26px] h-[26px] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] font-bold ${isFeature ? "bg-violet-50 text-violet-500" : "bg-amber-50 text-amber-500"}`}>
                       {isFeature ? "需" : "问"}
                     </div>

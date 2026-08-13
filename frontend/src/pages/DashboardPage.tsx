@@ -143,7 +143,7 @@ function Sparkline({ data, width = 200, height = 40 }: { data: Array<{ date: str
 
 function TrendPanel({ title, data, color = "var(--primary)" }: { title: string; data: Array<{ date: string; count: number }>; color?: string }) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
-  return <div className="card rounded-2xl p-5"><div className="mb-4 flex items-start justify-between"><div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{title}</p><p className="mt-1 text-2xl font-bold tabular-nums">{total}</p></div><span className="rounded-full bg-[var(--primary-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">30 days</span></div><div style={{ color }}><Sparkline data={data} width={320} height={76} /></div></div>;
+  return <div className="card rounded-2xl p-5"><div className="mb-4 flex items-start justify-between"><div><p className="text-[12px] font-semibold tracking-normal text-[var(--text-secondary)]">{title}</p><p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{total}</p></div><span className="rounded-full bg-[var(--primary-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">近 30 天</span></div><div style={{ color }}><Sparkline data={data} width={320} height={76} /></div></div>;
 }
 
 export default function DashboardPage() {
@@ -182,10 +182,10 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 page-enter">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-tight">{t("dashboard.title")}</h1>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{data.stats.total_issues} issues · {closedRate}% completed</p>
+      <div className="flex items-center justify-between px-1 py-2">
+        <div><p className="text-[11px] font-medium text-[var(--text-muted)]">项目概览</p>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-[var(--text)]">{t("dashboard.title")}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">共 {data.stats.total_issues} 个问题，完成率 {closedRate}%</p>
         </div>
         <Link to="/issues/new" className="btn btn-primary btn-sm">
           <svg width="13" height="13" viewBox="0 0 15 15" fill="none"><path d="M7.5 3v9M3 7.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
           { k: "feature_count", icon: Lightbulb, color: "text-violet-600", bg: "bg-violet-50" },
           { k: "overdue_milestones", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
         ].map(s => (
-          <div key={s.k} className="card rounded-[10px] px-4 py-3.5 transition-all hover:shadow-md hover:border-[#d1d5db] group">
+          <div key={s.k} className="card rounded-2xl px-4 py-4 transition-all hover:shadow-md group">
             <div className="flex items-center gap-2">
               <div className={`flex h-8 w-8 items-center justify-center rounded-[6px] ${s.bg} transition-transform group-hover:scale-110`}>
                 <s.icon size={15} className={s.color} strokeWidth={2} />
@@ -215,7 +215,7 @@ export default function DashboardPage() {
           </div>
         ))}
         {/* Completion rate */}
-        <div className="card rounded-[10px] px-4 py-3.5 transition-all hover:shadow-md hover:border-[#d1d5db] group">
+        <div className="card rounded-2xl px-4 py-4 transition-all hover:shadow-md group">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-emerald-50 transition-transform group-hover:scale-110">
               <TrendingUp size={15} className="text-emerald-600" strokeWidth={2} />
@@ -228,8 +228,8 @@ export default function DashboardPage() {
 
       {/* Charts row */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <TrendPanel title={t("dashboard.activity_trend", "New work trend")} data={data.stats.recent_activity || []} />
-        <TrendPanel title={t("dashboard.completion_trend", "Delivery trend")} data={data.stats.completion_activity || []} color="#10b981" />
+        <TrendPanel title={t("dashboard.activity_trend", "新增工作趋势")} data={data.stats.recent_activity || []} />
+        <TrendPanel title={t("dashboard.completion_trend", "交付完成趋势")} data={data.stats.completion_activity || []} color="#10b981" />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Status donut */}

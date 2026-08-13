@@ -22,10 +22,10 @@ function useNavItems() {
 }
 
 const linkCls = (isActive: boolean) =>
-  `relative flex items-center gap-2.5 rounded-[6px] px-2.5 py-[6px] text-[13px] font-medium transition-colors ${
+  `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${
     isActive
-      ? "bg-[#f3f4f6] text-[#374151]"
-      : "text-[#6b7280] hover:bg-[#f9fafb] hover:text-[#374151]"
+      ? "bg-[var(--primary-subtle)] text-[var(--primary)]"
+      : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
   }`;
 
 function Sidebar({ close }: { close?: () => void }) {
@@ -35,21 +35,22 @@ function Sidebar({ close }: { close?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-sidebar)]">
-      {/* Logo */}
+      {/* Brand */}
       <NavLink to="/dashboard" onClick={close}
-        className="flex h-[48px] items-center gap-2 border-b border-[var(--border)] px-3 transition-colors hover:bg-[#f9fafb]">
-        <div className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] bg-[var(--primary)] text-[12px] font-bold text-white">F</div>
-        <span className="text-[13px] font-semibold tracking-tight text-[var(--text)]">Flowy</span>
+        className="m-3 flex h-12 items-center gap-2.5 rounded-xl px-3 transition-colors hover:bg-[var(--bg-hover)]">
+        <div className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-[var(--primary)] text-[12px] font-bold text-white">F</div>
+        <div><span className="block text-[14px] font-semibold tracking-tight text-[var(--text)]">Flowy</span><span className="block text-[9px] font-medium tracking-[.12em] text-[var(--text-faint)]">工作空间</span></div>
       </NavLink>
 
       {/* Main nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2.5">
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
+        <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[.16em] text-[var(--text-faint)]">工作台</p>
         <div className="space-y-[2px]">
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} onClick={close}
               className={({ isActive }) => linkCls(isActive)}>
               {({ isActive }) => (<>
-                {isActive && <span className="absolute left-[-8px] top-1/2 -translate-y-1/2 h-[14px] w-[3px] rounded-r-full bg-[var(--primary)]" />}
+                {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-r-full bg-[var(--primary)]" />}
                 <item.icon size={16} strokeWidth={1.8} />
                 <span className="truncate">{item.label}</span>
               </>)}
@@ -59,7 +60,7 @@ function Sidebar({ close }: { close?: () => void }) {
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-[var(--border)] px-2 py-2 space-y-[2px]">
+      <div className="border-t border-[var(--border-light)] px-3 py-3 space-y-[2px]">
         <ThemePanel />
         <NavLink to="/profile" onClick={close}
           className={({ isActive }) => linkCls(isActive)}>
@@ -83,10 +84,10 @@ function Sidebar({ close }: { close?: () => void }) {
 
       {/* User */}
       {user && (
-        <div className="border-t border-[var(--border)] px-2 py-2">
+        <div className="border-t border-[var(--border-light)] px-3 py-3">
           <NavLink to="/profile" onClick={close}
-            className="flex items-center gap-2.5 rounded-[6px] px-2 py-1.5 transition-colors hover:bg-[#f9fafb] group">
-            <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#f3f4f6] text-[11px] font-semibold text-[#6b7280] ring-1 ring-[var(--border)]">
+            className="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--bg-hover)] group">
+            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-full bg-[var(--primary-subtle)] text-[11px] font-semibold text-[var(--primary)] ring-1 ring-[var(--border)]">
               {(user.display_name || user.username).slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -110,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-[var(--bg)]">
       {/* Desktop sidebar */}
-      <aside className="hidden w-[220px] flex-col border-r border-[var(--border)] lg:flex">
+      <aside className="hidden w-[236px] flex-col border-r border-[var(--border-light)] bg-[var(--bg-sidebar)] backdrop-blur-xl lg:flex">
         <Sidebar />
       </aside>
 
@@ -153,7 +154,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      <main className="flex-1 overflow-auto px-4 pb-20 pt-14 sm:px-6 sm:pb-6 sm:pt-5 lg:px-8 lg:pb-8 lg:pt-6">{children}</main>
+      <main className="flex-1 overflow-auto px-4 pb-20 pt-14 sm:px-7 sm:pb-7 sm:pt-6 lg:px-10 lg:pb-10 lg:pt-8"><div className="mx-auto max-w-[1500px]">{children}</div></main>
     </div>
   );
 }
