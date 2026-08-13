@@ -12,6 +12,7 @@ export default function IssueCreatePage() {
   const [title, setTitle] = useState(""); const [desc, setDesc] = useState("");
   const [issueType, setIssueType] = useState("bug");
   const [priority, setPriority] = useState("medium"); const [sub, setSub] = useState(false);
+  const [startDate, setStartDate] = useState(""); const [dueDate, setDueDate] = useState("");
   const [users, setUsers] = useState<Array<{id:string;username:string;display_name:string}>>([]);
   const [assignees, setAssignees] = useState<Array<{user_id:string;role:string;name:string}>>([]);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -37,7 +38,7 @@ export default function IssueCreatePage() {
     setSub(true);
     const issue = await createIssue({
       title, description: desc, issue_type: issueType, priority,
-      assignees: assignees.map(a => ({ user_id: a.user_id, role: a.role })),
+      assignees: assignees.map(a => ({ user_id: a.user_id, role: a.role })), start_date: startDate || null, due_date: dueDate || null,
     });
     setSub(false); navigate(`/issues/${issue.id}`);
   };
@@ -129,6 +130,7 @@ export default function IssueCreatePage() {
         </div>
 
         {/* Priority */}
+        <div className="grid gap-4 sm:grid-cols-2"><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Start date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="input text-sm"/></div><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.due_date", "Due date")}</label><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="input text-sm"/></div></div>
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.priority")}</label>
           <select value={priority} onChange={e => setPriority(e.target.value)} className="input text-sm w-48">

@@ -22,6 +22,8 @@ export interface IssueData {
   created_at: string;
   updated_at: string;
   closed_at: string | null;
+  start_date: string | null;
+  due_date: string | null;
 }
 
 export interface LabelData {
@@ -50,6 +52,8 @@ export async function createIssue(data: {
   assignees?: Array<{user_id: string; role: string}>;
   label_ids?: string[];
   milestone_ids?: string[];
+  start_date?: string | null;
+  due_date?: string | null;
 }): Promise<IssueData> {
   const res = await api.post("/issues", data);
   return res.data;

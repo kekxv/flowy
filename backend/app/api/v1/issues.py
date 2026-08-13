@@ -150,6 +150,8 @@ async def list_issues(
             "created_at": i.created_at,
             "updated_at": i.updated_at,
             "closed_at": i.closed_at,
+            "start_date": i.start_date,
+            "due_date": i.due_date,
             "assignees": [a.model_dump() for a in assignees_map.get(i.id, [])],
         }
         data.append(d)
@@ -244,6 +246,8 @@ def _issue_detail(issue, assignees: list):
         "created_at": issue.created_at,
         "updated_at": issue.updated_at,
         "closed_at": issue.closed_at,
+        "start_date": issue.start_date,
+        "due_date": issue.due_date,
         "comments": [
             _comment_dict(c) for c in (issue.comments or []) if not getattr(c, "parent_id", None)
         ],

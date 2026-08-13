@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { LayoutDashboard, ListTodo, Flag, Tags, Shield, Settings, Bell, Globe, LogOut, Menu, X, Bot, BookOpen } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
+import ThemePanel from "../theme/ThemePanel";
 
 function useNavItems() {
   const { t } = useTranslation();
@@ -59,6 +60,7 @@ function Sidebar({ close }: { close?: () => void }) {
 
       {/* Bottom section */}
       <div className="border-t border-[var(--border)] px-2 py-2 space-y-[2px]">
+        <ThemePanel />
         <NavLink to="/profile" onClick={close}
           className={({ isActive }) => linkCls(isActive)}>
           <Settings size={16} strokeWidth={1.8} />{t("settings.profile","Profile")}

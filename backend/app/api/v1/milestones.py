@@ -66,6 +66,7 @@ async def list_milestones(
                 "name": m.name,
                 "description": m.description,
                 "owner_id": m.owner_id,
+                "start_date": m.start_date,
                 "due_date": m.due_date,
                 "status": m.status,
                 "total_issues": total,
@@ -88,6 +89,7 @@ async def create_milestone(
         id=str(uuid.uuid4()),
         name=data.name,
         description=data.description,
+        start_date=data.start_date,
         due_date=data.due_date,
         owner_id=user.id,
     )
@@ -119,6 +121,7 @@ async def create_milestone(
         "name": milestone.name,
         "description": milestone.description,
         "owner_id": milestone.owner_id,
+        "start_date": milestone.start_date,
         "due_date": milestone.due_date,
         "status": milestone.status,
         "progress": 0,
@@ -147,6 +150,8 @@ async def update_milestone(
         m.name = data.name
     if data.description is not None:
         m.description = data.description
+    if data.start_date is not None:
+        m.start_date = data.start_date
     if data.due_date is not None:
         m.due_date = data.due_date
     if data.status is not None:
@@ -188,6 +193,7 @@ async def update_milestone(
         "id": m.id,
         "name": m.name,
         "description": m.description,
+        "start_date": m.start_date,
         "due_date": m.due_date,
         "status": m.status,
         "owner_id": m.owner_id,
@@ -229,6 +235,8 @@ async def milestone_issues(
             "status": i.status,
             "priority": i.priority,
             "issue_type": i.issue_type,
+            "start_date": i.start_date,
+            "due_date": i.due_date,
             "created_at": i.created_at,
         }
         for i in issues

@@ -11,11 +11,12 @@ export default function IssueEditPage() {
   const navigate = useNavigate(); const { t } = useTranslation();
   const [title, setTitle] = useState(""); const [desc, setDesc] = useState("");
   const [status, setStatus] = useState(""); const [priority, setPriority] = useState("");
+  const [startDate, setStartDate] = useState(""); const [dueDate, setDueDate] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { if(!id)return; getIssue(id).then(d=>{ setTitle(d.title); setDesc(d.description); setStatus(d.status); setPriority(d.priority); setLoading(false); }); }, [id]);
+  useEffect(() => { if(!id)return; getIssue(id).then(d=>{ setTitle(d.title); setDesc(d.description); setStatus(d.status); setPriority(d.priority); setStartDate(d.start_date || ""); setDueDate(d.due_date || ""); setLoading(false); }); }, [id]);
 
-  const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority}); navigate(`/issues/${id}`); };
+  const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority,start_date:startDate || null,due_date:dueDate || null}); navigate(`/issues/${id}`); };
 
   if (loading) return <Loader />;
 
@@ -53,6 +54,7 @@ export default function IssueEditPage() {
             </select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Start date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="input text-sm"/></div><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.due_date", "Due date")}</label><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="input text-sm"/></div></div>
 
         <div className="flex gap-3 pt-1">
           <button type="submit" className="btn btn-primary">{t("common.save")}</button>

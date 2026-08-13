@@ -16,7 +16,7 @@ interface DashboardData {
     total_issues: number; open_issues: number; closed_issues: number; my_reported: number;
     bug_count: number; feature_count: number; overdue_milestones: number;
     by_status: Record<string, number>; by_priority: Record<string, number>;
-    recent_activity: Array<{ date: string; count: number }>;
+    recent_activity: Array<{ date: string; count: number }>; completion_activity?: Array<{ date: string; count: number }>;
   };
   milestones: Array<{ id: string; name: string; status: string; due_date: string | null; total: number; closed: number; progress: number }>;
 }
@@ -141,6 +141,11 @@ function Sparkline({ data, width = 200, height = 40 }: { data: Array<{ date: str
   );
 }
 
+function TrendPanel({ title, data, color = "var(--primary)" }: { title: string; data: Array<{ date: string; count: number }>; color?: string }) {
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+  return <div className="card rounded-2xl p-5"><div className="mb-4 flex items-start justify-between"><div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{title}</p><p className="mt-1 text-2xl font-bold tabular-nums">{total}</p></div><span className="rounded-full bg-[var(--primary-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">30 days</span></div><div style={{ color }}><Sparkline data={data} width={320} height={76} /></div></div>;
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation();
   const user = useAuthStore(s => s.user);
@@ -222,6 +227,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts row */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <TrendPanel title={t("dashboard.activity_trend", "New work trend")} data={data.stats.recent_activity || []} />
+        <TrendPanel title={t("dashboard.completion_trend", "Delivery trend")} data={data.stats.completion_activity || []} color="#10b981" />
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Status donut */}
         <div className="card rounded-[10px] p-5">

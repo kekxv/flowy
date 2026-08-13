@@ -108,6 +108,8 @@ async def create_issue(db: AsyncSession, data: IssueCreate, reporter_id: str) ->
         description=data.description,
         issue_type=data.issue_type,
         priority=data.priority,
+        start_date=data.start_date,
+        due_date=data.due_date,
         reporter_id=reporter_id,
     )
     # Don't set issue.assignees via relationship - we'll insert manually below
@@ -213,6 +215,11 @@ async def update_issue(
             )
         )
         issue.priority = data.priority
+
+    if data.start_date is not None:
+        issue.start_date = data.start_date
+    if data.due_date is not None:
+        issue.due_date = data.due_date
 
     if data.assignees is not None:
         # Get old assignees for logging

@@ -35,6 +35,7 @@ class Milestone(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    start_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     due_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     owner_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

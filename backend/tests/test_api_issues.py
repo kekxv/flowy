@@ -31,6 +31,22 @@ async def _login(client, username="testuser", password="password123"):
 
 class TestIssueAPI:
     @pytest.mark.asyncio
+    async def test_issue_schedule_dates_are_saved_and_returned(self, db_session, test_user):
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            created = await client.post(
+                "/api/v1/issues",
+                json={"title": "Scheduled", "start_date": "2026-08-01", "due_date": "2026-08-15"},
+                headers=headers,
+            )
+            issue_id = created.json()["id"]
+            response = await client.get(f"/api/v1/issues/{issue_id}", headers=headers)
+
+        assert response.json()["start_date"] == "2026-08-01"
+        assert response.json()["due_date"] == "2026-08-15"
+
+    @pytest.mark.asyncio
     async def test_wiki_upload_limit_endpoint_returns_configured_limit(
         self, db_session, test_user
     ):

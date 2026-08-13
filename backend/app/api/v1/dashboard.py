@@ -155,9 +155,10 @@ async def get_dashboard(
         )
     ).scalar() or 0
 
-    # Recent activity: issue creation counts for last 7 days
+    # Recent activity: issue creation counts for last 30 days, suitable for reports.
     recent_activity = []
-    for i in range(6, -1, -1):
+    completion_activity = []
+    for i in range(29, -1, -1):
         day = (datetime.now() - timedelta(days=i)).date()
         day_str = day.isoformat()
         next_day_str = (day + timedelta(days=1)).isoformat()
@@ -170,6 +171,15 @@ async def get_dashboard(
             )
         ).scalar() or 0
         recent_activity.append({"date": day_str, "count": count})
+        completed = (
+            await db.execute(
+                select(func.count(Issue.id)).where(
+                    Issue.closed_at >= day_str,
+                    Issue.closed_at < next_day_str,
+                )
+            )
+        ).scalar() or 0
+        completion_activity.append({"date": day_str, "count": completed})
 
     # Active milestones
     ml_result = await db.execute(
@@ -221,6 +231,7 @@ async def get_dashboard(
             "by_status": by_status,
             "by_priority": by_priority,
             "recent_activity": recent_activity,
+            "completion_activity": completion_activity,
         },
         "milestones": milestones_data,
     }

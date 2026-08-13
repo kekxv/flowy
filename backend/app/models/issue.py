@@ -53,6 +53,8 @@ class Issue(Base):
         onupdate=lambda: datetime.now().isoformat(),
     )
     closed_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    start_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    due_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     time_estimate_ms: Mapped[int] = mapped_column(default=0, server_default="0")
 
     reporter: Mapped["User"] = relationship("User", lazy="joined")

@@ -18,6 +18,7 @@ export default function AdminPage() {
   const [oauthConfig, setOauthConfig] = useState<Record<string,string>>({});
   const [wikiMaxMb, setWikiMaxMb] = useState("5");
   const [wikiSaved, setWikiSaved] = useState(false);
+  const [themeColor, setThemeColor] = useState("#2563eb");
 
   const fetch = async () => {
     const [u, s, oc] = await Promise.all([
@@ -26,6 +27,7 @@ export default function AdminPage() {
     ]);
     setUsers(u.data); setStats(s.data); setOauthConfig(oc.data);
     setWikiMaxMb(oc.data.wiki_upload_max_mb || "5");
+    setThemeColor(oc.data.theme_primary_color || "#2563eb");
     setLoading(false);
   };
   useEffect(()=>{fetch();},[]);
@@ -172,6 +174,12 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* OAuth Configuration */}
+      <div className="card rounded-xl overflow-hidden">
+        <div className="border-b border-[var(--border-light)] px-5 py-3.5"><h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><Settings2 size={14}/>Brand theme</h2></div>
+        <div className="flex items-center justify-between gap-4 px-5 py-4"><div><div className="text-[13px] font-medium">Global primary color</div><div className="mt-0.5 text-[11px] text-[var(--text-muted)]">Used as the default for new devices.</div></div><div className="flex items-center gap-2"><input aria-label="Global primary color" type="color" value={themeColor} onChange={e=>setThemeColor(e.target.value)} /><button onClick={()=>api.put("/system/settings",{theme_primary_color:themeColor})} className="btn btn-outline btn-sm">{t("common.save")}</button></div></div>
       </div>
 
       {/* OAuth Configuration */}

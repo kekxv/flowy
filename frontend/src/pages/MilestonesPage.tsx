@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Plus, Clock, Flag } from "lucide-react";
+import { Plus, Clock, Flag, GanttChart as GanttIcon, LayoutGrid } from "lucide-react";
 import api from "../api/client";
 import Loader from "../components/Loader";
+import GanttChart, { type GanttMilestone } from "../components/GanttChart";
 
 interface Milestone {
-  id: string; name: string; description: string; due_date: string | null;
+  id: string; name: string; description: string; start_date?: string | null; due_date: string | null;
   status: string; total_issues: number; closed_issues: number; progress: number;
   created_at: string; updated_at: string;
 }
@@ -21,7 +22,9 @@ export default function MilestonesPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", due_date: "" });
+  const [form, setForm] = useState({ name: "", description: "", start_date: "", due_date: "" });
+  const [view, setView] = useState<"cards"|"gantt">("cards");
+  const [gantt, setGantt] = useState<GanttMilestone[]>([]);
   const [filter, setFilter] = useState<"all"|"open"|"closed"|"published">("all");
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -34,11 +37,12 @@ export default function MilestonesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    try { await api.post("/milestones", form); setShowForm(false); setForm({ name: "", description: "", due_date: "" }); fetch(); }
+    try { await api.post("/milestones", form); setShowForm(false); setForm({ name: "", description: "", start_date: "", due_date: "" }); fetch(); }
     catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error","Failed")); }
   };
 
   const filtered = milestones.filter(m => filter === "all" || m.status === filter);
+  const loadGantt = async () => setGantt(await Promise.all(filtered.map(async m => ({ ...m, issues: (await api.get(`/milestones/${m.id}/issues`)).data }))));
 
   if (loading) return <Loader />;
 
@@ -52,7 +56,7 @@ export default function MilestonesPage() {
           <h1 className="text-[18px] font-semibold tracking-tight">{t("milestone.title")}</h1>
           <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{milestones.length} milestones · {milestones.filter(m => m.status === "open").length} active</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary btn-sm"><Plus size={14} />{t("milestone.new_milestone")}</button>
+        <div className="flex gap-2"><button onClick={() => { setView(view === "cards" ? "gantt" : "cards"); if (view === "cards") loadGantt(); }} className="btn btn-outline btn-sm">{view === "cards" ? <GanttIcon size={14}/> : <LayoutGrid size={14}/>} {view === "cards" ? "Gantt" : "Cards"}</button><button onClick={() => setShowForm(!showForm)} className="btn btn-primary btn-sm"><Plus size={14} />{t("milestone.new_milestone")}</button></div>
       </div>
 
       {/* Create form */}
@@ -61,7 +65,7 @@ export default function MilestonesPage() {
           <form onSubmit={handleCreate} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.name")}</label><input required placeholder="Sprint 3" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input" /></div>
-              <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.due_date")}</label><input type="date" value={form.due_date} onChange={e => setForm({...form, due_date: e.target.value})} className="input" /></div>
+              <div className="grid grid-cols-2 gap-2"><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">Start</label><input type="date" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} className="input" /></div><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.due_date")}</label><input type="date" value={form.due_date} onChange={e => setForm({...form, due_date: e.target.value})} className="input" /></div></div>
             </div>
             <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.description")} <span className="font-normal lowercase text-[var(--text-muted)]/60">(Markdown)</span></label>
               <textarea rows={3} placeholder={t("milestone.desc_hint", "## Goals\n- Feature X\n- Bug fixes")} value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input resize-none mono text-[12px]" /></div>
@@ -85,6 +89,7 @@ export default function MilestonesPage() {
         ))}
       </div>
 
+      {view === "gantt" ? <GanttChart milestones={gantt} /> : <>
       {/* Grid cards */}
       {filtered.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-16 rounded-[8px] text-[var(--text-muted)]">
@@ -139,7 +144,7 @@ export default function MilestonesPage() {
             );
           })}
         </div>
-      )}
+      )}</>}
     </div>
   );
 }

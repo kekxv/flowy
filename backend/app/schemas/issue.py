@@ -81,6 +81,8 @@ class IssueResponse(BaseModel):
     created_at: str
     updated_at: str
     closed_at: str | None
+    start_date: str | None = None
+    due_date: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -106,6 +108,8 @@ class IssueCreate(BaseModel):
     assignees: list[AssigneeInput] = Field(default_factory=list)
     label_ids: list[str] = Field(default_factory=list)
     milestone_ids: list[str] = Field(default_factory=list)
+    start_date: str | None = None
+    due_date: str | None = None
 
 
 class IssueUpdate(BaseModel):
@@ -120,6 +124,8 @@ class IssueUpdate(BaseModel):
     assignees: list[AssigneeInput] | None = None
     label_ids: list[str] | None = None
     milestone_ids: list[str] | None = None
+    start_date: str | None = None
+    due_date: str | None = None
 
 
 class IssueFilter:
@@ -168,12 +174,14 @@ class ExternalLinkCreate(BaseModel):
 class MilestoneCreate(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(default="", max_length=2000)
+    start_date: str | None = None
     due_date: str | None = None
 
 
 class MilestoneUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | None = None
+    start_date: str | None = None
     due_date: str | None = None
     status: str | None = Field(default=None, pattern=r"^(open|closed|published)$")
     owner_id: str | None = None

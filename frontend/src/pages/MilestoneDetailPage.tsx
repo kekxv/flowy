@@ -7,8 +7,8 @@ import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import Loader from "../components/Loader";
 
-interface IssueItem { id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string; }
-interface MilestoneData { id: string; name: string; description: string; due_date: string|null; status: string; total_issues: number; closed_issues: number; progress: number; created_at: string; updated_at: string; owner_id?: string; }
+interface IssueItem { id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string; start_date?: string|null; due_date?: string|null; }
+interface MilestoneData { id: string; name: string; description: string; start_date?: string|null; due_date: string|null; status: string; total_issues: number; closed_issues: number; progress: number; created_at: string; updated_at: string; owner_id?: string; }
 
 const daysLeft = (date: string|null) => { if (!date) return null; return Math.ceil((new Date(date).getTime()-Date.now())/86400000); };
 
@@ -20,7 +20,7 @@ export default function MilestoneDetailPage() {
   const [issues, setIssues] = useState<IssueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
-  const [ef, setEf] = useState({name:"",description:"",due_date:""});
+  const [ef, setEf] = useState({name:"",description:"",start_date:"",due_date:""});
   const [toast, setToast] = useState("");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -29,7 +29,7 @@ export default function MilestoneDetailPage() {
     if (!id) return;
     Promise.all([api.get("/milestones"), api.get(`/milestones/${id}/issues`)]).then(([mlRes, isRes]) => {
       const found = mlRes.data.find((m:any)=>m.id===id);
-      if (found) { setMilestone(found); setEf({name:found.name,description:found.description||"",due_date:found.due_date||""}); }
+      if (found) { setMilestone(found); setEf({name:found.name,description:found.description||"",start_date:found.start_date||"",due_date:found.due_date||""}); }
       setIssues(isRes.data); setLoading(false);
     });
   }, [id]);
@@ -37,7 +37,7 @@ export default function MilestoneDetailPage() {
   const refresh = async () => {
     const [mlRes, isRes] = await Promise.all([api.get("/milestones"), api.get(`/milestones/${id}/issues`)]);
     const found = mlRes.data.find((m:any)=>m.id===id);
-    if (found) { setMilestone(found); setEf({name:found.name,description:found.description||"",due_date:found.due_date||""}); }
+    if (found) { setMilestone(found); setEf({name:found.name,description:found.description||"",start_date:found.start_date||"",due_date:found.due_date||""}); }
     setIssues(isRes.data);
   };
 
@@ -73,7 +73,7 @@ export default function MilestoneDetailPage() {
             <div className="space-y-3">
               <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.name")}</label><input value={ef.name} onChange={e=>setEf({...ef,name:e.target.value})} className="input font-bold text-lg"/></div>
               <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.description")} <span className="font-normal lowercase">(Markdown)</span></label><textarea rows={4} value={ef.description} onChange={e=>setEf({...ef,description:e.target.value})} className="input resize-none font-mono text-xs"/></div>
-              <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.due_date")}</label><input type="date" value={ef.due_date} onChange={e=>setEf({...ef,due_date:e.target.value})} className="input w-48"/></div>
+              <div className="flex gap-3"><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">Start</label><input type="date" value={ef.start_date} onChange={e=>setEf({...ef,start_date:e.target.value})} className="input w-48"/></div><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.due_date")}</label><input type="date" value={ef.due_date} onChange={e=>setEf({...ef,due_date:e.target.value})} className="input w-48"/></div></div>
               <div className="flex gap-2">
                 <button onClick={save} className="btn btn-primary btn-sm">{t("common.save")}</button>
                 <button onClick={()=>setEdit(false)} className="btn btn-ghost btn-sm">{t("common.cancel")}</button>

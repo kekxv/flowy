@@ -22,6 +22,7 @@ async def get_settings(
         "gitea_instance_url",
         "registration_enabled",
         "wiki_upload_max_mb",
+        "theme_primary_color",
     }
     data = {s.key: s.value for s in result.scalars().all() if s.key in safe_keys}
     origin = req.headers.get("origin", str(req.base_url).rstrip("/"))
@@ -44,6 +45,7 @@ async def save_settings(
         "gitea_instance_url",
         "registration_enabled",
         "wiki_upload_max_mb",
+        "theme_primary_color",
     }
     for key, value in data.items():
         if key not in allowed:
