@@ -7,6 +7,7 @@ export interface WikiPageData {
   title: string;
   slug: string;
   content: string;
+  summary: string;
   tags: string;
   is_public: boolean;
   weight: number;
@@ -45,6 +46,7 @@ export async function getWikiPage(id: string): Promise<WikiPageData> {
 export async function createWikiPage(data: {
   title: string;
   content?: string;
+  summary?: string;
   tags?: string;
   is_public?: boolean;
   weight?: number;
@@ -58,6 +60,7 @@ export async function updateWikiPage(
   data: {
     title?: string;
     content?: string;
+    summary?: string;
     tags?: string;
     is_public?: boolean;
     weight?: number;

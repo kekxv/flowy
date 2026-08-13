@@ -12,6 +12,7 @@ export default function WikiCreatePage() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [summary, setSummary] = useState("");
   const [tags, setTags] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [weight, setWeight] = useState(0);
@@ -31,7 +32,7 @@ export default function WikiCreatePage() {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const page = await createWikiPage({ title, content, tags, is_public: isPublic, weight });
+      const page = await createWikiPage({ title, summary, content, tags, is_public: isPublic, weight });
       navigate(`/wiki/${page.id}`);
     } finally {
       setSaving(false);
@@ -110,6 +111,21 @@ export default function WikiCreatePage() {
             className="input text-lg font-bold"
             placeholder={t("wiki.page_title_placeholder", "Enter page title...")}
             autoFocus
+          />
+        </div>
+
+        <div>
+          <label htmlFor="wiki-summary" className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+            {t("wiki.summary", "Summary")} ({t("wiki.markdown", "Markdown")})
+          </label>
+          <textarea
+            id="wiki-summary"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            maxLength={4000}
+            rows={4}
+            className="input resize-y font-mono text-[13px] leading-relaxed"
+            placeholder={t("wiki.summary_placeholder", "A short Markdown overview shown in search results...")}
           />
         </div>
 

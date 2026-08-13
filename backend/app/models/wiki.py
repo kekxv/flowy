@@ -37,6 +37,7 @@ class WikiPage(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     slug: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str] = mapped_column(Text, default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
     tags: Mapped[str] = mapped_column(String(1000), default="")
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     weight: Mapped[int] = mapped_column(default=0, server_default="0")

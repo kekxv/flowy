@@ -50,6 +50,7 @@ export default function WikiDetailPage() {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [summary, setSummary] = useState("");
   const [tags, setTags] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [weight, setWeight] = useState(0);
@@ -80,6 +81,7 @@ export default function WikiDetailPage() {
       setPage(data);
       setTitle(data.title);
       setContent(data.content);
+      setSummary(data.summary || "");
       setTags(data.tags);
       setIsPublic(data.is_public);
       setWeight(data.weight);
@@ -107,6 +109,7 @@ export default function WikiDetailPage() {
       const updated = await updateWikiPage(page.id, {
         title,
         content,
+        summary,
         tags,
         is_public: isPublic,
         weight,
@@ -129,6 +132,7 @@ export default function WikiDetailPage() {
     if (!page) return;
     setTitle(page.title);
     setContent(page.content);
+    setSummary(page.summary || "");
     setTags(page.tags);
     setIsPublic(page.is_public);
     setWeight(page.weight);
@@ -319,6 +323,20 @@ export default function WikiDetailPage() {
         {editing ? (
           <div className="space-y-4">
             <div>
+              <label htmlFor="wiki-summary" className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+                {t("wiki.summary", "Summary")} ({t("wiki.markdown", "Markdown")})
+              </label>
+              <textarea
+                id="wiki-summary"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                maxLength={4000}
+                rows={4}
+                className="input resize-y font-mono text-[13px] leading-relaxed"
+                placeholder={t("wiki.summary_placeholder", "A short Markdown overview shown in search results...")}
+              />
+            </div>
+            <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
                 {t("wiki.content", "Content")} (Markdown)
               </label>
@@ -465,9 +483,12 @@ export default function WikiDetailPage() {
             </div>
           </div>
         ) : (
-          <div className="prose prose-sm max-w-none text-[14px] leading-relaxed text-[var(--text-secondary)]">
-            <MarkdownContent>{page.content || t("wiki.empty_content", "No content")}</MarkdownContent>
-          </div>
+          <>
+            {page.summary && <div className="mb-5 border-b border-[var(--border-light)] pb-5 prose prose-sm max-w-none text-[14px] leading-relaxed text-[var(--text-secondary)]"><MarkdownContent>{page.summary}</MarkdownContent></div>}
+            <div className="prose prose-sm max-w-none text-[14px] leading-relaxed text-[var(--text-secondary)]">
+              <MarkdownContent>{page.content || t("wiki.empty_content", "No content")}</MarkdownContent>
+            </div>
+          </>
         )}
       </div>
 

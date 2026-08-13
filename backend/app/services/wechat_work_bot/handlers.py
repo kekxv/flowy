@@ -1524,8 +1524,10 @@ class CommandHandlers:
             lines = ["📚 **最近的知识库页面**\n"]
             for p in pages:
                 visibility = "🌐" if p.is_public else "🔒"
-                # Plain text preview
-                text = _re.sub(r'!\[[^\]]*\]\([^)]+\)', '', p.content or "")
+                # Prefer the explicit Markdown summary; body remains a fallback for
+                # the recent-pages view only and is never used as a search key.
+                text = p.summary or p.content or ""
+                text = _re.sub(r'!\[[^\]]*\]\([^)]+\)', '', text)
                 text = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
                 text = _re.sub(r'[*_#>`\-|]', '', text)
                 text = _re.sub(r'\n+', ' ', text).strip()
@@ -1618,6 +1620,11 @@ class CommandHandlers:
             owner_name = p.owner.display_name or p.owner.username if p.owner else "未知"
             visibility = "🌐" if p.is_public else "🔒"
             lines.append(f"{i}. {visibility} **{p.title}** _({owner_name})_")
+            if p.summary:
+                summary = re.sub(r"\s+", " ", p.summary).strip()
+                if len(summary) > 120:
+                    summary = f"{summary[:120]}..."
+                lines.append(f"   {summary}")
 
         lines.append("\n> _回复序号查看详细内容_")
 

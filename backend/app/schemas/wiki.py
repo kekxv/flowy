@@ -9,6 +9,7 @@ class WikiPageResponse(BaseModel):
     title: str
     slug: str
     content: str
+    summary: str
     tags: str
     is_public: bool
     weight: int = 0
@@ -24,6 +25,7 @@ class WikiPageResponse(BaseModel):
 class WikiPageCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     content: str = Field(default="")
+    summary: str = Field(default="", max_length=4000)
     tags: str = Field(default="", max_length=1000)
     is_public: bool = False
     weight: int = Field(default=0, ge=0, le=9999)
@@ -32,6 +34,7 @@ class WikiPageCreate(BaseModel):
 class WikiPageUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     content: str | None = None
+    summary: str | None = Field(default=None, max_length=4000)
     tags: str | None = Field(default=None, max_length=1000)
     is_public: bool | None = None
     weight: int | None = Field(default=None, ge=0, le=9999)

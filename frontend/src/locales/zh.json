@@ -312,6 +312,9 @@
     "max_size": "最大 {{mb}}MB"
   },
   "wiki": {
+    "summary": "摘要",
+    "summary_placeholder": "用于搜索结果展示的简短 Markdown 概述…",
+    "markdown": "Markdown",
     "title": "知识库",
     "pages_count": "个页面",
     "new_page": "新建页面",

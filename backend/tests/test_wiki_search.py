@@ -60,6 +60,7 @@ async def _create_wiki_page(
     owner_id: str,
     title: str,
     content: str = "",
+    summary: str = "",
     tags: str = "",
     is_public: bool = False,
     weight: int = 0,
@@ -71,6 +72,7 @@ async def _create_wiki_page(
         title=title,
         slug=title.lower().replace(" ", "-"),
         content=content,
+        summary=summary,
         tags=tags,
         is_public=is_public,
         weight=weight,
@@ -86,6 +88,17 @@ async def _create_wiki_page(
 
 
 class TestFuzzySearch:
+
+    @pytest.mark.asyncio
+    async def test_summary_is_persisted_when_creating_a_page(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="summary-user", username="summary", email="summary@example.com")
+        page = await wiki_service.create_page(
+            db_session,
+            user.id,
+            "Docker Guide",
+            summary="**Docker** quick reference",
+        )
+        assert page.summary == "**Docker** quick reference"
 
     @pytest.mark.asyncio
     async def test_empty_keyword_returns_empty(self, db_session: AsyncSession):
@@ -119,17 +132,22 @@ class TestFuzzySearch:
         await _create_wiki_page(db_session, user.id, "Docker 入门指南", is_public=True)
         await _create_wiki_page(db_session, user.id, "Kubernetes 入门", content="Docker 相关", is_public=True)
         result = await wiki_service.fuzzy_search(db_session, "Docker", user.id)
-        assert len(result) == 2
-        # Title match should rank higher
-        assert result[0].title == "Docker 入门指南"
+        assert [page.title for page in result] == ["Docker 入门指南"]
 
     @pytest.mark.asyncio
-    async def test_content_match(self, db_session: AsyncSession):
+    async def test_content_only_match_is_excluded(self, db_session: AsyncSession):
         user = await _create_user(db_session, id="u5", username="u5", email="u5@ex.com")
         await _create_wiki_page(db_session, user.id, "My Notes", content="Learn about docker containers", is_public=True)
         result = await wiki_service.fuzzy_search(db_session, "docker", user.id)
-        assert len(result) == 1
-        assert result[0].title == "My Notes"
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_web_search_excludes_content_only_matches(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="web-search-user", username="web-search", email="web-search@example.com")
+        await _create_wiki_page(db_session, user.id, "Release notes", content="Docker migration instructions")
+        pages, total = await wiki_service.get_visible_pages(db_session, user.id, q="Docker")
+        assert pages == []
+        assert total == 0
 
     @pytest.mark.asyncio
     async def test_tag_match(self, db_session: AsyncSession):
@@ -140,9 +158,9 @@ class TestFuzzySearch:
 
     @pytest.mark.asyncio
     async def test_relevance_ranking(self, db_session: AsyncSession):
-        """Title match > tags match > content match."""
+        """Title match ranks above tags; content never participates."""
         user = await _create_user(db_session, id="u7", username="u7", email="u7@ex.com")
-        # Content match only (lowest score)
+        # Content-only match must be excluded
         await _create_wiki_page(db_session, user.id, "Random Title", content="docker is great", is_public=True)
         # Tag match (medium score)
         await _create_wiki_page(db_session, user.id, "Another Page", tags="docker,tools", is_public=True)
@@ -150,10 +168,9 @@ class TestFuzzySearch:
         await _create_wiki_page(db_session, user.id, "Docker Tutorial", content="Some content", is_public=True)
 
         result = await wiki_service.fuzzy_search(db_session, "docker", user.id)
-        assert len(result) == 3
+        assert len(result) == 2
         assert result[0].title == "Docker Tutorial"
         assert result[1].title == "Another Page"
-        assert result[2].title == "Random Title"
 
     @pytest.mark.asyncio
     async def test_public_only_for_non_related(self, db_session: AsyncSession):
@@ -195,10 +212,10 @@ class TestFuzzySearch:
 
     @pytest.mark.asyncio
     async def test_weight_priority(self, db_session: AsyncSession):
-        """Higher weight should rank higher when content relevance is similar."""
+        """Higher weight should rank higher when title relevance is similar."""
         user = await _create_user(db_session, id="u13", username="u13", email="u13@ex.com")
-        await _create_wiki_page(db_session, user.id, "Docker Low", content="docker", is_public=True, weight=8)
-        await _create_wiki_page(db_session, user.id, "Docker High", content="docker", is_public=True, weight=10)
+        await _create_wiki_page(db_session, user.id, "Docker Low", is_public=True, weight=8)
+        await _create_wiki_page(db_session, user.id, "Docker High", is_public=True, weight=10)
 
         result = await wiki_service.fuzzy_search(db_session, "docker", user.id)
         assert len(result) == 2
@@ -274,6 +291,19 @@ class TestHandleWiki:
         # Should set pending_wiki_results
         assert handlers.pending_wiki_results is not None
         assert len(handlers.pending_wiki_results) == 3
+
+    @pytest.mark.asyncio
+    async def test_multiple_results_include_markdown_summary_preview(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="wiki-summary-preview", username="preview", email="preview@example.com")
+        await _create_wiki_page(db_session, user.id, "Docker Basics", summary="**Start here**", is_public=True)
+        await _create_wiki_page(db_session, user.id, "Docker Advanced", summary="_Production tips_", is_public=True)
+        bot_user = await _create_bot_user(db_session, "wx-wiki-summary-preview", flowy_user_id=user.id)
+        handlers = CommandHandlers(db=db_session, bot_user=bot_user, wechat_user_id="wx-wiki-summary-preview")
+
+        result = await handlers.handle_wiki(["Docker"], {})
+
+        assert "Start here" in result
+        assert "Production tips" in result
 
     @pytest.mark.asyncio
     async def test_list_recent_pages(self, db_session: AsyncSession):

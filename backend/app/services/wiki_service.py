@@ -45,6 +45,7 @@ async def create_page(
     owner_id: str,
     title: str,
     content: str = "",
+    summary: str = "",
     tags: str = "",
     is_public: bool = False,
     weight: int = 0,
@@ -56,6 +57,7 @@ async def create_page(
         title=title,
         slug=slug,
         content=content,
+        summary=summary,
         tags=tags,
         is_public=is_public,
         weight=weight,
@@ -108,13 +110,11 @@ async def get_visible_pages(
     )
     count_query = select(func.count(WikiPage.id)).where(visibility)
 
-    if q:
-        search = f"%{q}%"
-        search_filter = or_(
-            WikiPage.title.ilike(search),
-            WikiPage.content.ilike(search),
-            WikiPage.tags.ilike(search),
-        )
+    if q and q.strip():
+        tokens = tokenize(q)
+        if not tokens:
+            return [], 0
+        search_filter = _title_or_tag_filter(tokens)
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
@@ -180,6 +180,7 @@ async def update_page(
     page: WikiPage,
     title: str | None = None,
     content: str | None = None,
+    summary: str | None = None,
     tags: str | None = None,
     is_public: bool | None = None,
     weight: int | None = None,
@@ -193,6 +194,8 @@ async def update_page(
             page.slug = await _ensure_unique_slug(db, page.owner_id, new_slug)
     if content is not None:
         page.content = content
+    if summary is not None:
+        page.summary = summary
     if tags is not None:
         page.tags = tags
     if is_public is not None:
@@ -325,6 +328,14 @@ def can_view(page: WikiPage, user_id: str) -> bool:
 _MIN_SCORE = 30
 
 
+def _title_or_tag_filter(tokens: list[str]):
+    """Build the shared Wiki search predicate from title and tags only."""
+    return or_(*[
+        or_(WikiPage.title.ilike(f"%{token}%"), WikiPage.tags.ilike(f"%{token}%"))
+        for token in tokens
+    ])
+
+
 def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     """Calculate relevance score for a wiki page against search tokens.
 
@@ -332,7 +343,6 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     - Title exact match (all tokens): 100
     - Title contains token: 50
     - Tags contain token: 30
-    - Content contains token: 10
 
     Bonus:
     - Match ratio: matched_tokens / total_tokens * 50  (encourages multi-token hits)
@@ -341,7 +351,6 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
     score = 0
     matched = 0
     title_lower = page.title.lower()
-    content_lower = (page.content or "").lower()
     tags_lower = (page.tags or "").lower()
 
     for token in tokens:
@@ -358,9 +367,6 @@ def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
             hit = True
         if token_lower in tags_lower:
             score += 30 * weight // 5
-            hit = True
-        if token_lower in content_lower:
-            score += 10 * weight // 5
             hit = True
         if hit:
             matched += 1
@@ -383,8 +389,8 @@ async def fuzzy_search(
 ) -> list[WikiPage]:
     """Fuzzy search wiki pages, ranked by relevance.
 
-    Searches both related users' wiki and public wiki.
-    Returns pages sorted by relevance score (title match > tags > content).
+    Searches both related users' wiki and public wiki by title and tags.
+    Returns pages sorted by relevance score (title match > tags).
     """
     if not keyword or not keyword.strip():
         return []
@@ -410,18 +416,7 @@ async def fuzzy_search(
     visibility = or_(*visibility_conditions)
 
     # Build search filter: any token matches any field
-    token_filters = []
-    for token in tokens:
-        pattern = f"%{token}%"
-        token_filters.append(
-            or_(
-                WikiPage.title.ilike(pattern),
-                WikiPage.content.ilike(pattern),
-                WikiPage.tags.ilike(pattern),
-            )
-        )
-    # At least one token must match
-    search_filter = or_(*token_filters)
+    search_filter = _title_or_tag_filter(tokens)
 
     # Fetch all matching pages
     result = await db.execute(
@@ -458,7 +453,7 @@ async def search_for_bot(
 ) -> dict:
     """Search wiki for bot with priority: related users' wiki > public wiki.
 
-    Segments *keyword* with jieba and matches any token in title/content/tags.
+    Segments *keyword* with jieba and matches any token in title or tags.
     Returns dict with keys:
     - related: list of pages from related users
     - public: list of public pages
@@ -467,18 +462,7 @@ async def search_for_bot(
     if not tokens:
         return {"related": [], "public": []}
 
-    # Build filter: any token matches any field
-    token_filters = []
-    for token in tokens:
-        pattern = f"%{token}%"
-        token_filters.append(
-            or_(
-                WikiPage.title.ilike(pattern),
-                WikiPage.content.ilike(pattern),
-                WikiPage.tags.ilike(pattern),
-            )
-        )
-    search_filter = or_(*token_filters)
+    search_filter = _title_or_tag_filter(tokens)
 
     related_pages: list[WikiPage] = []
     public_pages: list[WikiPage] = []

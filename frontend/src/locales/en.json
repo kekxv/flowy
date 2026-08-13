@@ -315,6 +315,9 @@
     "max_size": "Max {{mb}}MB"
   },
   "wiki": {
+    "summary": "Summary",
+    "summary_placeholder": "A short Markdown overview shown in search results...",
+    "markdown": "Markdown",
     "title": "Knowledge Base",
     "pages_count": "pages",
     "new_page": "New Page",

@@ -141,7 +141,7 @@ export default function WikiListPage() {
       ) : (
         <div className="space-y-2">
           {pages.map(page => {
-            const preview = getPreview(page.content);
+            const preview = getPreview(page.summary || page.content);
             const hasPreview = preview !== "暂无内容";
             return (
               <div

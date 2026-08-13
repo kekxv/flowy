@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { expect, it, vi } from "vitest"
 
@@ -22,4 +22,11 @@ it("does not limit file extensions in Wiki creation upload pickers", () => {
   for (const picker of document.querySelectorAll<HTMLInputElement>('input[type="file"]')) {
     expect(picker).not.toHaveAttribute("accept")
   }
+})
+
+it("provides a Markdown summary input", () => {
+  wikiMocks.getWikiUploadLimit.mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
+  render(<MemoryRouter><WikiCreatePage /></MemoryRouter>)
+
+  expect(screen.getByLabelText("Summary (Markdown)")).toBeInTheDocument()
 })

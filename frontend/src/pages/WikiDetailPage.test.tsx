@@ -78,4 +78,19 @@ describe("WikiDetailPage", () => {
       expect(picker).not.toHaveAttribute("accept")
     }
   })
+
+  it("provides a Markdown summary input while editing", async () => {
+    wikiMocks.getWikiPage.mockResolvedValue({
+      collaborator_ids: [], content: "", created_at: "2026-08-05T00:00:00", id: "wiki-page",
+      is_public: false, owner_display_name: "Owner", owner_id: "admin-user", owner_name: "owner",
+      slug: "wiki-page", summary: "**Existing** summary", tags: "", title: "Wiki page", updated_at: "2026-08-05T00:00:00", weight: 0,
+    })
+    wikiMocks.listCollaborators.mockResolvedValue([])
+    wikiMocks.getWikiUploadLimit.mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
+
+    render(<MemoryRouter initialEntries={["/wiki/wiki-page"]}><Routes><Route path="/wiki/:id" element={<WikiDetailPage />} /></Routes></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }))
+    expect(screen.getByLabelText("Summary (Markdown)")).toHaveValue("**Existing** summary")
+  })
 })
