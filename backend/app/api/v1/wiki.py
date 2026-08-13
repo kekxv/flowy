@@ -46,6 +46,13 @@ async def _get_upload_limit(db: AsyncSession) -> int:
     return DEFAULT_UPLOAD_SIZE
 
 
+@router.get("/upload-limit")
+async def get_upload_limit(db: AsyncSession = Depends(get_db)):
+    """Return the current wiki upload size limit in bytes (public)."""
+    limit = await _get_upload_limit(db)
+    return {"limit": limit, "limit_mb": round(limit / 1024 / 1024, 1)}
+
+
 def _page_to_response(page) -> WikiPageResponse:
     """Convert a WikiPage model to WikiPageResponse schema."""
     collaborator_ids = [c.id for c in page.collaborators] if page.collaborators else []
@@ -246,13 +253,6 @@ def _get_wiki_attachments_dir() -> str:
     """Get wiki attachments directory."""
     base = os.environ.get("UPLOAD_DIR") or os.environ.get("STATIC_DIR", "static")
     return os.path.join(base, "wiki_attachments")
-
-
-@router.get("/upload-limit")
-async def get_upload_limit(db: AsyncSession = Depends(get_db)):
-    """Return the current wiki upload size limit in bytes (public)."""
-    limit = await _get_upload_limit(db)
-    return {"limit": limit, "limit_mb": round(limit / 1024 / 1024, 1)}
 
 
 @router.post("/upload")

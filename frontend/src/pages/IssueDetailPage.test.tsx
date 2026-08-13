@@ -33,7 +33,15 @@ vi.mock("../store/authStore", () => ({
 }))
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => ({
+      "comment_status.invalid": "无效",
+      "comment_status.outdated": "已过时",
+      "comment_status.duplicate": "重复",
+      "comment_status.resolved": "已解决",
+      "comment_status.valid": "有效",
+    }[key] ?? fallback ?? key),
+  }),
 }))
 
 describe("IssueDetailPage", () => {
@@ -137,5 +145,36 @@ describe("IssueDetailPage", () => {
       expect(apiMocks.delete).toHaveBeenCalledWith("/bot-attachments/AbC123xyz")
     })
     vi.unstubAllGlobals()
+  })
+
+  it("renders a non-valid comment status in the active locale", async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === "/issues/issue-0001") {
+        return Promise.resolve({
+          data: {
+            assignees: [], created_at: "2026-08-05T00:00:00", description: "",
+            id: "issue-0001", issue_type: "bug", labels: [], milestone_ids: [],
+            priority: "medium", reporter: { display_name: "Reporter" }, status: "open", title: "状态翻译",
+          },
+        })
+      }
+      if (url.endsWith("/comments")) {
+        return Promise.resolve({
+          data: [{
+            author: { id: "viewer", display_name: "Viewer" }, body: "已过时评论",
+            created_at: "2026-08-05T00:00:00", id: "comment-1", replies: [], status: "outdated",
+          }],
+        })
+      }
+      return Promise.resolve({ data: [] })
+    })
+
+    render(
+      <MemoryRouter initialEntries={["/issues/issue-0001"]}>
+        <Routes><Route path="/issues/:id" element={<IssueDetailPage />} /></Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText("⚠ 已过时")).toBeInTheDocument()
   })
 })

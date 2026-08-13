@@ -26,6 +26,7 @@ export default function MarkdownEditor({
   const { t } = useTranslation();
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [uploadLimitMb, setUploadLimitMb] = useState(5);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -35,9 +36,7 @@ export default function MarkdownEditor({
     getWikiUploadLimit().then(({ limit_mb }) => setUploadLimitMb(limit_mb)).catch(() => {});
   }, []);
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const handleFileUpload = async (file: File) => {
     if (!file) return;
     if (file.size > uploadLimitMb * 1024 * 1024) {
       alert(t("markdown_editor.file_too_large", "文件大小超过 {{mb}}MB 限制", { mb: uploadLimitMb }));
@@ -63,8 +62,30 @@ export default function MarkdownEditor({
     }
   };
 
+  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void handleFileUpload(file);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file && confirm(t("markdown_editor.confirm_drop_upload", "确认上传 {{name}}？", { name: file.name }))) {
+      void handleFileUpload(file);
+    }
+  };
+
   return (
-    <div className={`overflow-hidden rounded-lg border border-[var(--border)] ${className}`}>
+    <div
+      data-testid="markdown-editor-dropzone"
+      onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
+      onDrop={handleDrop}
+      className={`overflow-hidden rounded-lg border ${dragging ? "border-[var(--primary)] bg-[var(--primary-light)]" : "border-[var(--border)]"} ${className}`}
+    >
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border-light)] bg-[var(--bg-muted)] p-1.5">
         <div className="flex items-center gap-1">
           <input ref={imageInputRef} aria-label={t("markdown_editor.upload_image", "上传图片")} type="file" accept="image/*" className="hidden" onChange={handleUpload} />

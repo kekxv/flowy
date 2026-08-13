@@ -108,6 +108,13 @@
     "title_placeholder": "Brief description",
     "transfer": "Transfer Owner"
   },
+  "comment_status": {
+    "valid": "Valid",
+    "invalid": "Invalid",
+    "outdated": "Outdated",
+    "duplicate": "Duplicate",
+    "resolved": "Resolved"
+  },
   "dashboard": {
     "title": "Dashboard",
     "my_tasks": "My Tasks",
@@ -304,6 +311,7 @@
     "uploading": "Uploading...",
     "file_too_large": "File size exceeds {{mb}}MB limit",
     "upload_failed": "Upload failed",
+    "confirm_drop_upload": "Upload {{name}}?",
     "max_size": "Max {{mb}}MB"
   },
   "wiki": {

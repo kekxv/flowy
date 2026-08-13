@@ -31,6 +31,24 @@ async def _login(client, username="testuser", password="password123"):
 
 class TestIssueAPI:
     @pytest.mark.asyncio
+    async def test_wiki_upload_limit_endpoint_returns_configured_limit(
+        self, db_session, test_user
+    ):
+        """The static upload-limit endpoint is not captured as a Wiki page ID."""
+        from app.models.settings import AppSetting
+
+        db_session.add(AppSetting(key="wiki_upload_max_mb", value="12"))
+        await db_session.flush()
+        transport = _build_transport(db_session)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            response = await client.get("/api/v1/wiki/upload-limit", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"limit": 12 * 1024 * 1024, "limit_mb": 12}
+
+    @pytest.mark.asyncio
     async def test_create_issue(self, db_session, test_user):
         """Create an issue."""
         transport = _build_transport(db_session)

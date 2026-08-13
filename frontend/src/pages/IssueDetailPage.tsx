@@ -538,9 +538,10 @@ function TimerW({issueId}:{issueId:string}){
     <span className="font-mono text-[11px] tabular-nums text-[var(--text-secondary)]">{String(h).padStart(2,"0")}:{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</span>
     <button onClick={tt} className={`flex h-5 w-5 items-center justify-center rounded-full text-white transition-all hover:scale-110 ${running?"bg-red-500 hover:bg-red-600":"bg-emerald-500 hover:bg-emerald-600"}`}>{running?<Square size={9}/>:<Play size={9}/>}</button></span>;}
 
-const STAT_LBLS:Record<string,string>={invalid:"Invalid",outdated:"Outdated",duplicate:"Duplicate",resolved:"Resolved",valid:""};
+const COMMENT_STATUS_KEYS:Record<string,string>={invalid:"comment_status.invalid",outdated:"comment_status.outdated",duplicate:"comment_status.duplicate",resolved:"comment_status.resolved",valid:"comment_status.valid"};
 function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any){
   const[ss,setSs]=useState(false);const hidden=c.status!=="valid";
+  const statusLabel = t(COMMENT_STATUS_KEYS[c.status] || c.status);
   const canDeleteAttachment=canEdit||c.author?.id===curUserId;
   const attachments = extractCommentAttachments(c.body || "");
   const handleDelete = async (storageName: string, displayName: string) => {
@@ -550,7 +551,7 @@ function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any)
   };
   return <div className={depth>0?"ml-8 border-l-2 border-[var(--border-light)] pl-3":""}>
     <div className={`mb-3 rounded-lg border p-3 transition-all ${hidden?"border-dashed bg-[var(--bg)] opacity-80":""}`}>
-      {hidden&&<div className="mb-2 inline-flex items-center gap-1.5 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">⚠ {STAT_LBLS[c.status]}</div>}
+      {hidden&&<div className="mb-2 inline-flex items-center gap-1.5 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">⚠ {statusLabel}</div>}
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[10px] font-semibold text-[var(--primary)]">{(c.author?.display_name||c.author?.username||"?")[0].toUpperCase()}</div>
@@ -559,10 +560,10 @@ function Cm({c,issueId,roles,canEdit,curUserId,onReply,onRefresh,t,depth=0}:any)
           <span className="text-[10px] text-[var(--text-muted)]">{new Date(c.created_at).toLocaleString()}</span>
         </div>
         {canEdit && <div className="relative">
-          <button onClick={()=>setSs(!ss)} className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors">{hidden?STAT_LBLS[c.status]:"···"}</button>
+          <button onClick={()=>setSs(!ss)} className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors">{hidden?statusLabel:"···"}</button>
           {ss&&<div className="absolute right-0 top-full z-10 mt-1.5 w-28 card rounded-lg py-1  animate-[fadeInUp_.15s_ease-out]">
             {(hidden?["valid",c.status]:["invalid","outdated","duplicate","resolved"]).map((s:string)=><button key={s} onClick={async()=>{await api.patch(`/issues/${issueId}/comments/${c.id}/status`,{status:s});setSs(false);onRefresh?.();}}
-              className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{STAT_LBLS[s]||s}</button>)}</div>}</div>}
+              className={`block w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-[var(--bg-hover)] ${c.status===s?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>{c.status===s&&"✓ "}{t(COMMENT_STATUS_KEYS[s] || s)}</button>)}</div>}</div>}
       </div>
       <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-secondary)] ${hidden?"blur-[1px] select-none":""}`}><MarkdownContent>{c.body}</MarkdownContent></div>
       {attachments.length > 0 && (

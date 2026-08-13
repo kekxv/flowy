@@ -101,6 +101,13 @@
     "milestone": "里程碑",
     "select_milestone": "选择里程碑"
   },
+  "comment_status": {
+    "valid": "有效",
+    "invalid": "无效",
+    "outdated": "已过时",
+    "duplicate": "重复",
+    "resolved": "已解决"
+  },
   "dashboard": {
     "title": "仪表盘",
     "my_tasks": "我的任务",
@@ -301,6 +308,7 @@
     "uploading": "上传中...",
     "file_too_large": "文件大小超过 {{mb}}MB 限制",
     "upload_failed": "上传失败",
+    "confirm_drop_upload": "确认上传 {{name}}？",
     "max_size": "最大 {{mb}}MB"
   },
   "wiki": {

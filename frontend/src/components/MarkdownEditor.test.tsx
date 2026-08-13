@@ -31,6 +31,7 @@ async function renderMarkdownEditor(
 
 describe("MarkdownEditor", () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(getWikiUploadLimit).mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
     vi.mocked(api.post).mockResolvedValue({
       data: {
@@ -105,6 +106,39 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith(
       "Before [note.any](/api/v1/bot-attachments/AbC123.bin)",
     )
+  })
+
+  it("uploads a dropped file only after confirmation", async () => {
+    const onChange = vi.fn()
+    vi.stubGlobal("confirm", vi.fn(() => true))
+    await renderMarkdownEditor(<MarkdownEditor value="" onChange={onChange} />)
+
+    const file = new File(["contents"], "dropped.any", { type: "application/octet-stream" })
+    fireEvent.drop(screen.getByTestId("markdown-editor-dropzone"), {
+      dataTransfer: { files: [file] },
+    })
+
+    await waitFor(() => expect(window.confirm).toHaveBeenCalled())
+    expect(api.post).toHaveBeenCalledWith(
+      "/bot-attachments/upload",
+      expect.any(FormData),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it("does not upload a dropped file when confirmation is cancelled", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => false))
+    await renderMarkdownEditor(<MarkdownEditor value="" onChange={vi.fn()} />)
+
+    const file = new File(["contents"], "dropped.any", { type: "application/octet-stream" })
+    fireEvent.drop(screen.getByTestId("markdown-editor-dropzone"), {
+      dataTransfer: { files: [file] },
+    })
+
+    expect(window.confirm).toHaveBeenCalled()
+    expect(api.post).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 
   it("renders distinct controls for file and image insertion", async () => {
