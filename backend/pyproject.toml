@@ -5,18 +5,18 @@ description = "Lightweight issue tracking platform"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.140.11",
-    "uvicorn[standard]>=0.32.0",
+    "uvicorn[standard]>=0.52.1",
     "sqlalchemy[asyncio]>=2.0.36",
     "aiosqlite>=0.20.0",
     "PyJWT[crypto]>=2.10.1",
     "bcrypt>=4.1,<5",
-    "python-multipart>=0.0.31",
+    "python-multipart>=0.0.32",
     "httpx>=0.28.0",
     "pydantic-settings>=2.14.2",
     "cryptography>=48.0.1",
     "alembic>=1.14.0",
     "email-validator>=2.2.0",
-    "wecom-aibot-sdk-python>=0.1.0",
+    "wecom-aibot-sdk-python>=0.1.7",
     "Pillow>=12.3.0",
     "pyasn1>=0.6.4",
     "jieba>=0.42.1",
@@ -28,8 +28,8 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "httpx>=0.28.0",
     "respx>=0.22.0",
-    "ruff>=0.8.0",
-    "mypy>=1.14.0",
+    "ruff>=0.16.1",
+    "mypy>=2.3.0",
     "pytest-cov>=6.0.0",
 ]
 
