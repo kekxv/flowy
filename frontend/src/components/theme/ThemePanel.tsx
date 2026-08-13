@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette } from "lucide-react";
-import { useTheme } from "./ThemeProvider";
+import { useTheme } from "./ThemeContext";
 
 export default function ThemePanel() {
   const { color, setColor, preset, setPreset, presets } = useTheme();
