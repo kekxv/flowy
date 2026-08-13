@@ -280,7 +280,7 @@ export default function WikiDetailPage() {
             </>
           )}
           {isOwner && !editing && (
-            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-red-500 hover:bg-red-50">
+            <button aria-label={t("wiki.delete_page", "Delete page")} onClick={handleDelete} className="btn btn-ghost btn-sm text-red-500 hover:bg-red-50">
               <Trash2 size={14} />
             </button>
           )}

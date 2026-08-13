@@ -1615,18 +1615,19 @@ class CommandHandlers:
             return f"**{p.title}**\n\n{content}"
 
         # Multiple results: numbered list for user selection
-        lines = [f"📚 找到 {len(pages)} 条与「{keyword}」相关的知识库页面：\n"]
+        lines = ["## 📚 知识库搜索结果\n", f"找到 **{len(pages)}** 条与「{keyword}」相关的页面\n"]
         for i, p in enumerate(pages, 1):
             owner_name = p.owner.display_name or p.owner.username if p.owner else "未知"
             visibility = "🌐" if p.is_public else "🔒"
-            lines.append(f"{i}. {visibility} **{p.title}** _({owner_name})_")
+            lines.append(f"### {i}. {visibility} {p.title}")
+            lines.append(f"_{owner_name}_")
             if p.summary:
                 summary = re.sub(r"\s+", " ", p.summary).strip()
                 if len(summary) > 120:
                     summary = f"{summary[:120]}..."
-                lines.append(f"   {summary}")
+                lines.append(f"> {summary}")
 
-        lines.append("\n> _回复序号查看详细内容_")
+        lines.append("\n> 回复序号（如 `1`）查看完整内容")
 
         # Store pending results for numeric selection
         self.pending_wiki_results = [p.id for p in pages]

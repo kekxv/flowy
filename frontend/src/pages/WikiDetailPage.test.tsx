@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
@@ -92,5 +92,31 @@ describe("WikiDetailPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }))
     expect(screen.getByLabelText("Summary (Markdown)")).toHaveValue("**Existing** summary")
+  })
+
+  it("deletes an owner page after confirmation and returns to the wiki list", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true))
+    wikiMocks.getWikiPage.mockResolvedValue({
+      collaborator_ids: [], content: "", created_at: "2026-08-05T00:00:00", id: "wiki-page",
+      is_public: false, owner_display_name: "Owner", owner_id: "admin-user", owner_name: "owner",
+      slug: "wiki-page", summary: "", tags: "", title: "Wiki page", updated_at: "2026-08-05T00:00:00", weight: 0,
+    })
+    wikiMocks.listCollaborators.mockResolvedValue([])
+    wikiMocks.getWikiUploadLimit.mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
+    wikiMocks.deleteWikiPage.mockResolvedValue(undefined)
+
+    render(
+      <MemoryRouter initialEntries={["/wiki/wiki-page"]}>
+        <Routes>
+          <Route path="/wiki/:id" element={<WikiDetailPage />} />
+          <Route path="/wiki" element={<p>Wiki list</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete page" }))
+
+    await waitFor(() => expect(wikiMocks.deleteWikiPage).toHaveBeenCalledWith("wiki-page"))
+    expect(screen.getByText("Wiki list")).toBeInTheDocument()
   })
 })

@@ -118,13 +118,19 @@ async def get_visible_pages(
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
-    query = query.order_by(WikiPage.id.desc()).offset(offset).limit(limit)
-
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
     result = await db.execute(query)
     pages = list(result.scalars().all())
+    if q and q.strip():
+        pages.sort(
+            key=lambda page: (_relevance_score(page, tokens), page.weight, page.updated_at),
+            reverse=True,
+        )
+    else:
+        pages.sort(key=lambda page: page.id, reverse=True)
+    pages = pages[offset:offset + limit]
     return pages, total
 
 
@@ -437,6 +443,11 @@ async def fuzzy_search(
     )
     pages = list(result.scalars().all())
 
+    exact_title_pages = [page for page in pages if page.title.casefold() == keyword.strip().casefold()]
+    if exact_title_pages:
+        exact_title_pages.sort(key=lambda page: (page.weight, page.updated_at), reverse=True)
+        return exact_title_pages[:1]
+
     # Score and sort by relevance, filter out low-quality matches
     scored = [(p, _relevance_score(p, tokens)) for p in pages]
     scored.sort(key=lambda x: x[1], reverse=True)
@@ -445,10 +456,10 @@ async def fuzzy_search(
     if not filtered:
         return []
 
-    # If the runner-up is less than half the top score, the top result is a
+    # If the runner-up is less than one third of the top score, the top result is a
     # clear winner — return only it. Otherwise return the normal list so the
     # user can pick from multiple candidates.
-    if len(filtered) >= 2 and filtered[1][1] < filtered[0][1] / 2:
+    if len(filtered) >= 2 and filtered[1][1] < filtered[0][1] / 3:
         return [filtered[0][0]]
 
     return [p for p, _ in filtered[:limit]]

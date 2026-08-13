@@ -336,6 +336,7 @@
     "hour_ago": "小时前",
     "not_found": "页面未找到",
     "confirm_delete": "确定要删除此页面吗？",
+    "delete_page": "删除页面",
     "collaborators": "协作者",
     "add_collaborator": "添加协作者",
     "search_user": "搜索用户...",

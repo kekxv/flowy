@@ -7,6 +7,8 @@ import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
 import { timeAgo } from "../utils/time";
 import Loader from "../components/Loader";
+import DashboardChart from "../components/DashboardChart";
+import type { EChartsOption } from "echarts";
 
 interface DashboardData {
   my_issues: Array<{ id: string; title: string; status: string; priority: string; issue_type?: string; roles: string[]; created_at: string }>;
@@ -23,17 +25,13 @@ interface DashboardData {
 
 const fmtMs = (ms: number) => { const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
 
-function RingProgress({ pct, size = 44, stroke = 4 }: { pct: number; size?: number; stroke?: number }) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
-  return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f3f4f6" strokeWidth={stroke} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--primary)" strokeWidth={stroke}
-        strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700" />
-    </svg>
-  );
+function RingProgress({ pct, size = 44 }: { pct: number; size?: number }) {
+  return <DashboardChart height={size} option={{
+    series: [{ type: "pie", radius: ["70%", "88%"], silent: true, label: { show: false }, data: [
+      { value: pct, itemStyle: { color: "#2563eb" } },
+      { value: Math.max(0, 100 - pct), itemStyle: { color: "#f3f4f6" } },
+    ] }],
+  }} />;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -44,106 +42,23 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: "#ef4444", high: "#f97316", medium: "#6b7280", low: "#0ea5e9", trivial: "#9ca3af",
 };
 
-function DonutChart({ data, size = 160 }: { data: Record<string, number>; size?: number }) {
-  const total = Object.values(data).reduce((a, b) => a + b, 0);
-  if (total === 0) return <div className="flex h-40 items-center justify-center text-[12px] text-[var(--text-muted)]">No data</div>;
-  const r = (size - 20) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-  const entries = Object.entries(data).filter(([, v]) => v > 0);
-  return (
-    <div className="flex items-center gap-4">
-      <svg width={size} height={size} className="-rotate-90 shrink-0">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f3f4f6" strokeWidth={14} />
-        {entries.map(([key, value]) => {
-          const pct = value / total;
-          const dash = pct * c;
-          const el = (
-            <circle key={key} cx={size / 2} cy={size / 2} r={r} fill="none"
-              stroke={STATUS_COLORS[key] || "#9ca3af"} strokeWidth={14}
-              strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={-offset}
-              strokeLinecap="butt" className="transition-all duration-700" />
-          );
-          offset += dash;
-          return el;
-        })}
-        <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
-          className="rotate-90 fill-[var(--text)] text-[22px] font-semibold" style={{ transformOrigin: "center" }}>
-          {total}
-        </text>
-      </svg>
-      <div className="flex flex-col gap-1.5 min-w-0">
-        {entries.map(([key, value]) => (
-          <div key={key} className="flex items-center gap-2 text-[12px]">
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[key] || "#9ca3af" }} />
-            <span className="text-[var(--text-secondary)] truncate">{key.replace("_", " ")}</span>
-            <span className="ml-auto font-semibold tabular-nums text-[var(--text)]">{value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function lineOption(data: Array<{ date: string; count: number }>, color: string): EChartsOption {
+  return { grid: { left: 8, right: 8, top: 8, bottom: 22 }, tooltip: { trigger: "axis" }, xAxis: { type: "category", boundaryGap: false, data: data.map(d => d.date.slice(5)), axisLabel: { fontSize: 9, color: "#9ca3af" }, axisLine: { show: false }, axisTick: { show: false } }, yAxis: { type: "value", minInterval: 1, splitLine: { lineStyle: { color: "#f3f4f6" } }, axisLabel: { fontSize: 9, color: "#9ca3af" } }, series: [{ type: "line", data: data.map(d => d.count), smooth: true, symbol: "none", lineStyle: { color, width: 2 }, areaStyle: { color }, emphasis: { focus: "series" } }] };
 }
 
-function PriorityBars({ data }: { data: Record<string, number> }) {
-  const order = ["critical", "high", "medium", "low", "trivial"];
-  const max = Math.max(1, ...Object.values(data));
-  const entries = order.filter(k => (data[k] ?? 0) > 0);
-  if (entries.length === 0) return <div className="flex h-24 items-center justify-center text-[12px] text-[var(--text-muted)]">No data</div>;
-  return (
-    <div className="space-y-2">
-      {entries.map(k => {
-        const v = data[k] ?? 0;
-        const pct = (v / max) * 100;
-        return (
-          <div key={k} className="flex items-center gap-2.5">
-            <span className="w-14 text-[11px] font-medium text-[var(--text-muted)] capitalize">{k}</span>
-            <div className="flex-1 h-4 rounded-full bg-[var(--bg-muted)] overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${pct}%`, backgroundColor: PRIORITY_COLORS[k] || "#9ca3af" }} />
-            </div>
-            <span className="w-6 text-right text-[12px] font-semibold tabular-nums text-[var(--text)]">{v}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
+function donutOption(data: Record<string, number>): EChartsOption {
+  const entries = Object.entries(data).filter(([, value]) => value > 0);
+  return { tooltip: { trigger: "item" }, legend: { type: "scroll", orient: "vertical", right: 0, top: "center", textStyle: { fontSize: 11 } }, series: [{ type: "pie", radius: ["55%", "78%"], center: ["35%", "50%"], label: { show: false }, data: entries.map(([name, value]) => ({ name: name.replace("_", " "), value, itemStyle: { color: STATUS_COLORS[name] || "#9ca3af" } })) }] };
 }
 
-function Sparkline({ data, width = 200, height = 40 }: { data: Array<{ date: string; count: number }>; width?: number; height?: number }) {
-  if (!data.length) return null;
-  const max = Math.max(1, ...data.map(d => d.count));
-  const step = width / Math.max(1, data.length - 1);
-  const points = data.map((d, i) => `${i * step},${height - (d.count / max) * (height - 4) - 2}`).join(" ");
-  const areaPoints = `0,${height} ${points} ${width},${height}`;
-  return (
-    <div>
-      <svg width={width} height={height} className="w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon points={areaPoints} fill="url(#sparkGrad)" />
-        <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {data.map((d, i) => d.count > 0 ? (
-          <circle key={i} cx={i * step} cy={height - (d.count / max) * (height - 4) - 2} r="2.5"
-            fill="white" stroke="var(--primary)" strokeWidth="1.5" />
-        ) : null)}
-      </svg>
-      <div className="flex justify-between text-[9px] text-[var(--text-faint)] mt-1">
-        {data.map((d, i) => (i === 0 || i === data.length - 1 || i === Math.floor(data.length / 2))
-          ? <span key={i}>{d.date.slice(5)}</span>
-          : <span key={i} />)}
-      </div>
-    </div>
-  );
+function barOption(data: Record<string, number>): EChartsOption {
+  const names = ["critical", "high", "medium", "low", "trivial"].filter(name => (data[name] ?? 0) > 0);
+  return { grid: { left: 55, right: 12, top: 8, bottom: 8 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: { type: "value", minInterval: 1, splitLine: { show: false }, axisLabel: { show: false } }, yAxis: { type: "category", data: names, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 11 } }, series: [{ type: "bar", barMaxWidth: 16, label: { show: true, position: "right" }, data: names.map(name => ({ value: data[name] ?? 0, itemStyle: { color: PRIORITY_COLORS[name] || "#9ca3af", borderRadius: [0, 4, 4, 0] } })) }] };
 }
 
-function TrendPanel({ title, data, color = "var(--primary)" }: { title: string; data: Array<{ date: string; count: number }>; color?: string }) {
+function TrendPanel({ title, data, color = "#2563eb" }: { title: string; data: Array<{ date: string; count: number }>; color?: string }) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
-  return <div className="card rounded-2xl p-5"><div className="mb-4 flex items-start justify-between"><div><p className="text-[12px] font-semibold tracking-normal text-[var(--text-secondary)]">{title}</p><p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{total}</p></div><span className="rounded-full bg-[var(--primary-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">近 30 天</span></div><div style={{ color }}><Sparkline data={data} width={320} height={76} /></div></div>;
+  return <div className="card rounded-2xl p-5"><div className="mb-2 flex items-start justify-between"><div><p className="text-[12px] font-semibold tracking-normal text-[var(--text-secondary)]">{title}</p><p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{total}</p></div><span className="rounded-full bg-[var(--primary-subtle)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">近 30 天</span></div><DashboardChart option={lineOption(data, color)} height={110} /></div>;
 }
 
 export default function DashboardPage() {
@@ -235,19 +150,19 @@ export default function DashboardPage() {
         {/* Status donut */}
         <div className="card rounded-[10px] p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-4">{t("dashboard.by_status", "By Status")}</h3>
-          <DonutChart data={data.stats.by_status || {}} />
+          <DashboardChart option={donutOption(data.stats.by_status || {})} />
         </div>
 
         {/* Priority bars */}
         <div className="card rounded-[10px] p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-4">{t("dashboard.by_priority", "By Priority")}</h3>
-          <PriorityBars data={data.stats.by_priority || {}} />
+          <DashboardChart option={barOption(data.stats.by_priority || {})} />
         </div>
 
         {/* 7-day activity sparkline */}
         <div className="card rounded-[10px] p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-4">{t("dashboard.recent_activity", "Last 7 Days")}</h3>
-          <Sparkline data={data.stats.recent_activity || []} />
+          <DashboardChart option={lineOption(data.stats.recent_activity || [], "#2563eb")} height={100} />
           <div className="mt-3 flex items-center justify-between text-[12px] text-[var(--text-muted)]">
             <span>{(data.stats.recent_activity || []).reduce((a, d) => a + d.count, 0)} issues created</span>
             <span className="font-semibold text-[var(--primary)] tabular-nums">
@@ -400,7 +315,7 @@ export default function DashboardPage() {
                 <Link key={m.id} to={`/milestones/${m.id}`}
                   className="card flex items-center gap-3.5 rounded-[10px] px-4 py-3.5 transition-all hover:border-[#d1d5db] hover:shadow-sm">
                   <div className="relative flex items-center justify-center shrink-0">
-                    <RingProgress pct={m.progress} size={44} stroke={3.5} />
+                    <RingProgress pct={m.progress} size={44} />
                     <span className="absolute text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">{m.progress}%</span>
                   </div>
                   <div className="min-w-0 flex-1">

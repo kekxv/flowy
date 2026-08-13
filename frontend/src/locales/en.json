@@ -339,6 +339,7 @@
     "hour_ago": "h ago",
     "not_found": "Page not found",
     "confirm_delete": "Are you sure you want to delete this page?",
+    "delete_page": "Delete page",
     "collaborators": "Collaborators",
     "add_collaborator": "Add Collaborator",
     "search_user": "Search user...",

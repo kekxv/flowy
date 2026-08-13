@@ -127,6 +127,17 @@ class TestFuzzySearch:
         assert result[0].title == "Docker"
 
     @pytest.mark.asyncio
+    async def test_exact_full_title_match_returns_only_that_page(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="exact-title-user", username="exact-title", email="exact-title@example.com")
+        await _create_wiki_page(db_session, user.id, "批量制证设置流程", is_public=True)
+        await _create_wiki_page(db_session, user.id, "边导入制证流水边批量制证", is_public=True)
+        await _create_wiki_page(db_session, user.id, "批量制证页面不展示：失败数", is_public=True)
+
+        result = await wiki_service.fuzzy_search(db_session, "批量制证设置流程", user.id)
+
+        assert [page.title for page in result] == ["批量制证设置流程"]
+
+    @pytest.mark.asyncio
     async def test_title_partial_match(self, db_session: AsyncSession):
         user = await _create_user(db_session, id="u4", username="u4", email="u4@ex.com")
         await _create_wiki_page(db_session, user.id, "Docker 入门指南", is_public=True)
@@ -173,6 +184,23 @@ class TestFuzzySearch:
 
         assert [page.title for page in pages] == ["Release notes"]
         assert total == 1
+
+    @pytest.mark.asyncio
+    async def test_web_search_ranks_title_matches_before_tag_matches(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="web-ranking", username="web-ranking", email="web-ranking@example.com")
+        await _create_wiki_page(db_session, user.id, "Release notes", tags="docker")
+        await _create_wiki_page(db_session, user.id, "Docker deployment", summary="notes")
+        pages, total = await wiki_service.get_visible_pages(db_session, user.id, q="docker")
+        assert total == 2
+        assert [page.title for page in pages] == ["Docker deployment", "Release notes"]
+
+    @pytest.mark.asyncio
+    async def test_web_search_prioritizes_pages_matching_more_query_tokens(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="web-multi-token", username="web-multi-token", email="web-multi-token@example.com")
+        await _create_wiki_page(db_session, user.id, "Docker guide")
+        await _create_wiki_page(db_session, user.id, "Docker Compose guide")
+        pages, _ = await wiki_service.get_visible_pages(db_session, user.id, q="docker compose")
+        assert [page.title for page in pages] == ["Docker Compose guide", "Docker guide"]
 
     @pytest.mark.asyncio
     async def test_tag_match(self, db_session: AsyncSession):
@@ -247,6 +275,16 @@ class TestFuzzySearch:
         assert result[0].title == "Docker High"
 
     @pytest.mark.asyncio
+    async def test_runner_up_above_one_third_of_top_score_keeps_multiple_results(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="score-ratio-user", username="score-ratio", email="score-ratio@example.com")
+        await _create_wiki_page(db_session, user.id, "Docker Compose Guide handbook", is_public=True)
+        await _create_wiki_page(db_session, user.id, "Docker handbook", is_public=True, weight=7)
+
+        result = await wiki_service.fuzzy_search(db_session, "docker compose guide reference", user.id)
+
+        assert [page.title for page in result] == ["Docker Compose Guide handbook", "Docker handbook"]
+
+    @pytest.mark.asyncio
     async def test_multi_token_search(self, db_session: AsyncSession):
         """Search with multiple tokens."""
         user = await _create_user(db_session, id="u14", username="u14", email="u14@ex.com")
@@ -316,6 +354,20 @@ class TestHandleWiki:
         # Should set pending_wiki_results
         assert handlers.pending_wiki_results is not None
         assert len(handlers.pending_wiki_results) == 3
+
+    @pytest.mark.asyncio
+    async def test_multiple_results_use_compact_readable_markdown(self, db_session: AsyncSession):
+        user = await _create_user(db_session, id="wiki-format-user", username="format", email="format@example.com")
+        await _create_wiki_page(db_session, user.id, "Docker Basics", summary="**Start here**", is_public=True)
+        await _create_wiki_page(db_session, user.id, "Docker Advanced", summary="_Production tips_", is_public=True)
+        bot_user = await _create_bot_user(db_session, "wx-wiki-format", flowy_user_id=user.id)
+        handlers = CommandHandlers(db=db_session, bot_user=bot_user, wechat_user_id="wx-wiki-format")
+
+        result = await handlers.handle_wiki(["Docker"], {})
+
+        assert "## 📚 知识库搜索结果" in result
+        assert "### 1. 🌐 Docker" in result
+        assert "> 回复序号（如 `1`）查看完整内容" in result
 
     @pytest.mark.asyncio
     async def test_multiple_results_include_markdown_summary_preview(self, db_session: AsyncSession):
