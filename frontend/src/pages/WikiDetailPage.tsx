@@ -101,6 +101,7 @@ export default function WikiDetailPage() {
     page && currentUser && page.collaborator_ids.includes(currentUser.id);
   const isAdmin = currentUser?.role === "admin";
   const canEdit = isAdmin || isOwner || isCollaborator;
+  const canDelete = isAdmin || isOwner;
 
   const handleSave = async () => {
     if (!page) return;
@@ -122,7 +123,7 @@ export default function WikiDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!page || !isOwner) return;
+    if (!page || !canDelete) return;
     if (!confirm(t("wiki.confirm_delete", "Are you sure you want to delete this page?"))) return;
     await deleteWikiPage(page.id);
     navigate("/wiki");
@@ -279,7 +280,7 @@ export default function WikiDetailPage() {
               </button>
             </>
           )}
-          {isOwner && !editing && (
+          {canDelete && !editing && (
             <button aria-label={t("wiki.delete_page", "Delete page")} onClick={handleDelete} className="btn btn-ghost btn-sm text-red-500 hover:bg-red-50">
               <Trash2 size={14} />
             </button>

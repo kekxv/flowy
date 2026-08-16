@@ -27,6 +27,7 @@ vi.mock("react-i18next", () => ({
 
 describe("WikiDetailPage", () => {
   it("shows edit controls to an admin for a page owned by another user", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true))
     wikiMocks.getWikiPage.mockResolvedValue({
       collaborator_ids: [],
       content: "Private content",
@@ -44,18 +45,23 @@ describe("WikiDetailPage", () => {
     })
     wikiMocks.listCollaborators.mockResolvedValue([])
     wikiMocks.getWikiUploadLimit.mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
+    wikiMocks.deleteWikiPage.mockResolvedValue(undefined)
 
     render(
       <MemoryRouter initialEntries={["/wiki/private-page"]}>
         <Routes>
           <Route path="/wiki/:id" element={<WikiDetailPage />} />
+          <Route path="/wiki" element={<p>Wiki list</p>} />
         </Routes>
       </MemoryRouter>,
     )
 
     const editButton = await screen.findByRole("button", { name: "Edit" })
-    fireEvent.click(editButton)
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument()
+    expect(editButton).toBeInTheDocument()
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete page" }))
+    await waitFor(() => expect(wikiMocks.deleteWikiPage).toHaveBeenCalledWith("private-page"))
+    expect(screen.getByText("Wiki list")).toBeInTheDocument()
   })
 
   it("does not limit file extensions in either Wiki upload picker", async () => {
