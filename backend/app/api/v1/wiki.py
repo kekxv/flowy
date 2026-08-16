@@ -172,7 +172,7 @@ async def delete_wiki_page(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Delete a wiki page (owner only)."""
+    """Delete a wiki page (owner or administrator)."""
     page = await wiki_service.get_page_for_user(
         db, page_id, user.id, is_admin=user.role == "admin"
     )

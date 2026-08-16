@@ -27,6 +27,38 @@ vi.mock("react-i18next", () => ({
 
 describe("WikiDetailPage", () => {
   it("shows edit controls to an admin for a page owned by another user", async () => {
+    wikiMocks.getWikiPage.mockResolvedValue({
+      collaborator_ids: [],
+      content: "Private content",
+      created_at: "2026-08-05T00:00:00",
+      id: "private-page",
+      is_public: false,
+      owner_display_name: "Owner",
+      owner_id: "owner-user",
+      owner_name: "owner",
+      slug: "private-page",
+      tags: "",
+      title: "Private page",
+      updated_at: "2026-08-05T00:00:00",
+      weight: 0,
+    })
+    wikiMocks.listCollaborators.mockResolvedValue([])
+    wikiMocks.getWikiUploadLimit.mockResolvedValue({ limit: 5 * 1024 * 1024, limit_mb: 5 })
+
+    render(
+      <MemoryRouter initialEntries={["/wiki/private-page"]}>
+        <Routes>
+          <Route path="/wiki/:id" element={<WikiDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const editButton = await screen.findByRole("button", { name: "Edit" })
+    fireEvent.click(editButton)
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument()
+  })
+
+  it("deletes a page owned by another user when an administrator confirms", async () => {
     vi.stubGlobal("confirm", vi.fn(() => true))
     wikiMocks.getWikiPage.mockResolvedValue({
       collaborator_ids: [],
@@ -55,9 +87,6 @@ describe("WikiDetailPage", () => {
         </Routes>
       </MemoryRouter>,
     )
-
-    const editButton = await screen.findByRole("button", { name: "Edit" })
-    expect(editButton).toBeInTheDocument()
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete page" }))
     await waitFor(() => expect(wikiMocks.deleteWikiPage).toHaveBeenCalledWith("private-page"))
