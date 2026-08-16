@@ -178,7 +178,7 @@ async def delete_wiki_page(
     )
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
-    if not wiki_service.is_owner(page, user.id):
+    if user.role != "admin" and not wiki_service.is_owner(page, user.id):
         raise HTTPException(status_code=403, detail="Only the owner can delete this wiki page")
     await wiki_service.delete_page(db, page)
 

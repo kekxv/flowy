@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -14,6 +15,27 @@ from app.services.wechat_work_bot.handlers import CommandHandlers
 from app.services.wechat_work_bot.service import split_for_wecom
 
 NOW = datetime.now().isoformat()
+
+
+def _build_transport(db_session: AsyncSession) -> ASGITransport:
+    """Override the database dependency to use the test session."""
+    from app.main import app
+
+    async def override_get_db():
+        yield db_session
+
+    from app.database import get_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    return ASGITransport(app=app, raise_app_exceptions=True)
+
+
+async def _login(client: AsyncClient, username: str) -> dict[str, str]:
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"username_or_email": username, "password": "password123"},
+    )
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 def _make_user_kwargs(**kwargs) -> dict:
@@ -82,6 +104,48 @@ async def _create_wiki_page(
     db_session.add(page)
     await db_session.flush()
     return page
+
+
+# ─── Wiki Delete API Tests ────────────────────────────────────
+
+
+class TestWikiDeleteApi:
+
+    @pytest.mark.asyncio
+    async def test_only_owner_or_admin_can_delete_a_wiki_page(
+        self, db_session: AsyncSession, test_admin: User
+    ):
+        """Reject a member deleting another user's page, while allowing an admin."""
+        owner = await _create_user(
+            db_session,
+            id="wiki-owner",
+            username="wiki-owner",
+            email="wiki-owner@example.com",
+        )
+        member = await _create_user(
+            db_session,
+            id="wiki-member",
+            username="wiki-member",
+            email="wiki-member@example.com",
+        )
+        foreign_page = await _create_wiki_page(
+            db_session, owner.id, "Foreign page", is_public=True
+        )
+
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            member_headers = await _login(client, member.username)
+            member_response = await client.delete(
+                f"/api/v1/wiki/{foreign_page.id}", headers=member_headers
+            )
+            admin_headers = await _login(client, test_admin.username)
+            admin_response = await client.delete(
+                f"/api/v1/wiki/{foreign_page.id}", headers=admin_headers
+            )
+
+        assert member_response.status_code == 403
+        assert admin_response.status_code == 204
+        assert await db_session.get(WikiPage, foreign_page.id) is None
 
 
 # ─── Fuzzy Search Tests ────────────────────────────────────────
