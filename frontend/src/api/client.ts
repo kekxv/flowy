@@ -35,7 +35,12 @@ async function refreshAccessToken(): Promise<string> {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && !error.config._retry) {
+    const hasAuthTokens = Boolean(
+      localStorage.getItem("accessToken") && localStorage.getItem("refreshToken")
+    );
+    const isAuthRequest = error.config?.url?.startsWith("/auth/");
+
+    if (error.response?.status === 401 && hasAuthTokens && !isAuthRequest && !error.config._retry) {
       error.config._retry = true;
       try {
         const newToken = await refreshAccessToken();

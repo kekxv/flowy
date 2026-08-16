@@ -26,7 +26,7 @@ interface DashboardData {
 const fmtMs = (ms: number) => { const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
 
 function RingProgress({ pct, size = 44 }: { pct: number; size?: number }) {
-  return <DashboardChart height={size} option={{
+  return <DashboardChart height={size} width={size} option={{
     series: [{ type: "pie", radius: ["70%", "88%"], silent: true, label: { show: false }, data: [
       { value: pct, itemStyle: { color: "#2563eb" } },
       { value: Math.max(0, 100 - pct), itemStyle: { color: "#f3f4f6" } },

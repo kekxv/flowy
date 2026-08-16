@@ -4,6 +4,7 @@ import type { EChartsOption } from "echarts"
 interface DashboardChartProps {
   option: EChartsOption
   height?: number
+  width?: number | string
   emptyText?: string
 }
 
@@ -14,10 +15,12 @@ function hasSeriesData(option: EChartsOption): boolean {
   })
 }
 
-export default function DashboardChart({ option, height = 180, emptyText = "No data" }: DashboardChartProps) {
+export default function DashboardChart({ option, height = 180, width = "100%", emptyText = "No data" }: DashboardChartProps) {
+  const style = { width, height }
+
   if (!hasSeriesData(option)) {
-    return <div className="flex items-center justify-center text-[12px] text-[var(--text-muted)]" style={{ height }}>{emptyText}</div>
+    return <div className="flex items-center justify-center text-[12px] text-[var(--text-muted)]" style={style}>{emptyText}</div>
   }
 
-  return <ReactECharts data-testid="dashboard-echart" option={option} style={{ height }} notMerge lazyUpdate />
+  return <ReactECharts data-testid="dashboard-echart" option={option} style={style} notMerge lazyUpdate />
 }
