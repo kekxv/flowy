@@ -268,7 +268,10 @@
     "registration": "注册开关",
     "registration_hint": "允许新用户自行注册账号",
     "wiki_upload_limit": "Wiki 上传大小限制",
-    "wiki_upload_limit_hint": "知识库图片和文件的最大上传大小（MB）"
+    "wiki_upload_limit_hint": "知识库图片和文件的最大上传大小（MB）",
+    "reset_password": "重置密码",
+    "new_password": "新密码",
+    "confirm_password_reset": "确认重置"
   },
   "external": {
     "linked_issues": "关联的外部 Issue",

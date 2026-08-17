@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, UserCog, Crown, Globe, Code2, Settings2, Lock, Briefcase, X, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, UserCog, Crown, Globe, Code2, Settings2, Lock, Briefcase, X, Plus, ChevronDown, ChevronUp, KeyRound } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
@@ -42,6 +42,8 @@ export default function AdminPage() {
   const [roleEditRoles, setRoleEditRoles] = useState<string[]>([]);
   const [userEditUser, setUserEditUser] = useState<UserItem|null>(null);
   const [userEditForm, setUserEditForm] = useState({display_name: "", nickname: ""});
+  const [passwordResetUser, setPasswordResetUser] = useState<UserItem|null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const toggleRole = async (u:UserItem) => { await api.put(`/users/${u.id}`,{role:u.role==="admin"?"member":"admin"}); fetch(); };
   const toggleActive = async (u:UserItem) => { await api.put(`/users/${u.id}`,{is_active:!u.is_active}); fetch(); };
@@ -64,6 +66,16 @@ export default function AdminPage() {
     await api.put(`/users/${userEditUser.id}`, userEditForm);
     setUserEditUser(null);
     fetch();
+  };
+  const closePasswordReset = () => {
+    setPasswordResetUser(null);
+    setNewPassword("");
+  };
+  const resetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordResetUser) return;
+    await api.put(`/users/${passwordResetUser.id}/reset-password`, {new_password: newPassword});
+    closePasswordReset();
   };
 
   const saveNewUser = async () => {
@@ -316,6 +328,9 @@ export default function AdminPage() {
                           u.is_active?"text-[var(--text-muted)] hover:bg-red-50 hover:text-red-500":"text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
                         }`}>
                         {u.is_active?<ShieldOff size={14}/>:<Shield size={14}/>}</button>
+                      <button onClick={()=>setPasswordResetUser(u)} title={t("admin.reset_password")}
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-amber-50 hover:text-amber-600 transition-colors">
+                        <KeyRound size={14}/></button>
                     </div>
                   </td>
                 </tr>
@@ -415,6 +430,23 @@ export default function AdminPage() {
               <button onClick={saveUserEdit} className="btn btn-primary btn-sm w-full">{t("common.save")}</button>
             </div>
           </div>
+        </div>
+      )}
+      {passwordResetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={closePasswordReset}>
+          <form onSubmit={resetPassword} className="card w-80 rounded-xl overflow-hidden animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
+              <h3 className="text-sm font-semibold">{t("admin.reset_password")}</h3>
+              <button type="button" onClick={closePasswordReset} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
+            </div>
+            <div className="px-5 py-4">
+              <label htmlFor="admin-reset-password" className="text-[11px] font-medium text-[var(--text-secondary)]">{t("admin.new_password")}</label>
+              <input id="admin-reset-password" type="password" required minLength={6} value={newPassword} onChange={e => setNewPassword(e.target.value)} className="input mt-1 text-[13px]" />
+            </div>
+            <div className="border-t border-[var(--border-light)] px-5 py-3">
+              <button type="submit" className="btn btn-primary btn-sm w-full">{t("admin.confirm_password_reset")}</button>
+            </div>
+          </form>
         </div>
       )}
     </div>

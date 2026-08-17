@@ -271,7 +271,10 @@
     "registration": "Registration",
     "registration_hint": "Allow new users to create accounts",
     "wiki_upload_limit": "Wiki Upload Size Limit",
-    "wiki_upload_limit_hint": "Maximum file size for wiki image/file uploads (MB)"
+    "wiki_upload_limit_hint": "Maximum file size for wiki image/file uploads (MB)",
+    "reset_password": "Reset Password",
+    "new_password": "New Password",
+    "confirm_password_reset": "Confirm Reset"
   },
   "external": {
     "linked_issues": "Linked Issues",
