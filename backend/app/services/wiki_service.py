@@ -125,7 +125,7 @@ async def get_visible_pages(
     pages = list(result.scalars().all())
     if q and q.strip():
         pages.sort(
-            key=lambda page: (_relevance_score(page, tokens), page.weight, page.updated_at),
+            key=lambda page: (_relevance_score(page, tokens, q), page.weight, page.updated_at),
             reverse=True,
         )
     else:
@@ -330,12 +330,28 @@ def can_view(page: WikiPage, user_id: str) -> bool:
 
 
 # Minimum score threshold — pages below this are considered irrelevant noise
-# (e.g. matched only on a single digit or common character).
-_MIN_SCORE = 30
+# (e.g. matched only on a single digit or common character). It must stay low
+# enough to keep genuine field matches (title/tag/overview) now that the field
+# scores are small (10 / 5 / 2).
+_MIN_SCORE = 2
+
+# Field weights when ranking non-full-title matches (higher = more important).
+# The page body (content) is never searched — only curated metadata fields.
+_TITLE_SCORE = 10
+_TAG_SCORE = 5
+_SUMMARY_SCORE = 2
+
+# A complete/exact title match is the strongest signal and is returned directly
+# (see fuzzy_search); this bonus keeps it dominant in ranked lists too.
+_EXACT_TITLE_BONUS = 100
 
 
 def _searchable_wiki_metadata_filter(tokens: list[str]):
-    """Build the shared predicate for title, tags, and Markdown summary."""
+    """Build the shared predicate for title, tags, and the overview summary.
+
+    The page *body* (content) is deliberately NOT searched — only the metadata
+    fields a user curates (title / tags / overview summary) contribute to results.
+    """
     return or_(*[
         or_(
             WikiPage.title.ilike(f"%{token}%"),
@@ -346,52 +362,41 @@ def _searchable_wiki_metadata_filter(tokens: list[str]):
     ])
 
 
-def _relevance_score(page: WikiPage, tokens: list[str]) -> int:
+def _relevance_score(page: WikiPage, tokens: list[str], exact_keyword: str = "") -> int:
     """Calculate relevance score for a wiki page against search tokens.
 
-    Scoring per token (short tokens with len <= 1 score at 1/5 weight):
-    - Title exact match (all tokens): 100
-    - Title contains token: 50
-    - Tags contain token: 30
-    - Summary contains token: 20
+    Only title, tags, and the overview summary are scored — the page body
+    (content) is never searched. Scoring per token (short tokens with len <= 1
+    count at 1/5 weight because they are too common to be useful alone):
+    - Title contains token:        10
+    - Tags contain token:           5
+    - Overview/summary contains:    2
 
-    Bonus:
-    - Match ratio: matched_tokens / total_tokens * 50  (encourages multi-token hits)
-    - Page weight: page.weight * 2
+    A complete (exact) title match adds a substantial bonus so it always ranks
+    first. Page weight is added as a final tie-breaker.
     """
     score = 0
-    matched = 0
-    title_lower = page.title.lower()
+    title_lower = page.title.strip().lower()
     tags_lower = (page.tags or "").lower()
     summary_lower = (page.summary or "").lower()
 
+    # Complete/exact title match is the strongest signal.
+    if exact_keyword and title_lower == exact_keyword.strip().lower():
+        score += _EXACT_TITLE_BONUS
+
     for token in tokens:
         token_lower = token.lower()
-        # Short tokens (single digit / single char) count at 1/5 weight —
-        # they are too common to be useful as sole matches.
         weight = 1 if len(token) <= 1 else 5
-        hit = False
-        if title_lower == token_lower:
-            score += 100 * weight // 5
-            hit = True
-        elif token_lower in title_lower:
-            score += 50 * weight // 5
-            hit = True
+
+        if token_lower in title_lower:
+            score += _TITLE_SCORE * weight // 5
         if token_lower in tags_lower:
-            score += 30 * weight // 5
-            hit = True
+            score += _TAG_SCORE * weight // 5
         if token_lower in summary_lower:
-            score += 20 * weight // 5
-            hit = True
-        if hit:
-            matched += 1
+            score += _SUMMARY_SCORE * weight // 5
 
-    # Match-ratio bonus: rewards pages that match a larger share of the query.
-    if tokens:
-        score += int(matched / len(tokens) * 50)
-
-    # Weight bonus
-    score += page.weight * 2
+    # Weight bonus acts as a final tie-breaker without overpowering field matches.
+    score += page.weight
     return score
 
 
@@ -404,8 +409,10 @@ async def fuzzy_search(
 ) -> list[WikiPage]:
     """Fuzzy search wiki pages, ranked by relevance.
 
-    Searches both related users' wiki and public wiki by title, tags, and summary.
-    Returns pages sorted by relevance score (title match > tags > summary).
+    Searches both related users' wiki and public wiki by title, tags, and
+    overview summary — the page body is never searched. A page whose title
+    matches the keyword exactly is returned directly; other pages are ranked
+    by relevance (title > tags > overview).
     """
     if not keyword or not keyword.strip():
         return []
@@ -430,7 +437,21 @@ async def fuzzy_search(
         visibility_conditions.append(related_filter)
     visibility = or_(*visibility_conditions)
 
-    # Build search filter: any token matches any field
+    # Exact/complete title match is the highest priority — return it directly,
+    # regardless of weight, so the user always gets the page they named.
+    keyword_clean = keyword.strip()
+    exact_result = await db.execute(
+        select(WikiPage)
+        .where(visibility, func.lower(WikiPage.title) == keyword_clean.lower())
+        .options(selectinload(WikiPage.owner))
+        .order_by(WikiPage.weight.desc(), WikiPage.updated_at.desc())
+        .limit(1)
+    )
+    exact_page = exact_result.scalar_one_or_none()
+    if exact_page:
+        return [exact_page]
+
+    # Build search filter: any token matches any curated metadata field
     search_filter = _searchable_wiki_metadata_filter(tokens)
 
     # Fetch all matching pages
@@ -443,13 +464,8 @@ async def fuzzy_search(
     )
     pages = list(result.scalars().all())
 
-    exact_title_pages = [page for page in pages if page.title.casefold() == keyword.strip().casefold()]
-    if exact_title_pages:
-        exact_title_pages.sort(key=lambda page: (page.weight, page.updated_at), reverse=True)
-        return exact_title_pages[:1]
-
     # Score and sort by relevance, filter out low-quality matches
-    scored = [(p, _relevance_score(p, tokens)) for p in pages]
+    scored = [(p, _relevance_score(p, tokens, keyword_clean)) for p in pages]
     scored.sort(key=lambda x: x[1], reverse=True)
     filtered = [(p, s) for p, s in scored if s >= _MIN_SCORE]
 

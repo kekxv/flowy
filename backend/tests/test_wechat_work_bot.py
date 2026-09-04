@@ -1595,3 +1595,46 @@ class TestBotFileCommand:
             assert result.count("[下载文件](") == 10
             assert "| 文件名 |" not in result
             assert "| --- |" not in result
+
+
+# ─── Stay-Silent On Group Mentions ─────────────────────────────
+
+
+class TestShouldStaySilent:
+    """The bot stays silent on group messages that @-mention it together with others."""
+
+    def _service(self, bot_id: str = "bot-123"):
+        from app.services.wechat_work_bot.service import WeChatWorkBotService
+        svc = WeChatWorkBotService()
+        svc._bot_id = bot_id
+        return svc
+
+    def test_stays_silent_when_group_bot_and_others_mentioned(self):
+        from app.services.wechat_work_bot.message_parser import MessageContext
+        svc = self._service()
+        ctx = MessageContext(chattype="group", mentioned_list=["bot-123", "alice"])
+        assert svc._should_stay_silent(ctx) is True
+
+    def test_replies_when_only_bot_mentioned(self):
+        from app.services.wechat_work_bot.message_parser import MessageContext
+        svc = self._service()
+        ctx = MessageContext(chattype="group", mentioned_list=["bot-123"])
+        assert svc._should_stay_silent(ctx) is False
+
+    def test_silent_when_no_mentions(self):
+        from app.services.wechat_work_bot.message_parser import MessageContext
+        svc = self._service()
+        ctx = MessageContext(chattype="group", mentioned_list=[])
+        assert svc._should_stay_silent(ctx) is False
+
+    def test_silent_in_single_chat_even_with_others(self):
+        from app.services.wechat_work_bot.message_parser import MessageContext
+        svc = self._service()
+        ctx = MessageContext(chattype="single", mentioned_list=["bot-123", "alice"])
+        assert svc._should_stay_silent(ctx) is False
+
+    def test_silent_when_others_but_not_bot(self):
+        from app.services.wechat_work_bot.message_parser import MessageContext
+        svc = self._service()
+        ctx = MessageContext(chattype="group", mentioned_list=["alice", "bob"])
+        assert svc._should_stay_silent(ctx) is False

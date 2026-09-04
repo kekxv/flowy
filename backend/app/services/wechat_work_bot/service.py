@@ -237,7 +237,15 @@ class WeChatWorkBotService:
             parsed = await cmd_parser.parse(msg_ctx)
 
             if not parsed:
-                # No command matched — send help hint if auto_reply
+                # No command matched. Stay silent when the message @-mentions the
+                # bot together with other people — it is likely directed at the
+                # others, so replying with a help hint would just be noise.
+                if self._should_stay_silent(msg_ctx):
+                    logger.debug(
+                        "Message @-mentions the bot and others with no matching command; staying silent"
+                    )
+                    return
+                # Otherwise send a help hint
                 if self._client and msg_ctx.text.strip():
                     await self._client.reply_text(
                         frame,
@@ -314,6 +322,27 @@ class WeChatWorkBotService:
                     db, wechat_user_id, bot_user.id if bot_user else None, command_name,
                     parsed.args, error_msg, "failed", str(e)
                 )
+
+    def _should_stay_silent(self, msg_ctx) -> bool:
+        """Return True when the bot should stay silent on an unmatched message.
+
+        In group chats, if a message @-mentions the bot *and* other people but
+        no command was matched, the message is likely aimed at the other people
+        (e.g. "@assistant @alice 帮忙处理一下"), so replying with a help hint
+        would be noise.
+        """
+        if msg_ctx.chattype != "group":
+            return False
+        mentioned = msg_ctx.mentioned_list
+        if not mentioned:
+            return False
+        bot_userid = self._bot_id
+        if not bot_userid:
+            return False
+        mentioned_ids = {str(m) for m in mentioned}
+        bot_mentioned = bot_userid in mentioned_ids
+        others_mentioned = any(m != bot_userid for m in mentioned_ids)
+        return bot_mentioned and others_mentioned
 
     def _extract_mentions(self, frame: dict) -> list[str]:
         """Extract @mentioned userids from incoming message frame."""
