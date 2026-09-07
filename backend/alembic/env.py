@@ -14,6 +14,7 @@ from app.models.notification import (  # noqa: F401
     NotificationRule,
 )
 from app.models.settings import AppSetting  # noqa: F401
+from app.models.software import SoftwareComponent, SoftwareDependency, SoftwareVersion  # noqa: F401
 from app.models.tracking import (  # noqa: F401
     IssueAssigneeLog,
     Milestone,

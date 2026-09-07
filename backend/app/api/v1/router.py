@@ -12,6 +12,7 @@ from app.api.v1 import (
     milestones,
     notifications,
     settings_api,
+    software,
     sync,
     users,
     wechat_work_bot,
@@ -35,3 +36,4 @@ api_router.include_router(wechat_work_bot.router)
 api_router.include_router(wechat_work_bot.public_router)
 api_router.include_router(bot_attachments.router)
 api_router.include_router(wiki.router)
+api_router.include_router(software.router)

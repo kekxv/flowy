@@ -22,6 +22,7 @@ const WeChatWorkBotPage = lazy(() => import("./pages/WeChatWorkBotPage"))
 const WikiListPage = lazy(() => import("./pages/WikiListPage"))
 const WikiCreatePage = lazy(() => import("./pages/WikiCreatePage"))
 const WikiDetailPage = lazy(() => import("./pages/WikiDetailPage"))
+const SoftwareVersionPage = lazy(() => import("./pages/SoftwareVersionPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -53,6 +54,7 @@ function App() {
                       <Route path="/wiki" element={<WikiListPage />} />
                       <Route path="/wiki/new" element={<WikiCreatePage />} />
                       <Route path="/wiki/:id" element={<WikiDetailPage />} />
+                      <Route path="/software" element={<SoftwareVersionPage />} />
                       <Route path="/profile" element={<UserProfilePage />} />
                       <Route path="/settings/notifications" element={<NotificationsPage />} />
                       <Route path="/settings/wechat-work-bot" element={<WeChatWorkBotPage />} />

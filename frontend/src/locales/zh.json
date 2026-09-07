@@ -360,5 +360,63 @@
     "edit_mode": "编辑",
     "preview_mode": "预览",
     "no_content_preview": "暂无内容可预览"
+  },
+  "software": {
+    "breadcrumb_1": "项目概览",
+    "breadcrumb_2": "制品软件",
+    "title": "软件版本管理",
+    "subtitle": "管理当前项目包含的多个软件组件、制品包及跨软件依赖关系",
+    "publish": "发布新版本",
+    "publish_title": "发布新版本",
+    "component": "软件组件",
+    "select_component": "选择软件组件",
+    "new_component": "新建组件",
+    "create": "创建组件",
+    "version": "版本号",
+    "version_required": "请填写版本号",
+    "artifact_type": "产物类型",
+    "artifact": {
+      "file": "文件",
+      "url": "外链路径",
+      "none": "缺省"
+    },
+    "download_url": "下载路径",
+    "choose_file": "选择制品文件上传…",
+    "note": "版本说明",
+    "note_placeholder": "说明该版本的变更内容…",
+    "dependencies": "软件环境依赖",
+    "add_dependency": "添加依赖",
+    "publish_failed": "发布失败",
+    "latest_note": "最新说明：",
+    "file_prefix": "文件：",
+    "url_prefix": "外链：",
+    "env_deps": "软件环境依赖：",
+    "internal_deps": "依赖内部软件：",
+    "external_deps": "外部依赖：",
+    "history": "历史版本",
+    "no_versions": "暂无历史版本",
+    "deps_short": "个依赖",
+    "download": "下载",
+    "confirm_delete_component": "确定要删除此软件组件及其所有版本吗？",
+    "deleted": "已删除",
+    "empty": "暂无软件组件",
+    "no_version": "尚未发布任何版本",
+    "stat": {
+      "components": "软件组件数",
+      "versions": "累计发布版本",
+      "artifacts": "独立文件/路径产物",
+      "dependencies": "跨软件依赖项"
+    },
+    "tab_all": "全部软件",
+    "category": {
+      "frontend": "前端应用",
+      "backend": "后端服务",
+      "mobile": "移动端",
+      "engine": "引擎/服务",
+      "other": "其他"
+    },
+    "sort": "排序：",
+    "sort_updated": "按最后更新时间",
+    "sort_name": "按名称"
   }
 }

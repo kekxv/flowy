@@ -363,5 +363,63 @@
     "edit_mode": "Edit",
     "preview_mode": "Preview",
     "no_content_preview": "No content to preview"
+  },
+  "software": {
+    "breadcrumb_1": "Project Overview",
+    "breadcrumb_2": "Software Artifacts",
+    "title": "Software Version Management",
+    "subtitle": "Manage the software components, release artifacts and cross-software dependencies in this project",
+    "publish": "Publish Version",
+    "publish_title": "Publish a New Version",
+    "component": "Component",
+    "select_component": "Select a component",
+    "new_component": "New Component",
+    "create": "Create Component",
+    "version": "Version",
+    "version_required": "Version is required",
+    "artifact_type": "Artifact Type",
+    "artifact": {
+      "file": "File",
+      "url": "URL / Path",
+      "none": "None"
+    },
+    "download_url": "Download URL",
+    "choose_file": "Choose an artifact file to upload…",
+    "note": "Release Note",
+    "note_placeholder": "Describe the changes in this release…",
+    "dependencies": "Environment Dependencies",
+    "add_dependency": "Add Dependency",
+    "publish_failed": "Publish failed",
+    "latest_note": "Latest: ",
+    "file_prefix": "File: ",
+    "url_prefix": "Link: ",
+    "env_deps": "Environment deps: ",
+    "internal_deps": "Internal: ",
+    "external_deps": "External: ",
+    "history": "History",
+    "no_versions": "No versions yet",
+    "deps_short": "deps",
+    "download": "Download",
+    "confirm_delete_component": "Delete this component and all its versions?",
+    "deleted": "Deleted",
+    "empty": "No software components yet",
+    "no_version": "No version published yet",
+    "stat": {
+      "components": "Components",
+      "versions": "Releases",
+      "artifacts": "File / Path Artifacts",
+      "dependencies": "Cross-software Dependencies"
+    },
+    "tab_all": "All Software",
+    "category": {
+      "frontend": "Frontend",
+      "backend": "Backend",
+      "mobile": "Mobile",
+      "engine": "Engine / Service",
+      "other": "Other"
+    },
+    "sort": "Sort: ",
+    "sort_updated": "Last updated",
+    "sort_name": "Name"
   }
 }
