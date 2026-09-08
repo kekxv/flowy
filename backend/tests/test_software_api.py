@@ -260,7 +260,7 @@ async def test_soft_bot_command(db_session):
 
         # Duplicate names are NOT fuzzy-matched to a single hit:
         # querying by name disambiguates by identifier instead.
-        comp2 = await _create_component(
+        await _create_component(
             client, headers, identifier="flowy-web-legacy", name="Web Console",
         )
         res = await client.post(
