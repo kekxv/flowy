@@ -1807,28 +1807,31 @@ class CommandHandlers:
                 return f"[下载]({v.download_url})"
             return None
 
-        def _note_summary(v, limit: int = 140) -> str | None:
-            """Plain-text preview of a release note (markdown stripped)."""
-            text = (v.note or "").strip()
-            if not text:
+        def _note_md(v, limit: int | None = 140) -> str | None:
+            """Raw Markdown release note (optionally truncated for a preview).
+
+            Keeps Markdown syntax intact so WeChat renders the note as Markdown.
+            """
+            note = (v.note or "").strip()
+            if not note:
                 return None
-            import re as _re
-            cleaned = _re.sub(r'!\[[^\]]*\]\([^)]+\)', '', text)
-            cleaned = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)
-            cleaned = _re.sub(r'[#>*`_~\[\]|-]', '', cleaned)
-            cleaned = _re.sub(r'\s+', ' ', cleaned).strip()
-            return cleaned if len(cleaned) <= limit else cleaned[:limit].rstrip() + "…"
+            if limit and len(note) > limit:
+                cut = note[:limit]
+                boundary = max(cut.rfind("\n"), cut.rfind("。"), cut.rfind(". "), cut.rfind("，"))
+                if boundary >= limit * 0.6:
+                    cut = cut[:boundary].rstrip()
+                return cut.rstrip() + "\n  … _（完整说明请用 `/soft <标识>` 查看）_"
+            return note
 
         def _version_block(v) -> list[str]:
-            lines = [f"**v{v.version}**"]
-            if v.published_at:
-                lines.append(f"  · 发布于 {v.published_at[:10]}")
+            lines = [f"**v{v.version}** · 发布于 {v.published_at[:10] if v.published_at else '-'}"]
             dl = _download(v)
             if dl:
                 lines.append(f"  · 下载 {dl}")
-            summary = _note_summary(v)
-            if summary:
-                lines.append(f"  · {summary}")
+            note = _note_md(v)
+            if note:
+                lines.append("  · 说明:")
+                lines.append(note)
             return lines
 
         # ── No args: list every component with its latest version ──
@@ -1886,8 +1889,9 @@ class CommandHandlers:
                         out.append(f"  下载: {dl}")
                     note = (v.note or "").strip()
                     if note:
-                        out.append("  说明:")
-                        out.append("\n".join(f"> {line}" if line else ">" for line in note.split("\n")))
+                        out.append("")
+                        out.append("**说明:**")
+                        out.append(note)
                     out.append("")
                 if len(versions) > 5:
                     out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个_")

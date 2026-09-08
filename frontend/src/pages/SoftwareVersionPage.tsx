@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "../store/authStore";
 import Loader from "../components/Loader";
 import MarkdownContent from "../components/MarkdownContent";
+import MarkdownEditor from "../components/MarkdownEditor";
 import remarkBreaks from "remark-breaks";
 import { timeAgo } from "../utils/time";
 import {
@@ -318,7 +319,7 @@ function VersionFormModal({
 
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.note")}</label>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t("software.note_placeholder")} className="input resize-none" />
+            <MarkdownEditor value={note} onChange={setNote} rows={4} placeholder={t("software.note_placeholder")} />
             <p className="mt-1 text-[10px] text-[var(--text-faint)]">{t("software.note_md_hint")}</p>
           </div>
 

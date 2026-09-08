@@ -227,7 +227,7 @@ async def test_soft_bot_command(db_session):
         comp = await _create_component(client, headers)
         await _create_version(
             client, headers, comp["id"],
-            note="修复登录问题\n优化性能",
+            note="**修复登录问题**\n- 优化性能",
             download_url="https://mirrors.example.com/web-v3.2.0.zip",
         )
 
@@ -243,6 +243,8 @@ async def test_soft_bot_command(db_session):
         assert "Web Console" in data["response"]
         assert "v3.2.0" in data["response"]
         assert "mirrors.example.com" in data["response"]
+        # Release note stays as raw Markdown (not stripped to plain text)
+        assert "**修复登录问题**" in data["response"]
 
         # /soft <identifier> shows the component detail (exact identifier match)
         res = await client.post(
