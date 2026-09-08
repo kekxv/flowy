@@ -215,3 +215,53 @@ async def test_artifact_upload_and_category_filter(db_session):
         assert len(res.json()) == 1
         res = await client.get("/api/v1/software?category=backend", headers=headers)
         assert res.json() == []
+
+
+@pytest.mark.asyncio
+async def test_soft_bot_command(db_session):
+    """The /soft bot command returns version notes & download info."""
+    await _create_user(db_session, username="adminsoft", role="admin", email="as@example.com")
+    transport = _build_transport(db_session)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        headers = await _login(client, "adminsoft")
+        comp = await _create_component(client, headers)
+        await _create_version(
+            client, headers, comp["id"],
+            note="修复登录问题\n优化性能",
+            download_url="https://mirrors.example.com/web-v3.2.0.zip",
+        )
+
+        # /soft (no args) lists every component with its latest version info
+        res = await client.post(
+            "/api/v1/wechat-work-bot/test-command",
+            json={"command": "/soft"},
+            headers=headers,
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["error"] is None, data["error"]
+        assert "Web Console" in data["response"]
+        assert "v3.2.0" in data["response"]
+        assert "mirrors.example.com" in data["response"]
+
+        # /soft <identifier> shows the component detail
+        res = await client.post(
+            "/api/v1/wechat-work-bot/test-command",
+            json={"command": "/soft flowy-frontend"},
+            headers=headers,
+        )
+        data = res.json()
+        assert data["error"] is None, data["error"]
+        assert "Web Console" in data["response"]
+        assert "3.2.0" in data["response"]
+        assert "mirrors.example.com" in data["response"]
+
+        # Unknown keyword returns an error message
+        res = await client.post(
+            "/api/v1/wechat-work-bot/test-command",
+            json={"command": "/soft 不存在的组件"},
+            headers=headers,
+        )
+        data = res.json()
+        assert data["error"] is None
+        assert "未找到" in data["response"]

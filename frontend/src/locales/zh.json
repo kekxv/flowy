@@ -38,7 +38,8 @@
     "updated_at": "更新时间",
     "due_date": "截止日期",
     "add": "添加",
-    "desc_hint": "简短描述"
+    "desc_hint": "简短描述",
+    "collapse": "收起"
   },
   "auth": {
     "login": "登录",
@@ -368,6 +369,9 @@
     "subtitle": "管理当前项目包含的多个软件组件、制品包及跨软件依赖关系",
     "publish": "发布新版本",
     "publish_title": "发布新版本",
+    "edit_title": "编辑版本",
+    "view_detail": "查看详情",
+    "note_md_hint": "支持 Markdown 语法与换行",
     "component": "软件组件",
     "select_component": "选择软件组件",
     "new_component": "新建组件",

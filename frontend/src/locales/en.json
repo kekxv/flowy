@@ -38,7 +38,8 @@
     "clear": "Clear",
     "error": "Operation failed",
     "desc_hint": "Short description",
-    "add": "Add"
+    "add": "Add",
+    "collapse": "Collapse"
   },
   "auth": {
     "login": "Login",
@@ -371,6 +372,9 @@
     "subtitle": "Manage the software components, release artifacts and cross-software dependencies in this project",
     "publish": "Publish Version",
     "publish_title": "Publish a New Version",
+    "edit_title": "Edit Version",
+    "view_detail": "View details",
+    "note_md_hint": "Supports Markdown syntax and line breaks",
     "component": "Component",
     "select_component": "Select a component",
     "new_component": "New Component",

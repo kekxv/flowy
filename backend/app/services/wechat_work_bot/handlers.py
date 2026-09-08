@@ -206,6 +206,7 @@ class CommandHandlers:
 | `/stats` `/统计` | 问题统计 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
 | `/file` `/文件` [关键词] | 搜索内网文件 |
+| `/soft` `/软件` [关键词] | 软件版本说明与下载 |
 
 ### ✏️ 操作类
 | 指令 | 说明 |
@@ -1760,3 +1761,136 @@ class CommandHandlers:
             lines.append(f"\n> _部分源获取失败: {', '.join(errors)}_")
 
         return "\n".join(lines)
+
+    # ─── Software Versions ─────────────────────────────────────
+
+    async def handle_soft(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Handle /soft — query software components, release notes and download info.
+
+        Usage:
+        - /soft            — 列出所有软件组件及其最新版本说明/下载
+        - /soft 名称/标识    — 查看指定组件的版本历史与说明
+        """
+        from sqlalchemy.orm import selectinload
+
+        from app.models.software import SoftwareComponent, SoftwareDependency, SoftwareVersion
+        from app.utils.settings import get_frontend_url
+
+        try:
+            frontend_url = await get_frontend_url(self.db)
+        except Exception:
+            frontend_url = ""
+
+        result = await self.db.execute(
+            select(SoftwareComponent)
+            .options(
+                selectinload(SoftwareComponent.versions).selectinload(
+                    SoftwareVersion.dependencies
+                ).selectinload(SoftwareDependency.target_component)
+            )
+            .order_by(SoftwareComponent.updated_at.desc())
+        )
+        components = list(result.scalars().unique().all())
+
+        if not components:
+            return "📭 暂无软件版本信息\n\n请管理员在「软件版本管理」中录入组件与版本"
+
+        def _download(v) -> str | None:
+            """Human-friendly download line for a version, or None."""
+            if v.artifact_type == "file" and v.stored_filename:
+                path = f"/api/v1/software/files/{v.stored_filename}"
+                url = f"{frontend_url}{path}" if frontend_url else path
+                size = _format_file_size(int(v.file_size * 1024 * 1024)) if v.file_size else ""
+                label = v.file_name or "下载"
+                return f"[{label}]({url}){(' · ' + size) if size else ''}"
+            if v.artifact_type == "url" and v.download_url:
+                return f"[下载]({v.download_url})"
+            return None
+
+        def _note_summary(v, limit: int = 140) -> str | None:
+            """Plain-text preview of a release note (markdown stripped)."""
+            text = (v.note or "").strip()
+            if not text:
+                return None
+            import re as _re
+            cleaned = _re.sub(r'!\[[^\]]*\]\([^)]+\)', '', text)
+            cleaned = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)
+            cleaned = _re.sub(r'[#>*`_~\[\]|-]', '', cleaned)
+            cleaned = _re.sub(r'\s+', ' ', cleaned).strip()
+            return cleaned if len(cleaned) <= limit else cleaned[:limit].rstrip() + "…"
+
+        def _version_block(v) -> list[str]:
+            lines = [f"**v{v.version}**"]
+            if v.published_at:
+                lines.append(f"  · 发布于 {v.published_at[:10]}")
+            dl = _download(v)
+            if dl:
+                lines.append(f"  · 下载 {dl}")
+            summary = _note_summary(v)
+            if summary:
+                lines.append(f"  · {summary}")
+            return lines
+
+        # ── No args: list every component with its latest version ──
+        if not args:
+            lines = ["## 📦 软件版本总览\n"]
+            for c in components:
+                lv = c.versions[0] if c.versions else None
+                lines.append(f"### {c.name} (`{c.identifier}`)")
+                if not lv:
+                    lines.append("  _暂无版本_")
+                else:
+                    lines.extend(_version_block(lv))
+                lines.append("")
+            return "\n".join(lines).rstrip()
+
+        # ── Args: fuzzy match by name / identifier ──
+        keyword = " ".join(args).lower()
+        matches = [
+            c for c in components
+            if keyword in (c.name or "").lower() or keyword in (c.identifier or "").lower()
+        ]
+
+        if not matches:
+            return f"❌ 未找到与「{keyword}」匹配的软件组件\n\n可用: `/soft` 查看全部组件"
+
+        # Single match → detailed version history
+        if len(matches) == 1:
+            c = matches[0]
+            versions = list(c.versions)
+            out = [f"## 📦 {c.name}"]
+            out.append(f"> 标识: `{c.identifier}`")
+            if c.description:
+                out.append(f"> {c.description}")
+            out.append("")
+            out.append(f"共 **{len(versions)}** 个版本\n")
+            if not versions:
+                out.append("_暂无版本_")
+            else:
+                for v in versions[:5]:
+                    out.append(f"### v{v.version}")
+                    if v.published_at:
+                        out.append(f"  发布时间: {v.published_at[:10]}")
+                    dl = _download(v)
+                    if dl:
+                        out.append(f"  下载: {dl}")
+                    note = (v.note or "").strip()
+                    if note:
+                        out.append("  说明:")
+                        out.append("\n".join(f"> {line}" if line else ">" for line in note.split("\n")))
+                    out.append("")
+                if len(versions) > 5:
+                    out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个_")
+            return "\n".join(out).rstrip()
+
+        # Multiple matches → show each component's latest version
+        lines = [f"🔍 找到 **{len(matches)}** 个匹配的软件组件：\n"]
+        for c in matches[:10]:
+            lv = c.versions[0] if c.versions else None
+            lines.append(f"### {c.name} (`{c.identifier}`)")
+            if not lv:
+                lines.append("  _暂无版本_")
+            else:
+                lines.extend(_version_block(lv))
+            lines.append("")
+        return "\n".join(lines).rstrip()

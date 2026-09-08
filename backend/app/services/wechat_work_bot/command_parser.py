@@ -39,6 +39,8 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "comment": {"handler": "handle_comment", "roles": ["viewer", "helper", "admin"], "aliases": ["评论", "留言", "回复", "添加评论"]},
     # Milestone
     "milestone": {"handler": "handle_milestone", "roles": ["helper", "admin"], "aliases": ["里程碑", "版本", "迭代"]},
+    # Software / versions
+    "soft": {"handler": "handle_soft", "roles": ["viewer", "helper", "admin"], "aliases": ["软件", "软件版本", "版本信息", "制品", "制品软件"]},
     # Wiki / Knowledge Base
     "wiki": {"handler": "handle_wiki", "roles": ["viewer", "helper", "admin"], "aliases": ["知识库", "wiki", "搜索知识库"]},
     # Intranet file search
@@ -75,6 +77,7 @@ AI_KEYWORDS: dict[str, list[str]] = {
     "update": ["更新", "修改", "更改", "变更"],
     "help": ["帮助", "怎么用", "使用说明", "指令"],
     "milestone": ["里程碑", "版本", "sprint"],
+    "soft": ["软件", "软件版本", "版本信息", "查版本", "查软件", "制品"],
     "comment": ["评论", "留言", "回复问题"],
     "priority": ["优先级", "改优先级", "调整优先级"],
     "wiki": ["知识库", "搜索知识库", "查知识库", "wiki", "查找文档", "文档"],

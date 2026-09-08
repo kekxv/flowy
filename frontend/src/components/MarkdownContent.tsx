@@ -7,6 +7,7 @@ interface MarkdownContentProps {
   className?: string;
   urlTransform?: (url: string) => string;
   components?: Components;
+  remarkPlugins?: any[];
 }
 
 /**
@@ -37,11 +38,12 @@ export default function MarkdownContent({
   className = "",
   urlTransform = defaultUrlTransform,
   components,
+  remarkPlugins = [],
 }: MarkdownContentProps) {
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, ...remarkPlugins]}
         urlTransform={urlTransform}
         components={components}
       >

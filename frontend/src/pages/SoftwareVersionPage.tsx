@@ -3,15 +3,17 @@ import { useTranslation } from "react-i18next";
 import {
   Plus, Package, Link2, FileArchive, GitBranch, Clock, History,
   Trash2, Box, Server, Smartphone, Cpu, Download, X,
-  PlusCircle, Loader2,
+  PlusCircle, Loader2, Pencil, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import Loader from "../components/Loader";
+import MarkdownContent from "../components/MarkdownContent";
+import remarkBreaks from "remark-breaks";
 import { timeAgo } from "../utils/time";
 import {
   listComponents, getStats, createComponent, deleteComponent,
   createVersion, getComponent, deleteVersion, uploadArtifact,
-  artifactUrl,
+  updateVersion, artifactUrl,
   type ComponentData, type SoftwareStats, type VersionData,
   type DependencyInput,
 } from "../api/software";
@@ -145,24 +147,57 @@ function DepEditor({
   );
 }
 
+// ─── Release note (Markdown summary with expand) ──────────
+function NoteSummary({ note, label }: { note: string; label?: string }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  if (!note) return null;
+  const isLong = note.length > 100 || note.includes("\n");
+  return (
+    <div>
+      {label && <div className="mt-1.5 text-[11px] font-medium text-[var(--text-secondary)]">{label}</div>}
+      <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-muted)] ${expanded ? "" : "line-clamp-2"}`}>
+        <MarkdownContent remarkPlugins={[remarkBreaks]}>{note}</MarkdownContent>
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--primary)] hover:underline"
+        >
+          {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          {expanded ? t("common.collapse") : t("software.view_detail")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Publish modal ─────────────────────────────────────────
-function PublishModal({
-  component, components, onClose, onSaved,
+// Unified version form modal — supports both create (publish) and edit
+function VersionFormModal({
+  component, components, editing, onClose, onSaved,
 }: {
   component: ComponentData | null;
   components: ComponentData[];
+  editing: VersionData | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [target, setTarget] = useState<string>(component?.id || "");
-  const [version, setVersion] = useState("");
-  const [note, setNote] = useState("");
-  const [artifactType, setArtifactType] = useState<"file" | "url" | "none">("url");
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const [fileName, setFileName] = useState("");
+  const isEdit = !!editing;
+  const [target, setTarget] = useState<string>(editing?.component_id || component?.id || "");
+  const [version, setVersion] = useState(editing?.version || "");
+  const [note, setNote] = useState(editing?.note || "");
+  const [artifactType, setArtifactType] = useState<"file" | "url" | "none">(editing?.artifact_type || "url");
+  const [downloadUrl, setDownloadUrl] = useState(editing?.download_url || "");
+  const [fileName, setFileName] = useState(editing?.file_name || "");
   const [file, setFile] = useState<File | null>(null);
-  const [deps, setDeps] = useState<DependencyInput[]>([]);
+  const [deps, setDeps] = useState<DependencyInput[]>(
+    editing?.dependencies.map((d) => ({
+      kind: d.kind, name: d.name, target_component_id: d.target_component_id, constraint: d.constraint,
+    })) || []
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -186,17 +221,23 @@ function PublishModal({
     if (!target) { setError(t("software.select_component")); return; }
     if (!version.trim()) { setError(t("software.version_required")); return; }
     setSaving(true);
+    const payload = {
+      version: version.trim(),
+      note,
+      artifact_type: artifactType,
+      download_url: artifactType === "url" ? downloadUrl : "",
+      file_name: artifactType === "file" ? fileName : "",
+      dependencies: deps.filter((d) => d.kind === "internal" ? d.target_component_id : (d.name || d.constraint)),
+    };
     try {
-      const created = await createVersion(target, {
-        version: version.trim(),
-        note,
-        artifact_type: artifactType,
-        download_url: artifactType === "url" ? downloadUrl : "",
-        file_name: artifactType === "file" ? fileName : "",
-        dependencies: deps.filter((d) => d.kind === "internal" ? d.target_component_id : (d.name || d.constraint)),
-      });
+      let saved: VersionData;
+      if (isEdit && editing) {
+        saved = await updateVersion(editing.id, payload);
+      } else {
+        saved = await createVersion(target, payload);
+      }
       if (artifactType === "file" && file) {
-        await uploadArtifact(created.id, file);
+        await uploadArtifact(saved.id, file);
       }
       onSaved();
       onClose();
@@ -212,12 +253,12 @@ function PublishModal({
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
       <div className="relative w-full max-w-[640px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-lg animate-[fadeInUp_.15s_ease-out]">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-[var(--text)]">{t("software.publish_title")}</h2>
+          <h2 className="text-[15px] font-semibold text-[var(--text)]">{t(isEdit ? "software.edit_title" : "software.publish_title")}</h2>
           <button onClick={onClose} className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[#f3f4f6]"><X size={16} /></button>
         </div>
 
-        {/* Component selector */}
-        {!component && (
+        {/* Component selector (create with no preset component only) */}
+        {!component && !isEdit && (
           <div className="mb-3">
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.component")}</label>
             <div className="flex gap-2">
@@ -277,7 +318,8 @@ function PublishModal({
 
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.note")}</label>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t("software.note_placeholder")} className="input resize-none" />
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t("software.note_placeholder")} className="input resize-none" />
+            <p className="mt-1 text-[10px] text-[var(--text-faint)]">{t("software.note_md_hint")}</p>
           </div>
 
           <div>
@@ -291,8 +333,8 @@ function PublishModal({
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="btn btn-ghost btn-sm">{t("common.cancel")}</button>
           <button onClick={submit} disabled={saving} className="btn btn-primary btn-sm">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            {t("software.publish")}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : isEdit ? <Pencil size={14} /> : <Plus size={14} />}
+            {isEdit ? t("common.save") : t("software.publish")}
           </button>
         </div>
       </div>
@@ -301,10 +343,11 @@ function PublishModal({
 }
 
 // ─── History modal ─────────────────────────────────────────
-function HistoryModal({ component, onClose, onChanged }: {
+function HistoryModal({ component, onClose, onChanged, onEdit }: {
   component: ComponentData;
   onClose: () => void;
   onChanged: () => void;
+  onEdit: (v: VersionData) => void;
 }) {
   const { t } = useTranslation();
   const isAdmin = useAuthStore((s) => s.user?.role === "admin");
@@ -358,11 +401,18 @@ function HistoryModal({ component, onClose, onChanged }: {
                         </a>
                       )}
                       {isAdmin && (
-                        <button onClick={() => remove(v.id)} className="rounded p-1 text-[var(--text-faint)] hover:text-red-500"><Trash2 size={13} /></button>
+                        <>
+                          <button onClick={() => onEdit(v)} title={t("common.edit")} className="rounded p-1 text-[var(--text-faint)] hover:text-[var(--primary)]"><Pencil size={13} /></button>
+                          <button onClick={() => remove(v.id)} className="rounded p-1 text-[var(--text-faint)] hover:text-red-500"><Trash2 size={13} /></button>
+                        </>
                       )}
                     </div>
                   </div>
-                  {v.note && <p className="mt-1.5 text-[12px] text-[var(--text-muted)]">{v.note}</p>}
+                  {v.note && (
+                    <div className="prose prose-sm max-w-none mt-1.5 text-[12px] text-[var(--text-muted)]">
+                      <MarkdownContent remarkPlugins={[remarkBreaks]}>{v.note}</MarkdownContent>
+                    </div>
+                  )}
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--text-faint)]">
                     <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo(v.published_at || v.created_at)}</span>
                     <span>{v.dependencies.length} {t("software.deps_short")}</span>
@@ -390,6 +440,8 @@ export default function SoftwareVersionPage() {
   const [publishFor, setPublishFor] = useState<ComponentData | null>(null);
   const [showPublish, setShowPublish] = useState(false);
   const [historyFor, setHistoryFor] = useState<ComponentData | null>(null);
+  const [editFor, setEditFor] = useState<VersionData | null>(null);
+  const [editComponent, setEditComponent] = useState<ComponentData | null>(null);
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3000); };
 
@@ -513,13 +565,14 @@ export default function SoftwareVersionPage() {
 
                       {/* Version row */}
                       {lv ? (
-                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                          <span className="mono rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">v{lv.version}</span>
-                          {lv.note && (
-                            <span className="text-[12px] text-[var(--text-muted)]">
-                              <span className="font-medium text-[var(--text-secondary)]">{t("software.latest_note")}</span> {lv.note}
-                            </span>
-                          )}
+                        <div className="mt-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="mono rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">v{lv.version}</span>
+                            {lv.note && (
+                              <span className="text-[11px] font-medium text-[var(--text-secondary)]">{t("software.latest_note")}</span>
+                            )}
+                          </div>
+                          {lv.note && <NoteSummary note={lv.note} />}
                         </div>
                       ) : (
                         <div className="mt-2.5 text-[12px] text-[var(--text-faint)]">{t("software.no_version")}</div>
@@ -598,10 +651,18 @@ export default function SoftwareVersionPage() {
       )}
 
       {showPublish && (
-        <PublishModal component={publishFor} components={components} onClose={() => { setShowPublish(false); setPublishFor(null); }} onSaved={load} />
+        <VersionFormModal component={publishFor} components={components} editing={null} onClose={() => { setShowPublish(false); setPublishFor(null); }} onSaved={load} />
+      )}
+      {editFor && (
+        <VersionFormModal component={editComponent} components={components} editing={editFor} onClose={() => { setEditFor(null); setEditComponent(null); }} onSaved={load} />
       )}
       {historyFor && (
-        <HistoryModal component={historyFor} onClose={() => setHistoryFor(null)} onChanged={load} />
+        <HistoryModal
+          component={historyFor}
+          onClose={() => setHistoryFor(null)}
+          onChanged={load}
+          onEdit={(v) => { setHistoryFor(null); setEditFor(v); setEditComponent(historyFor); }}
+        />
       )}
     </div>
   );
