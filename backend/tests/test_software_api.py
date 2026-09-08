@@ -244,7 +244,7 @@ async def test_soft_bot_command(db_session):
         assert "v3.2.0" in data["response"]
         assert "mirrors.example.com" in data["response"]
 
-        # /soft <identifier> shows the component detail
+        # /soft <identifier> shows the component detail (exact identifier match)
         res = await client.post(
             "/api/v1/wechat-work-bot/test-command",
             json={"command": "/soft flowy-frontend"},
@@ -255,6 +255,22 @@ async def test_soft_bot_command(db_session):
         assert "Web Console" in data["response"]
         assert "3.2.0" in data["response"]
         assert "mirrors.example.com" in data["response"]
+
+        # Duplicate names are NOT fuzzy-matched to a single hit:
+        # querying by name disambiguates by identifier instead.
+        comp2 = await _create_component(
+            client, headers, identifier="flowy-web-legacy", name="Web Console",
+        )
+        res = await client.post(
+            "/api/v1/wechat-work-bot/test-command",
+            json={"command": "/soft Web Console"},
+            headers=headers,
+        )
+        data = res.json()
+        assert data["error"] is None, data["error"]
+        assert "重名" in data["response"]
+        assert "flowy-frontend" in data["response"]
+        assert "flowy-web-legacy" in data["response"]
 
         # Unknown keyword returns an error message
         res = await client.post(

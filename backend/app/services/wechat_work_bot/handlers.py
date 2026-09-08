@@ -1844,15 +1844,25 @@ class CommandHandlers:
                 lines.append("")
             return "\n".join(lines).rstrip()
 
-        # ── Args: fuzzy match by name / identifier ──
-        keyword = " ".join(args).lower()
-        matches = [
-            c for c in components
-            if keyword in (c.name or "").lower() or keyword in (c.identifier or "").lower()
+        # ── Args: exact match by identifier (unique), else exact name ──
+        keyword = " ".join(args).strip()
+        kw = keyword.lower()
+        # Prefer exact identifier match (identifiers are unique per component)
+        by_id = [c for c in components if (c.identifier or "").lower() == kw]
+        matches = by_id if by_id else [
+            c for c in components if (c.name or "").lower() == kw
         ]
 
         if not matches:
-            return f"❌ 未找到与「{keyword}」匹配的软件组件\n\n可用: `/soft` 查看全部组件"
+            return f"❌ 未找到与「{keyword}」匹配的软件组件\n\n可用 `/soft` 查看全部，或使用组件标识精确查询"
+
+        # Multiple exact-name matches (重名) → disambiguate by identifier
+        if len(matches) > 1 and not by_id:
+            lines = [f"🔍 「{keyword}」存在 **{len(matches)}** 个重名组件，请用标识区分：\n"]
+            for c in matches[:10]:
+                lines.append(f"- **{c.name}**（标识: `{c.identifier}`）")
+            lines.append("\n> 例: `/soft {identifier}`")
+            return "\n".join(lines)
 
         # Single match → detailed version history
         if len(matches) == 1:

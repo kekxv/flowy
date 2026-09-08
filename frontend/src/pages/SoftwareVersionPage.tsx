@@ -11,7 +11,7 @@ import MarkdownContent from "../components/MarkdownContent";
 import remarkBreaks from "remark-breaks";
 import { timeAgo } from "../utils/time";
 import {
-  listComponents, getStats, createComponent, deleteComponent,
+  listComponents, getStats, createComponent, deleteComponent, updateComponent,
   createVersion, getComponent, deleteVersion, uploadArtifact,
   updateVersion, artifactUrl,
   type ComponentData, type SoftwareStats, type VersionData,
@@ -342,6 +342,90 @@ function VersionFormModal({
   );
 }
 
+// ─── Component edit modal ──────────────────────────────────
+function ComponentEditModal({
+  component, onClose, onSaved,
+}: {
+  component: ComponentData;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState(component.name);
+  const [identifier, setIdentifier] = useState(component.identifier);
+  const [category, setCategory] = useState<Category>(categoryOf(component));
+  const [description, setDescription] = useState(component.description);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setError("");
+    if (!name.trim()) { setError(t("software.name_required")); return; }
+    if (!identifier.trim()) { setError(t("software.identifier_required")); return; }
+    setSaving(true);
+    try {
+      await updateComponent(component.id, {
+        name: name.trim(),
+        identifier: identifier.trim(),
+        category,
+        icon_key: name.slice(0, 3).toUpperCase(),
+        description,
+      });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || t("software.update_failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative w-full max-w-[520px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-lg animate-[fadeInUp_.15s_ease-out]">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold text-[var(--text)]">{t("software.edit_component_title")}</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[#f3f4f6]"><X size={16} /></button>
+        </div>
+
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.name")}</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.identifier")}</label>
+              <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="如 flowy-web" className="input" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.category")}</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value as Category)} className="select">
+              {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{t(`software.category.${c}`)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("common.description")}</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input resize-none" />
+          </div>
+        </div>
+
+        {error && <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-[12px] text-red-600">{error}</div>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="btn btn-ghost btn-sm">{t("common.cancel")}</button>
+          <button onClick={submit} disabled={saving} className="btn btn-primary btn-sm">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+            {t("common.save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── History modal ─────────────────────────────────────────
 function HistoryModal({ component, onClose, onChanged, onEdit }: {
   component: ComponentData;
@@ -442,6 +526,7 @@ export default function SoftwareVersionPage() {
   const [historyFor, setHistoryFor] = useState<ComponentData | null>(null);
   const [editFor, setEditFor] = useState<VersionData | null>(null);
   const [editComponent, setEditComponent] = useState<ComponentData | null>(null);
+  const [componentEditFor, setComponentEditFor] = useState<ComponentData | null>(null);
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3000); };
 
@@ -629,6 +714,11 @@ export default function SoftwareVersionPage() {
                           {t("software.publish")}
                         </button>
                       )}
+                      {isAdmin && (
+                        <button onClick={() => setComponentEditFor(c)} className="btn btn-ghost btn-sm">
+                          <Pencil size={12} /> {t("common.edit")}
+                        </button>
+                      )}
                       <button onClick={() => setHistoryFor(c)} className="btn btn-ghost btn-sm">
                         {t("software.history")} ({c.version_count})
                       </button>
@@ -655,6 +745,9 @@ export default function SoftwareVersionPage() {
       )}
       {editFor && (
         <VersionFormModal component={editComponent} components={components} editing={editFor} onClose={() => { setEditFor(null); setEditComponent(null); }} onSaved={load} />
+      )}
+      {componentEditFor && (
+        <ComponentEditModal component={componentEditFor} onClose={() => setComponentEditFor(null)} onSaved={load} />
       )}
       {historyFor && (
         <HistoryModal
