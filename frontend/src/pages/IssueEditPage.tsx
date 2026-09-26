@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getIssue, updateIssue } from "../api/issues";
 import { STAT, PRIS } from "../constants";
@@ -8,7 +8,8 @@ import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function IssueEditPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate(); const { t } = useTranslation();
+  const navigate = useNavigate(); const location = useLocation(); const { t } = useTranslation();
+  const returnTo = typeof location.state?.from === "string" && (location.state.from === "/issues" || location.state.from.startsWith("/issues?")) ? location.state.from : "/issues";
   const [title, setTitle] = useState(""); const [desc, setDesc] = useState("");
   const [status, setStatus] = useState(""); const [priority, setPriority] = useState("");
   const [startDate, setStartDate] = useState(""); const [dueDate, setDueDate] = useState("");
@@ -16,7 +17,7 @@ export default function IssueEditPage() {
 
   useEffect(() => { if(!id)return; getIssue(id).then(d=>{ setTitle(d.title); setDesc(d.description); setStatus(d.status); setPriority(d.priority); setStartDate(d.start_date || ""); setDueDate(d.due_date || ""); setLoading(false); }); }, [id]);
 
-  const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority,start_date:startDate || null,due_date:dueDate || null}); navigate(`/issues/${id}`); };
+  const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority,start_date:startDate || null,due_date:dueDate || null}); navigate(`/issues/${id}`, { state: { from: returnTo } }); };
 
   if (loading) return <Loader />;
 
@@ -58,7 +59,7 @@ export default function IssueEditPage() {
 
         <div className="flex gap-3 pt-1">
           <button type="submit" className="btn btn-primary">{t("common.save")}</button>
-          <button type="button" onClick={() => navigate(`/issues/${id}`)} className="btn btn-ghost">{t("common.cancel")}</button>
+          <button type="button" onClick={() => navigate(`/issues/${id}`, { state: { from: returnTo } })} className="btn btn-ghost">{t("common.cancel")}</button>
         </div>
       </form>
     </div>

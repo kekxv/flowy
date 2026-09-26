@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import MarkdownContent from "../components/MarkdownContent";
 import {
   ArrowLeft,
@@ -43,6 +43,8 @@ export default function WikiDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = typeof location.state?.from === "string" && (location.state.from === "/wiki" || location.state.from.startsWith("/wiki?")) ? location.state.from : "/wiki";
   const currentUser = useAuthStore((s) => s.user);
 
   const [page, setPage] = useState<WikiPageData | null>(null);
@@ -126,7 +128,7 @@ export default function WikiDetailPage() {
     if (!page || !canDelete) return;
     if (!confirm(t("wiki.confirm_delete", "Are you sure you want to delete this page?"))) return;
     await deleteWikiPage(page.id);
-    navigate("/wiki");
+    navigate(returnTo);
   };
 
   const handleCancel = () => {
@@ -222,7 +224,7 @@ export default function WikiDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate("/wiki")}
+          onClick={() => navigate(returnTo)}
           className="btn btn-ghost btn-sm"
         >
           <ArrowLeft size={16} />

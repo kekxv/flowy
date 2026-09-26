@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, Clock, Flag, GanttChart as GanttIcon, LayoutGrid } from "lucide-react";
 import api from "../api/client";
@@ -19,13 +19,23 @@ const daysLeft = (date: string|null) => {
 
 export default function MilestonesPage() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const [sp, setSp] = useSearchParams();
+  const updateQuery = (key: string, value: string) => setSp(previous => {
+    const next = new URLSearchParams(previous);
+    if (value) next.set(key, value); else next.delete(key);
+    return next;
+  });
+  const view: "cards" | "gantt" = sp.get("view") === "gantt" ? "gantt" : "cards";
+  const filterValue = sp.get("filter");
+  const filter: "all" | "open" | "closed" | "published" = filterValue === "open" || filterValue === "closed" || filterValue === "published" ? filterValue : "all";
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", start_date: "", due_date: "" });
-  const [view, setView] = useState<"cards"|"gantt">("cards");
+
   const [gantt, setGantt] = useState<GanttMilestone[]>([]);
-  const [filter, setFilter] = useState<"all"|"open"|"closed"|"published">("all");
+
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
@@ -42,7 +52,14 @@ export default function MilestonesPage() {
   };
 
   const filtered = milestones.filter(m => filter === "all" || m.status === filter);
-  const loadGantt = async () => setGantt(await Promise.all(filtered.map(async m => ({ ...m, issues: (await api.get(`/milestones/${m.id}/issues`)).data }))));
+  useEffect(() => {
+    if (view !== "gantt" || loading) return;
+    let active = true;
+    Promise.all(milestones.filter(m => filter === "all" || m.status === filter)
+      .map(async m => ({ ...m, issues: (await api.get(`/milestones/${m.id}/issues`)).data })))
+      .then(data => { if (active) setGantt(data); });
+    return () => { active = false; };
+  }, [view, filter, milestones, loading]);
 
   if (loading) return <Loader />;
 
@@ -56,7 +73,7 @@ export default function MilestonesPage() {
           <h1 className="text-[18px] font-semibold tracking-tight">{t("milestone.title")}</h1>
           <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{milestones.length} milestones · {milestones.filter(m => m.status === "open").length} active</p>
         </div>
-        <div className="flex gap-2"><button onClick={() => { setView(view === "cards" ? "gantt" : "cards"); if (view === "cards") loadGantt(); }} className="btn btn-outline btn-sm">{view === "cards" ? <GanttIcon size={14}/> : <LayoutGrid size={14}/>} {view === "cards" ? "Gantt" : "Cards"}</button><button onClick={() => setShowForm(!showForm)} className="btn btn-primary btn-sm"><Plus size={14} />{t("milestone.new_milestone")}</button></div>
+        <div className="flex gap-2"><button onClick={() => updateQuery("view", view === "cards" ? "gantt" : "")} className="btn btn-outline btn-sm">{view === "cards" ? <GanttIcon size={14}/> : <LayoutGrid size={14}/>} {view === "cards" ? "Gantt" : "Cards"}</button><button onClick={() => setShowForm(!showForm)} className="btn btn-primary btn-sm"><Plus size={14} />{t("milestone.new_milestone")}</button></div>
       </div>
 
       {/* Create form */}
@@ -80,7 +97,7 @@ export default function MilestonesPage() {
       {/* Filter tabs — minimal */}
       <div className="flex items-center gap-1">
         {(["all", "open", "closed", "published"] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
+          <button key={f} onClick={() => updateQuery("filter", f === "all" ? "" : f)}
             className={`rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
               filter === f ? "bg-[#f3f4f6] text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}>
@@ -103,7 +120,7 @@ export default function MilestonesPage() {
             const overdue = left !== null && left < 0;
             const soon = left !== null && left >= 0 && left <= 3;
             return (
-              <Link key={m.id} to={`/milestones/${m.id}`}
+              <Link key={m.id} to={`/milestones/${m.id}`} state={{ from: location.pathname + location.search }}
                 className={`card rounded-[8px] p-4 transition-all group ${m.status === "closed" ? "opacity-60" : ""}`}>
                 {/* Top: name + status */}
                 <div className="flex items-start justify-between gap-2">

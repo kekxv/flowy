@@ -206,7 +206,7 @@ class CommandHandlers:
 | `/stats` `/统计` | 问题统计 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
 | `/file` `/文件` [关键词] | 搜索内网文件 |
-| `/soft` `/软件` [关键词] | 软件版本说明与下载 |
+| `/soft` `/软件` [组件标识] [--all] | 软件版本说明与下载；`--all` 查看全部历史版本 |
 
 ### ✏️ 操作类
 | 指令 | 说明 |
@@ -1769,7 +1769,8 @@ class CommandHandlers:
 
         Usage:
         - /soft            — 列出所有软件组件及其最新版本说明/下载
-        - /soft 名称/标识    — 查看指定组件的版本历史与说明
+        - /soft 名称/标识    — 查看指定组件最新 5 个版本
+        - /soft [名称/标识] --all — 查看全部历史版本
         """
         from sqlalchemy.orm import selectinload
 
@@ -1828,22 +1829,26 @@ class CommandHandlers:
             dl = _download(v)
             if dl:
                 lines.append(f"  · 下载 {dl}")
-            note = _note_md(v)
+            note = _note_md(v, None if all_versions else 140)
             if note:
                 lines.append("  · 说明:")
                 lines.append(note)
             return lines
 
-        # ── No args: list every component with its latest version ──
+        all_versions = any(arg.lower() in {"--all", "-a", "全部"} for arg in args)
+        args = [arg for arg in args if arg.lower() not in {"--all", "-a", "全部"}]
+
+        # ── No component: list every component ──
         if not args:
             lines = ["## 📦 软件版本总览\n"]
             for c in components:
-                lv = c.versions[0] if c.versions else None
                 lines.append(f"### {c.name} (`{c.identifier}`)")
-                if not lv:
+                versions = list(c.versions) if all_versions else list(c.versions[:1])
+                if not versions:
                     lines.append("  _暂无版本_")
                 else:
-                    lines.extend(_version_block(lv))
+                    for version in versions:
+                        lines.extend(_version_block(version))
                 lines.append("")
             return "\n".join(lines).rstrip()
 
@@ -1880,7 +1885,7 @@ class CommandHandlers:
             if not versions:
                 out.append("_暂无版本_")
             else:
-                for v in versions[:5]:
+                for v in versions if all_versions else versions[:5]:
                     out.append(f"### v{v.version}")
                     if v.published_at:
                         out.append(f"  发布时间: {v.published_at[:10]}")
@@ -1893,8 +1898,8 @@ class CommandHandlers:
                         out.append("**说明:**")
                         out.append(note)
                     out.append("")
-                if len(versions) > 5:
-                    out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个_")
+                if len(versions) > 5 and not all_versions:
+                    out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个；使用 `/soft {c.identifier} --all` 查看全部_")
             return "\n".join(out).rstrip()
 
         # Multiple matches → show each component's latest version

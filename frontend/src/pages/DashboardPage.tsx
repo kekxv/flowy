@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BarChart3, AlertCircle, CheckCircle2, Flag, ChevronRight, Timer, Clock, Inbox, UserPlus, X, Bug, Lightbulb, AlertTriangle, TrendingUp } from "lucide-react";
+import { BarChart3, AlertCircle, CheckCircle2, Flag, ChevronRight, Timer, Clock, Inbox, UserPlus, X, Bug, Lightbulb, AlertTriangle, TrendingUp, BookOpen, Package, Layers } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
@@ -17,6 +17,7 @@ interface DashboardData {
   stats: {
     total_issues: number; open_issues: number; closed_issues: number; my_reported: number;
     bug_count: number; feature_count: number; overdue_milestones: number;
+    total_milestones: number; software_components: number; software_versions: number; wiki_pages: number;
     by_status: Record<string, number>; by_priority: Record<string, number>;
     recent_activity: Array<{ date: string; count: number }>; completion_activity?: Array<{ date: string; count: number }>;
   };
@@ -108,8 +109,8 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats — 8 cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         {[
           { k: "total_issues", icon: BarChart3, color: "text-[var(--primary)]", bg: "bg-[var(--primary-subtle)]" },
           { k: "open_issues", icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50" },
@@ -139,6 +140,22 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2.5 text-2xl font-bold tabular-nums tracking-tight text-[var(--text)]">{closedRate}%</div>
         </div>
+        {([
+          { key: "total_milestones", to: "/milestones", icon: Flag, color: "text-violet-600", bg: "bg-violet-50" },
+          { key: "wiki_pages", to: "/wiki", icon: BookOpen, color: "text-sky-600", bg: "bg-sky-50" },
+          { key: "software_components", to: "/software", icon: Package, color: "text-indigo-600", bg: "bg-indigo-50" },
+          { key: "software_versions", to: "/software", icon: Layers, color: "text-emerald-600", bg: "bg-emerald-50" },
+        ] as const).map(stat => (
+          <Link key={stat.key} to={stat.to} className="card rounded-2xl px-4 py-4 transition-all hover:shadow-md group">
+            <div className="flex items-center gap-2">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-[6px] ${stat.bg} transition-transform group-hover:scale-110`}>
+                <stat.icon size={15} className={stat.color} strokeWidth={2} />
+              </div>
+              <span className="text-[11px] font-medium text-[var(--text-muted)]">{t(`dashboard.${stat.key}`)}</span>
+            </div>
+            <div className="mt-2.5 text-2xl font-bold tabular-nums tracking-tight text-[var(--text)]">{data.stats[stat.key] ?? 0}</div>
+          </Link>
+        ))}
       </div>
 
       {/* Charts row */}

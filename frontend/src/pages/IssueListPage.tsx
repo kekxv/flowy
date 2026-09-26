@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, X, UserPlus, Flag, Filter, ChevronDown } from "lucide-react";
 import api from "../api/client";
@@ -50,14 +50,25 @@ function FilterPill({ label, value, values, onChange, filterOpen, setFilterOpen 
 
 export default function IssueListPage() {
   const { t } = useTranslation();
-  const [sp] = useSearchParams(); const user = useAuthStore(s => s.user);
+  const [sp, setSp] = useSearchParams(); const location = useLocation(); const user = useAuthStore(s => s.user);
+  const updateQuery = (changes: Record<string, string>) => setSp(previous => {
+    const next = new URLSearchParams(previous);
+    for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); }
+    return next;
+  });
+  const page = Math.max(1, Number.parseInt(sp.get("page") || "1", 10) || 1);
+  const setPage = (value: number | ((page: number) => number)) => updateQuery({ page: String(typeof value === "function" ? value(page) : value) });
+  const status = sp.get("status") || "all";
+  const priority = sp.get("priority") || "all";
+  const q = sp.get("q") || "";
+  const issueType = sp.get("issue_type") || "all";
+  const labelId = sp.get("label_id") || "";
+  const reporter = sp.get("reporter");
+  const changeFilter = (key: string, value: string) => updateQuery({ [key]: value === "all" ? "" : value, page: "" });
   const [issues, setIssues] = useState<IssueData[]>([]); const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1); const [status, setStatus] = useState(sp.get("status") || "all");
-  const [priority, setPriority] = useState(sp.get("priority") || "all");
-  const [q, setQ] = useState(sp.get("q") || ""); const [searchQ, setSearchQ] = useState(sp.get("q") || "");
-  const [issueType, setIssueType] = useState(sp.get("issue_type") || "all");
+  const [searchQ, setSearchQ] = useState(q);
   const [milestones, setMilestones] = useState<Array<{ id: string; name: string; status: string }>>([]);
-  const [labelId, setLabelId] = useState(sp.get("label_id") || "");
+  useEffect(() => setSearchQ(q), [q]);
   const [activeTimerIds, setActiveTimerIds] = useState<Set<string>>(new Set<string>());
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState<string | null>(null);
@@ -115,12 +126,12 @@ export default function IssueListPage() {
     setLoading(true); const p: Record<string, string> = { page: String(page), per_page: "20" };
     if (status !== "all") p.status = status; if (priority !== "all") p.priority = priority; if (q) p.q = q; if (labelId) p.label_id = labelId;
     if (issueType !== "all") p.issue_type = issueType;
-    if (sp.get("reporter") === "me" && user) p.reporter_id = user.id;
+    if (reporter === "me" && user) p.reporter_id = user.id;
     listIssues(p).then(r => { setIssues(r.data); setTotal(r.meta.total); setLoading(false); });
   };
   useEffect(() => { api.get("/labels").then(r => setLabels(r.data)); api.get("/milestones").then(r => setMilestones(r.data)); }, []);
   useEffect(() => { const poll = () => api.get("/dashboard").then(r => { const ids = new Set<string>((r.data.active_timers || []).map((t: any) => t.issue_id as string)); setActiveTimerIds(ids); }); poll(); const i = setInterval(poll, 15000); return () => clearInterval(i); }, []);
-  useEffect(fetch, [page, status, priority, q, labelId, issueType]);
+  useEffect(fetch, [page, status, priority, q, labelId, issueType, reporter, user]);
 
   const hasFilters = status !== "all" || priority !== "all" || labelId || issueType !== "all";
 
@@ -146,12 +157,12 @@ export default function IssueListPage() {
             <input
               value={searchQ}
               onChange={e => setSearchQ(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") { setQ(searchQ); setPage(1); } }}
+              onKeyDown={e => { if (e.key === "Enter") { updateQuery({ q: searchQ, page: "" }); } }}
               placeholder={t("common.search") + "…"}
               className="w-full rounded-[6px] border border-transparent bg-transparent py-1.5 pl-7 pr-7 text-[13px] outline-none transition-colors hover:bg-[#f9fafb] focus:border-[var(--border)] focus:bg-white"
             />
             {searchQ && (
-              <button onClick={() => { setSearchQ(""); setQ(""); setPage(1); }}
+              <button onClick={() => { setSearchQ(""); updateQuery({ q: "", page: "" }); }}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)] transition-colors">
                 <X size={13} />
               </button>
@@ -160,16 +171,16 @@ export default function IssueListPage() {
 
           {/* Filter pills */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <FilterPill label="Type" value={issueType} onChange={v => { setIssueType(v); setPage(1); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
+            <FilterPill label="Type" value={issueType} onChange={v => { changeFilter("issue_type", v); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
               values={[{ key: "bug", label: "Bug" }, { key: "feature", label: "Feature" }]} />
-            <FilterPill label={t("common.status")} value={status} onChange={v => { setStatus(v); setPage(1); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
+            <FilterPill label={t("common.status")} value={status} onChange={v => { changeFilter("status", v); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
               values={STAT.map(s => ({ key: s, label: t(`issues.status.${s}`), cls: `status-${s}` }))} />
-            <FilterPill label={t("common.priority")} value={priority} onChange={v => { setPriority(v); setPage(1); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
+            <FilterPill label={t("common.priority")} value={priority} onChange={v => { changeFilter("priority", v); }} filterOpen={filterOpen} setFilterOpen={setFilterOpen}
               values={PRIS.map(p => ({ key: p, label: t(`issues.priority.${p}`), cls: `priority-${p}` }))} />
           </div>
 
           {hasFilters && (
-            <button onClick={() => { setStatus("all"); setPriority("all"); setLabelId(""); setIssueType("all"); setPage(1); }}
+            <button onClick={() => { updateQuery({ status: "", priority: "", label_id: "", issue_type: "", page: "" }); }}
               className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
               <X size={12} />Clear
             </button>
@@ -192,7 +203,7 @@ export default function IssueListPage() {
               const milestoneIds = (issue as any).milestone_ids || [];
               const borderColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
               return (
-                <Link to={`/issues/${issue.id}`} key={issue.id} className="group flex items-start gap-3 px-5 py-4 transition-all hover:bg-[var(--primary-subtle)]">
+                <Link to={`/issues/${issue.id}`} state={{ from: location.pathname + location.search }} key={issue.id} className="group flex items-start gap-3 px-5 py-4 transition-all hover:bg-[var(--primary-subtle)]">
                   {/* Left: status indicator + type initial */}
                   <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
                     <div className="w-[4px] shrink-0 self-stretch rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: borderColor, color: borderColor }} />

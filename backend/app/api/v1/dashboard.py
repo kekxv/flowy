@@ -1,14 +1,16 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.issue import Issue, issue_assignees, issue_milestones_table
+from app.models.software import SoftwareComponent, SoftwareVersion
 from app.models.tracking import Milestone, TimeEntry
 from app.models.user import User
+from app.models.wiki import WikiPage, wiki_collaborators_table
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -155,6 +157,22 @@ async def get_dashboard(
         )
     ).scalar() or 0
 
+    total_milestones = (await db.execute(select(func.count(Milestone.id)))).scalar() or 0
+    software_components = (await db.execute(select(func.count(SoftwareComponent.id)))).scalar() or 0
+    software_versions = (await db.execute(select(func.count(SoftwareVersion.id)))).scalar() or 0
+    wiki_visibility = True if user.role == "admin" else or_(
+        WikiPage.owner_id == user.id,
+        WikiPage.is_public.is_(True),
+        WikiPage.id.in_(
+            select(wiki_collaborators_table.c.wiki_id).where(
+                wiki_collaborators_table.c.user_id == user.id
+            )
+        ),
+    )
+    wiki_pages = (
+        await db.execute(select(func.count(WikiPage.id)).where(wiki_visibility))
+    ).scalar() or 0
+
     # Recent activity: issue creation counts for last 30 days, suitable for reports.
     recent_activity = []
     completion_activity = []
@@ -228,6 +246,10 @@ async def get_dashboard(
             "bug_count": by_type.get("bug", 0),
             "feature_count": by_type.get("feature", 0),
             "overdue_milestones": overdue_count,
+            "total_milestones": total_milestones,
+            "software_components": software_components,
+            "software_versions": software_versions,
+            "wiki_pages": wiki_pages,
             "by_status": by_status,
             "by_priority": by_priority,
             "recent_activity": recent_activity,

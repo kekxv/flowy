@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Globe, Lock, Image, Paperclip, Eye, Edit3 } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import { createWikiPage, uploadWikiFile, getWikiUploadLimit } from "../api/wiki";
@@ -10,6 +10,8 @@ const DEFAULT_LIMIT_MB = 5;
 export default function WikiCreatePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = typeof location.state?.from === "string" && (location.state.from === "/wiki" || location.state.from.startsWith("/wiki?")) ? location.state.from : "/wiki";
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [summary, setSummary] = useState("");
@@ -33,7 +35,7 @@ export default function WikiCreatePage() {
     setSaving(true);
     try {
       const page = await createWikiPage({ title, summary, content, tags, is_public: isPublic, weight });
-      navigate(`/wiki/${page.id}`);
+      navigate(`/wiki/${page.id}`, { state: { from: returnTo } });
     } finally {
       setSaving(false);
     }
@@ -84,7 +86,7 @@ export default function WikiCreatePage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate("/wiki")}
+          onClick={() => navigate(returnTo)}
           className="btn btn-ghost btn-sm"
         >
           <ArrowLeft size={16} />

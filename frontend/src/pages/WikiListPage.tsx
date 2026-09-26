@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Plus, BookOpen, Search, Lock, X, Clock, User, ChevronRight } from "lucide-react";
 import { listWikiPages, type WikiPageData } from "../api/wiki";
 import Loader from "../components/Loader";
@@ -10,12 +10,22 @@ type Tab = "all" | "mine" | "collab" | "public";
 export default function WikiListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [sp, setSp] = useSearchParams();
+  const updateQuery = (changes: Record<string, string>) => setSp(previous => {
+    const next = new URLSearchParams(previous);
+    for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); }
+    return next;
+  });
+  const search = sp.get("q") || "";
+  const tab = sp.get("tab");
+  const activeTab: Tab = tab === "mine" || tab === "collab" || tab === "public" ? tab : "all";
+  const page = Math.max(1, Number.parseInt(sp.get("page") || "1", 10) || 1);
+  const setPage = (value: number | ((page: number) => number)) => updateQuery({ page: String(typeof value === "function" ? value(page) : value) });
   const [pages, setPages] = useState<WikiPageData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<Tab>("all");
-  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState(search);
+  useEffect(() => setSearchInput(search), [search]);
   const [total, setTotal] = useState(0);
   const PER_PAGE = 20;
   const didMount = useRef(false);
@@ -74,7 +84,7 @@ export default function WikiListPage() {
           </p>
         </div>
         <button
-          onClick={() => navigate("/wiki/new")}
+          onClick={() => navigate("/wiki/new", { state: { from: location.pathname + location.search } })}
           className="btn btn-primary btn-sm"
         >
           <Plus size={14} strokeWidth={2} />
@@ -90,12 +100,12 @@ export default function WikiListPage() {
             type="text"
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") { setSearch(searchInput); setPage(1); } }}
+            onKeyDown={e => { if (e.key === "Enter") { updateQuery({ q: searchInput, page: "" }); } }}
             placeholder={t("wiki.search_placeholder", "搜索知识库…")}
             className="w-full rounded-[6px] border border-[var(--border)] bg-[var(--bg)] py-[8px] pl-9 pr-9 text-[13px] text-[var(--text)] outline-none transition-all placeholder:text-[var(--text-faint)] hover:border-[#d1d5db] focus:border-[var(--primary)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(37,99,235,.08)]"
           />
           {searchInput && (
-            <button onClick={() => { setSearchInput(""); setSearch(""); setPage(1); }}
+            <button onClick={() => { setSearchInput(""); updateQuery({ q: "", page: "" }); }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)] transition-colors">
               <X size={14} />
             </button>
@@ -105,7 +115,7 @@ export default function WikiListPage() {
           {tabs.map(tab => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setPage(1); }}
+              onClick={() => { updateQuery({ tab: tab.key === "all" ? "" : tab.key, page: "" }); }}
               className={`rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-[var(--primary)] text-white"
@@ -118,7 +128,7 @@ export default function WikiListPage() {
           {search && (
             <span className="ml-2 flex items-center gap-1 text-[11px] text-[var(--text-faint)]">
               搜索: "{search}"
-              <button onClick={() => { setSearch(""); setSearchInput(""); setPage(1); }} className="text-[var(--text-muted)] hover:text-red-500 transition-colors">×</button>
+              <button onClick={() => { setSearchInput(""); updateQuery({ q: "", page: "" }); }} className="text-[var(--text-muted)] hover:text-red-500 transition-colors">×</button>
             </span>
           )}
         </div>
@@ -133,7 +143,7 @@ export default function WikiListPage() {
             {search ? "换个关键词试试" : "点击下方按钮创建你的第一篇知识库"}
           </p>
           {activeTab === "all" && !search && (
-            <button onClick={() => navigate("/wiki/new")} className="btn btn-outline btn-sm mt-4">
+            <button onClick={() => navigate("/wiki/new", { state: { from: location.pathname + location.search } })} className="btn btn-outline btn-sm mt-4">
               <Plus size={14} />{t("wiki.create_first", "创建页面")}
             </button>
           )}
@@ -146,7 +156,7 @@ export default function WikiListPage() {
             return (
               <div
                 key={page.id}
-                onClick={() => navigate(`/wiki/${page.id}`)}
+                onClick={() => navigate(`/wiki/${page.id}`, { state: { from: location.pathname + location.search } })}
                 className="card flex items-start gap-3.5 rounded-[8px] px-4 py-3.5 cursor-pointer transition-all hover:border-[#d1d5db] group"
               >
                 <BookOpen size={17} strokeWidth={1.8} className="mt-0.5 text-[var(--text-faint)] shrink-0 group-hover:text-[var(--primary)] transition-colors" />

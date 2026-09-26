@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Edit3, Plus, X, Check, Play, Square, ChevronDown, ExternalLink, Globe, Code2, Search, Unlink, RefreshCw, AlertCircle, GitPullRequest, CheckCircle2, UserPlus, Flag } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
@@ -13,6 +13,8 @@ import { extractCommentAttachments } from "../utils/commentAttachments";
 
 export default function IssueDetailPage() {
   const {id}=useParams<{id:string}>(); const {t}=useTranslation();
+  const location = useLocation();
+  const returnTo = typeof location.state?.from === "string" && (location.state.from === "/issues" || location.state.from.startsWith("/issues?")) ? location.state.from : "/issues";
   const [issue,setIssue]=useState<any>(null); const [loading,setLoading]=useState(true);
   const [errMsg, setErrMsg] = useState("");
 
@@ -118,9 +120,9 @@ export default function IssueDetailPage() {
 
       {/* Nav */}
       <div className="flex items-center justify-between">
-        <Link to="/issues" className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
+        <Link to={returnTo} className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
         <div className="flex items-center gap-2">
-          {canFullEdit && <Link to={`/issues/${issue.id}/edit`} className="btn btn-outline btn-sm"><Edit3 size={12}/>{t("common.edit")}</Link>}
+          {canFullEdit && <Link to={`/issues/${issue.id}/edit`} state={{ from: returnTo }} className="btn btn-outline btn-sm"><Edit3 size={12}/>{t("common.edit")}</Link>}
           <button onClick={openClaim} className="btn btn-outline btn-sm"><UserPlus size={12} className="mr-1"/>{t("roles.title","Claim")}</button>
         </div>
       </div>

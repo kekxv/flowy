@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Calendar, Flag, CheckCircle2, AlertCircle, Edit3, Rocket } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
@@ -14,6 +14,8 @@ const daysLeft = (date: string|null) => { if (!date) return null; return Math.ce
 
 export default function MilestoneDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const returnTo = typeof location.state?.from === "string" && (location.state.from === "/milestones" || location.state.from.startsWith("/milestones?")) ? location.state.from : "/milestones";
   const { t } = useTranslation();
   const user = useAuthStore(s => s.user);
   const [milestone, setMilestone] = useState<MilestoneData|null>(null);
@@ -64,7 +66,7 @@ export default function MilestoneDetailPage() {
     <div className="mx-auto max-w-5xl space-y-5 page-enter">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-[8px] bg-red-50 border border-red-100 px-3 py-2 text-[12px] text-red-600 shadow-sm animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
 
-      <Link to="/milestones" className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
+      <Link to={returnTo} className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
 
       {/* Header card */}
       <div className="card rounded-[8px] overflow-hidden">
