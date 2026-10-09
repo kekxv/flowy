@@ -206,7 +206,7 @@ class CommandHandlers:
 | `/stats` `/统计` | 问题统计 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
 | `/file` `/文件` [关键词] | 搜索内网文件 |
-| `/soft` `/软件` [组件标识] [--all] | 软件版本说明与下载；`--all` 查看全部历史版本 |
+| `/soft` `/软件` [组件标识] [/all] | 软件版本说明与下载；`/all`（或 `--all`）查看全部历史版本 |
 
 ### ✏️ 操作类
 | 指令 | 说明 |
@@ -1770,11 +1770,12 @@ class CommandHandlers:
         Usage:
         - /soft            — 列出所有软件组件及其最新版本说明/下载
         - /soft 名称/标识    — 查看指定组件最新 5 个版本
-        - /soft [名称/标识] --all — 查看全部历史版本
+        - /soft [名称/标识] /all（或 --all） — 查看全部历史版本
         """
         from sqlalchemy.orm import selectinload
 
         from app.models.software import SoftwareComponent, SoftwareDependency, SoftwareVersion
+        from app.services.wechat_work_bot.file_token import generate_file_token
         from app.utils.settings import get_frontend_url
 
         try:
@@ -1799,7 +1800,8 @@ class CommandHandlers:
         def _download(v) -> str | None:
             """Human-friendly download line for a version, or None."""
             if v.artifact_type == "file" and v.stored_filename:
-                path = f"/api/v1/software/files/{v.stored_filename}"
+                token = generate_file_token("software", v.stored_filename)
+                path = f"/api/v1/software/download/{v.stored_filename}/confirm?token={token}"
                 url = f"{frontend_url}{path}" if frontend_url else path
                 size = _format_file_size(int(v.file_size * 1024 * 1024)) if v.file_size else ""
                 label = v.file_name or "下载"
@@ -1835,8 +1837,9 @@ class CommandHandlers:
                 lines.append(note)
             return lines
 
-        all_versions = any(arg.lower() in {"--all", "-a", "全部"} for arg in args)
-        args = [arg for arg in args if arg.lower() not in {"--all", "-a", "全部"}]
+        all_flags = {"--all", "/all", "—all", "-a", "全部"}
+        all_versions = any(arg.lower() in all_flags for arg in args)
+        args = [arg for arg in args if arg.lower() not in all_flags]
 
         # ── No component: list every component ──
         if not args:
@@ -1899,7 +1902,7 @@ class CommandHandlers:
                         out.append(note)
                     out.append("")
                 if len(versions) > 5 and not all_versions:
-                    out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个；使用 `/soft {c.identifier} --all` 查看全部_")
+                    out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个；使用 `/soft {c.identifier} /all` 查看全部_")
             return "\n".join(out).rstrip()
 
         # Multiple matches → show each component's latest version

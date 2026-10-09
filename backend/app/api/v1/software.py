@@ -5,9 +5,10 @@ import mimetypes
 import os
 import uuid
 from datetime import datetime
+from urllib.parse import quote, urlencode
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,6 +30,11 @@ from app.services.wechat_work_bot.attachment_names import (
     encode_attachment_name,
     normalize_attachment_name,
 )
+from app.services.wechat_work_bot.download_page import (
+    render_download_confirmation,
+    render_download_link_expired,
+)
+from app.services.wechat_work_bot.file_token import verify_file_token
 
 logger = logging.getLogger("uvicorn")
 
@@ -138,6 +144,52 @@ async def download_artifact(
     _user: User = Depends(get_current_user),
 ):
     """Download an uploaded software artifact file."""
+    return _artifact_response(filename)
+
+
+@router.get("/download/{filename}")
+async def download_signed_artifact(filename: str, token: str = Query(...)):
+    """Download only the artifact authorized by a time-limited bot link."""
+    _validate_artifact_token(filename, token)
+    return _artifact_response(filename)
+
+
+def _validate_artifact_token(filename: str, token: str) -> None:
+    payload = verify_file_token(token)
+    if not payload or payload["sid"] != "software" or payload["url"] != filename:
+        raise HTTPException(status_code=401, detail="Invalid or expired download token")
+
+
+@router.get("/download/{filename}/confirm", response_class=HTMLResponse)
+async def confirm_artifact_download(
+    filename: str,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Show the same confirmation UI as intranet downloads before sending a file."""
+    try:
+        _validate_artifact_token(filename, token)
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return HTMLResponse(render_download_link_expired(), status_code=410)
+        raise
+
+    artifact = _artifact_response(filename)
+    result = await db.execute(
+        select(SoftwareVersion)
+        .where(SoftwareVersion.stored_filename == filename)
+        .options(selectinload(SoftwareVersion.component))
+    )
+    version = result.scalars().first()
+    display_name = (version.file_name if version else None) or artifact.filename
+    source_name = f"{version.component.name} · v{version.version}" if version else "软件制品"
+    direct_url = f"../{quote(filename, safe='')}?{urlencode({'token': token})}"
+    return HTMLResponse(render_download_confirmation(
+        display_name, os.path.getsize(artifact.path), source_name, direct_url,
+    ))
+
+
+def _artifact_response(filename: str) -> FileResponse:
     artifacts_dir = _artifacts_dir()
     real_dir = os.path.realpath(artifacts_dir)
     filepath = os.path.realpath(os.path.join(artifacts_dir, filename))
