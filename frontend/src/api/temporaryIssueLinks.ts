@@ -1,5 +1,5 @@
 import api from './client'
-export interface PublicIssueLink { expires_at: string; creator_name: string }
+export interface PublicIssueLink { expires_at: string; creator_name: string; server_time?: string }
 export interface TemporaryIssueLink { id: string; expires_at: string; used_at: string | null; issue_id: string | null; created_at: string; active: boolean }
 export async function createTemporaryIssueLink(expires_in_minutes = 1440) { const {data} = await api.post('/temporary-issue-links', {expires_in_minutes}); return data as {token:string;url:string;expires_at:string} }
 export async function listTemporaryIssueLinks() { const {data} = await api.get('/temporary-issue-links'); return data as TemporaryIssueLink[] }

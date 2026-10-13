@@ -476,6 +476,8 @@
     "submit": "提交需求",
     "submitting": "提交中…",
     "upload_failed": "上传失败。",
+    "link_expires_at": "链接到期时间：{{date}}",
+    "submit_failed": "提交失败，请重试。",
     "unavailable_title": "临时链接不可用",
     "unavailable": "链接已过期或已使用。",
     "submitted_title": "提交成功",

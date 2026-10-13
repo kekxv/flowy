@@ -42,7 +42,7 @@ async def get_public_link(token: str, response: Response, db: AsyncSession = Dep
     if not link: raise HTTPException(410, "This link is expired or already used")
     creator = await db.get(User, link.creator_id)
     _no_store(response)
-    return {"expires_at": link.expires_at, "creator_name": (creator.display_name or creator.username) if creator else ""}
+    return {"expires_at": link.expires_at, "server_time": datetime.now(UTC).isoformat(), "creator_name": (creator.display_name or creator.username) if creator else ""}
 @public_router.post("/{token}/attachments")
 async def upload_public_attachment(token: str, response: Response, file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     link = await service.get_active(db, token)

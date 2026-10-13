@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { isAxiosError } from 'axios'
 import { ArrowRight, CheckCircle2, Clock3, FileText, Info, LoaderCircle, MessageSquare, UploadCloud } from 'lucide-react'
 import { getPublicIssueLink, submitPublicIssueLink, uploadPublicIssueLinkAttachment } from '../api/temporaryIssueLinks'
 import type { PublicIssueLink } from '../api/temporaryIssueLinks'
@@ -23,22 +24,56 @@ export default function PublicIssueLinkPage() {
   const [dueDate, setDueDate] = useState('')
   const [attachments, setAttachments] = useState<{ original_name: string; markdown: string }[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
+  const serverOffset = useRef(0)
 
   useEffect(() => {
     let active = true
-    getPublicIssueLink(token).then(data => { if (active) setMeta(data) }).catch(() => { if (active) setUnavailable(true) })
+    getPublicIssueLink(token).then(data => {
+      if (!active) return
+      serverOffset.current = data.server_time ? Date.parse(data.server_time) - Date.now() : 0
+      setMeta(data)
+    }).catch(() => { if (active) setUnavailable(true) })
     return () => { active = false }
   }, [token])
 
+  useEffect(() => {
+    if (!meta || done || unavailable) return
+    let timer: ReturnType<typeof setTimeout>
+    function checkExpiry() {
+      clearTimeout(timer)
+      const remaining = Date.parse(meta!.expires_at) - (Date.now() + serverOffset.current)
+      if (remaining <= 0) setUnavailable(true)
+      else timer = setTimeout(checkExpiry, Math.min(remaining, 60_000))
+    }
+    checkExpiry()
+    window.addEventListener('focus', checkExpiry)
+    document.addEventListener('visibilitychange', checkExpiry)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('focus', checkExpiry)
+      document.removeEventListener('visibilitychange', checkExpiry)
+    }
+  }, [meta, done, unavailable])
+
+  function linkExpired() {
+    if (!meta || unavailable || done) return true
+    if (Date.parse(meta.expires_at) <= Date.now() + serverOffset.current) {
+      setUnavailable(true)
+      return true
+    }
+    return false
+  }
+
   async function upload(file: File) {
-    if (uploading || busy || attachments.length >= 5) return
+    if (uploading || busy || attachments.length >= 5 || linkExpired()) return
     setUploading(true)
     setError('')
     try {
       const result = await uploadPublicIssueLinkAttachment(token, file)
       setAttachments(items => [...items, result])
-    } catch {
-      setError('public_issue_link.upload_failed')
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 410) setUnavailable(true)
+      else setError('public_issue_link.upload_failed')
     } finally {
       setUploading(false)
       if (fileInput.current) fileInput.current.value = ''
@@ -47,7 +82,7 @@ export default function PublicIssueLinkPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!title.trim() || busy || uploading || !meta) return
+    if (!title.trim() || busy || uploading || linkExpired()) return
     setBusy(true)
     setError('')
     try {
@@ -57,8 +92,9 @@ export default function PublicIssueLinkPage() {
         issue_type: issueType, priority, due_date: dueDate || null,
       })
       setDone(true)
-    } catch {
-      setError('public_issue_link.unavailable')
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 410) setUnavailable(true)
+      else setError('public_issue_link.submit_failed')
     } finally {
       setBusy(false)
     }
@@ -78,7 +114,7 @@ export default function PublicIssueLinkPage() {
           <h1>{t('public_issue_link.heading_prefix')}<span>{t('public_issue_link.heading_accent')}</span></h1>
           {meta && <div className="collection-meta">
             <span>{t('public_issue_link.created_by')} <strong>{meta.creator_name}</strong></span>
-            <span className="collection-expiry"><Clock3 size={16} /> {t('temporary_links.expires_at', { date: date(meta.expires_at) })}</span>
+            <span className="collection-expiry"><Clock3 size={16} /> {t('public_issue_link.link_expires_at', { date: date(meta.expires_at) })}</span>
           </div>}
         </header>
         {status ? (

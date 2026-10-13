@@ -479,6 +479,8 @@
     "submit": "Submit request",
     "submitting": "Submitting…",
     "upload_failed": "Upload failed.",
+    "link_expires_at": "Link expires: {{date}}",
+    "submit_failed": "Submission failed. Please try again.",
     "unavailable_title": "Temporary link unavailable",
     "unavailable": "This link is expired or already used.",
     "submitted_title": "Request submitted",
