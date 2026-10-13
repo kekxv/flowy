@@ -481,7 +481,15 @@ class CommandHandlers:
             logger.exception("Failed to generate temporary issue link")
             return "❌ 生成填写链接失败，请稍后重试"
         url = f"{frontend_url}/#/public/issue-links/{raw_token}"
-        return "✅ 一次性问题填写链接已生成\n\n" f"[打开填写页面]({url})\n" f"有效期至：{link.expires_at}\n" "提交一次后链接立即失效。"
+        expires_at = datetime.fromisoformat(link.expires_at).astimezone()
+        expires_text = expires_at.strftime("%Y-%m-%d %H:%M")
+        return (
+            "✅ **一次性问题填写链接**\n\n"
+            f"[点击填写问题]({url})\n\n"
+            f"- 有效期：{expires_in_minutes} 分钟\n"
+            f"- 到期时间：{expires_text}\n"
+            "- 提交后立即失效"
+        )
 
     async def handle_create(self, args: list[str], quote: dict, frame: dict = None) -> str:
         if not args:

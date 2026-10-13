@@ -1648,7 +1648,12 @@ class TestTemporaryIssueLinkCommand:
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
         result = await handlers.handle_link(["60"], {})
         assert "#/public/issue-links/" in result
-        assert "60" not in result
+        assert "**一次性问题填写链接**" in result
+        assert "[点击填写问题]" in result
+        assert "有效期：60 分钟" in result
+        assert "提交后立即失效" in result
+        assert re.search(r"- 到期时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2}", result)
+        assert "+00:00" not in result
 
     @pytest.mark.asyncio
     async def test_link_command_requires_bound_account(self, db_session: AsyncSession):
