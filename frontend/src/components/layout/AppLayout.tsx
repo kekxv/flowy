@@ -11,7 +11,7 @@ function useNavItems() {
   const items = [
     { to: "/dashboard", label: t("dashboard.title"), icon: LayoutDashboard },
     { to: "/issues", label: t("issues.title"), icon: ListTodo },
-    { to: "/temporary-issue-links", label: "Temporary links", icon: LinkIcon },
+    { to: "/temporary-issue-links", label: t("temporary_links.nav"), icon: LinkIcon },
     { to: "/milestones", label: t("milestone.title"), icon: Flag },
     { to: "/wiki", label: t("wiki.title", "Knowledge Base"), icon: BookOpen },
     { to: "/software", label: t("software.title"), icon: Boxes },

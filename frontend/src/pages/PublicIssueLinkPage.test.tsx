@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import PublicIssueLinkPage from './PublicIssueLinkPage'
+import '../i18n'
 import * as api from '../api/temporaryIssueLinks'
 vi.mock('../api/temporaryIssueLinks')
 const mocked = vi.mocked(api)

@@ -432,5 +432,36 @@
     "sort": "排序：",
     "sort_updated": "按最后更新时间",
     "sort_name": "按名称"
+  },
+  "temporary_links": {
+    "nav": "临时填写链接",
+    "title": "临时问题填写链接",
+    "description": "每个链接只能创建一个问题，并会自动过期。",
+    "expires_in": "有效期",
+    "minutes": "{{count}} 分钟",
+    "hours": "{{count}} 小时",
+    "days": "{{count}} 天",
+    "generate": "生成链接",
+    "copy": "复制",
+    "empty": "暂无链接。",
+    "active": "有效",
+    "closed": "已关闭",
+    "expires_at": "到期时间：{{date}}",
+    "unused": "未使用",
+    "used_or_expired": "已使用或已过期"
+  },
+  "public_issue_link": {
+    "brand": "Flowy · 临时问题需求",
+    "title": "提交问题或需求",
+    "meta": "由 {{creator}} 创建 · 到期时间：{{expires}}",
+    "time": "时间",
+    "attachment": "附件",
+    "submit": "提交需求",
+    "submitting": "提交中…",
+    "upload_failed": "上传失败。",
+    "unavailable_title": "临时链接不可用",
+    "unavailable": "链接已过期或已使用。",
+    "submitted_title": "提交成功",
+    "submitted_body": "感谢提交，此一次性链接已经关闭。"
   }
 }

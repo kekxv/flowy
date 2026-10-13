@@ -435,5 +435,36 @@
     "sort": "Sort: ",
     "sort_updated": "Last updated",
     "sort_name": "Name"
+  },
+  "temporary_links": {
+    "nav": "Temporary links",
+    "title": "Temporary request links",
+    "description": "Each link can create one issue and expires automatically.",
+    "expires_in": "Expires in",
+    "minutes": "{{count}} minutes",
+    "hours": "{{count}} hours",
+    "days": "{{count}} days",
+    "generate": "Generate link",
+    "copy": "Copy",
+    "empty": "No links yet.",
+    "active": "Active",
+    "closed": "Closed",
+    "expires_at": "Expires: {{date}}",
+    "unused": "Unused",
+    "used_or_expired": "Used or expired"
+  },
+  "public_issue_link": {
+    "brand": "Flowy · Temporary request",
+    "title": "Submit a request",
+    "meta": "Created by {{creator}} · expires {{expires}}",
+    "time": "Time",
+    "attachment": "Attachment",
+    "submit": "Submit request",
+    "submitting": "Submitting…",
+    "upload_failed": "Upload failed.",
+    "unavailable_title": "Temporary link unavailable",
+    "unavailable": "This link is expired or already used.",
+    "submitted_title": "Request submitted",
+    "submitted_body": "Thanks. This one-time link is now closed."
   }
 }
