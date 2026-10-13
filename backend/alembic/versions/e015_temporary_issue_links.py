@@ -1,6 +1,8 @@
 """add one-time temporary issue links"""
 import sqlalchemy as sa
+
 from alembic import op
+
 revision = "e015"
 down_revision = "e014"
 branch_labels = None
