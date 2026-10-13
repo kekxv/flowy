@@ -23,6 +23,8 @@ const WikiListPage = lazy(() => import("./pages/WikiListPage"))
 const WikiCreatePage = lazy(() => import("./pages/WikiCreatePage"))
 const WikiDetailPage = lazy(() => import("./pages/WikiDetailPage"))
 const SoftwareVersionPage = lazy(() => import("./pages/SoftwareVersionPage"))
+const TemporaryIssueLinksPage = lazy(() => import("./pages/TemporaryIssueLinksPage"))
+const PublicIssueLinkPage = lazy(() => import("./pages/PublicIssueLinkPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -37,6 +39,7 @@ function App() {
         <Suspense fallback={<Loader fullScreen />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/public/issue-links/:token" element={<PublicIssueLinkPage />} />
             <Route
               path="/*"
               element={
@@ -45,6 +48,7 @@ function App() {
                     <Routes>
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/issues" element={<IssueListPage />} />
+                      <Route path="/temporary-issue-links" element={<TemporaryIssueLinksPage />} />
                       <Route path="/issues/new" element={<IssueCreatePage />} />
                       <Route path="/issues/:id" element={<IssueDetailPage />} />
                       <Route path="/issues/:id/edit" element={<IssueEditPage />} />
