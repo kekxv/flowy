@@ -31,6 +31,7 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "stats": {"handler": "handle_stats", "roles": ["viewer", "helper", "admin"], "aliases": ["统计", "概况", "问题统计", "数据分析", "汇总"]},
     # Issue management
     "create": {"handler": "handle_create", "roles": ["helper", "admin"], "aliases": ["创建", "新建", "报 bug", "提需求"]},
+    "link": {"handler": "handle_link", "roles": ["helper", "admin"], "aliases": ["临时链接", "填写链接", "问题链接", "生成链接"]},
     "update": {"handler": "handle_update", "roles": ["helper", "admin"], "aliases": ["更新", "修改", "编辑"]},
     "close": {"handler": "handle_close", "roles": ["helper", "admin"], "aliases": ["关闭", "标记完成"]},
     "resolve": {"handler": "handle_resolve", "roles": ["helper", "admin"], "aliases": ["解决", "完成", "处理完成", "解决问题"]},

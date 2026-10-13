@@ -1638,3 +1638,20 @@ class TestShouldStaySilent:
         svc = self._service()
         ctx = MessageContext(chattype="group", mentioned_list=["alice", "bob"])
         assert svc._should_stay_silent(ctx) is False
+
+class TestTemporaryIssueLinkCommand:
+    @pytest.mark.asyncio
+    async def test_link_command_generates_public_one_time_url(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-link-command", username="linker", email="linker@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+        result = await handlers.handle_link(["60"], {})
+        assert "#/public/issue-links/" in result
+        assert "60" not in result
+
+    @pytest.mark.asyncio
+    async def test_link_command_requires_bound_account(self, db_session: AsyncSession):
+        handlers = await _make_handlers(db_session, wechat_user_id="wx-unbound-link", flowy_user_id=None)
+        result = await handlers.handle_link([], {})
+        assert "绑定" in result

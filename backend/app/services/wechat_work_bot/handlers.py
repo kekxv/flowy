@@ -212,6 +212,7 @@ class CommandHandlers:
 | 指令 | 说明 |
 | --- | --- |
 | `/create` `/创建` [类型] <标题> [描述] | 创建问题/需求 |
+| `/link` `/临时链接` [分钟] | 生成一次性公开填写链接（默认 24 小时） |
 | `/update` `/修改` <id> <字段> <值> | 更新问题 |
 | `/close` `/关闭` <id> [原因] | 关闭问题 |
 | `/resolve` `/解决` <id> [说明] | 解决问题 |
@@ -459,6 +460,28 @@ class CommandHandlers:
         return "\n".join(lines)
 
     # ─── Issue Management ─────────────────────────────────────
+
+    async def handle_link(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Generate a one-time public issue request link for a bound bot member."""
+        if not self.bot_user or not self.bot_user.flowy_user_id:
+            return "⚠️ 生成填写链接需要绑定 Flowy 账号，请先联系管理员绑定"
+        expires_in_minutes = 1440
+        if args:
+            if len(args) != 1 or not args[0].isdigit():
+                return "❌ 用法: `/link [有效期分钟]`（5～10080，默认 1440）"
+            expires_in_minutes = int(args[0])
+        from app.services.temporary_issue_link_service import TemporaryIssueLinkService
+        from app.utils.settings import get_frontend_url
+        try:
+            link, raw_token = await TemporaryIssueLinkService().create(self.db, self.bot_user.flowy_user_id, expires_in_minutes)
+            frontend_url = await get_frontend_url(self.db)
+        except ValueError as exc:
+            return f"❌ 无法生成填写链接：{exc}"
+        except Exception:
+            logger.exception("Failed to generate temporary issue link")
+            return "❌ 生成填写链接失败，请稍后重试"
+        url = f"{frontend_url}/#/public/issue-links/{raw_token}"
+        return "✅ 一次性问题填写链接已生成\n\n" f"[打开填写页面]({url})\n" f"有效期至：{link.expires_at}\n" "提交一次后链接立即失效。"
 
     async def handle_create(self, args: list[str], quote: dict, frame: dict = None) -> str:
         if not args:
