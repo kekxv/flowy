@@ -1646,10 +1646,10 @@ class TestTemporaryIssueLinkCommand:
         db_session.add(user)
         await db_session.flush()
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
-        result = await handlers.handle_link(["60"], {})
+        result = await handlers.handle_collect(["60"], {})
         assert "#/public/issue-links/" in result
-        assert "**一次性问题填写链接**" in result
-        assert "[点击填写问题]" in result
+        assert "**问题或需求采集**" in result
+        assert "[提交问题或需求]" in result
         assert "有效期：60 分钟" in result
         assert "提交后立即失效" in result
         assert re.search(r"- 到期时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2}", result)
@@ -1658,5 +1658,17 @@ class TestTemporaryIssueLinkCommand:
     @pytest.mark.asyncio
     async def test_link_command_requires_bound_account(self, db_session: AsyncSession):
         handlers = await _make_handlers(db_session, wechat_user_id="wx-unbound-link", flowy_user_id=None)
-        result = await handlers.handle_link([], {})
+        result = await handlers.handle_collect([], {})
         assert "绑定" in result
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["/collect 60", "/采集 60", "/问题采集 60", "/需求采集 60"])
+async def test_collection_command_aliases(command):
+    from app.services.wechat_work_bot.command_parser import CommandParser, check_permission
+    from app.services.wechat_work_bot.message_parser import MessageContext
+
+    parsed = await CommandParser().parse(MessageContext(text=command))
+    assert parsed.command == "collect"
+    assert parsed.args == ["60"]
+    assert check_permission("helper", "collect")
+    assert not check_permission("viewer", "collect")

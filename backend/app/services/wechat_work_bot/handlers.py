@@ -212,7 +212,7 @@ class CommandHandlers:
 | 指令 | 说明 |
 | --- | --- |
 | `/create` `/创建` [类型] <标题> [描述] | 创建问题/需求 |
-| `/link` `/临时链接` [分钟] | 生成一次性公开填写链接（默认 24 小时） |
+| `/collect` `/采集` [分钟] | 发起问题或需求采集（默认 24 小时） |
 | `/update` `/修改` <id> <字段> <值> | 更新问题 |
 | `/close` `/关闭` <id> [原因] | 关闭问题 |
 | `/resolve` `/解决` <id> [说明] | 解决问题 |
@@ -461,14 +461,14 @@ class CommandHandlers:
 
     # ─── Issue Management ─────────────────────────────────────
 
-    async def handle_link(self, args: list[str], quote: dict, frame: dict = None) -> str:
+    async def handle_collect(self, args: list[str], quote: dict, frame: dict = None) -> str:
         """Generate a one-time public issue request link for a bound bot member."""
         if not self.bot_user or not self.bot_user.flowy_user_id:
-            return "⚠️ 生成填写链接需要绑定 Flowy 账号，请先联系管理员绑定"
+            return "⚠️ 发起采集需要绑定 Flowy 账号，请先联系管理员绑定"
         expires_in_minutes = 1440
         if args:
             if len(args) != 1 or not args[0].isdigit():
-                return "❌ 用法: `/link [有效期分钟]`（5～10080，默认 1440）"
+                return "❌ 用法: `/collect [有效期分钟]`（5～10080，默认 1440）"
             expires_in_minutes = int(args[0])
         from app.services.temporary_issue_link_service import TemporaryIssueLinkService
         from app.utils.settings import get_frontend_url
@@ -476,16 +476,16 @@ class CommandHandlers:
             link, raw_token = await TemporaryIssueLinkService().create(self.db, self.bot_user.flowy_user_id, expires_in_minutes)
             frontend_url = await get_frontend_url(self.db)
         except ValueError as exc:
-            return f"❌ 无法生成填写链接：{exc}"
+            return f"❌ 无法发起采集：{exc}"
         except Exception:
             logger.exception("Failed to generate temporary issue link")
-            return "❌ 生成填写链接失败，请稍后重试"
+            return "❌ 发起采集失败，请稍后重试"
         url = f"{frontend_url}/#/public/issue-links/{raw_token}"
         expires_at = datetime.fromisoformat(link.expires_at).astimezone()
         expires_text = expires_at.strftime("%Y-%m-%d %H:%M")
         return (
-            "✅ **一次性问题填写链接**\n\n"
-            f"[点击填写问题]({url})\n\n"
+            "✅ **问题或需求采集**\n\n"
+            f"[提交问题或需求]({url})\n\n"
             f"- 有效期：{expires_in_minutes} 分钟\n"
             f"- 到期时间：{expires_text}\n"
             "- 提交后立即失效"
