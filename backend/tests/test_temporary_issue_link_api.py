@@ -44,3 +44,69 @@ async def test_public_link_returns_server_time_for_expiry_checks(db_session, tes
     data = response.json()
     assert datetime.fromisoformat(data['server_time']).tzinfo is not None
     assert datetime.fromisoformat(data['server_time']) < datetime.fromisoformat(data['expires_at'])
+
+
+@pytest.mark.asyncio
+async def test_owner_can_recover_link_url_from_list(db_session, test_user):
+    async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
+        headers = await login(client)
+        created = (await client.post('/api/v1/temporary-issue-links', json={}, headers=headers)).json()
+        links = (await client.get('/api/v1/temporary-issue-links', headers=headers)).json()
+        assert links[0]['url'] == created['url']
+        from sqlalchemy import select
+
+        from app.models.temporary_issue_link import TemporaryIssueLink
+        stored = await db_session.scalar(select(TemporaryIssueLink))
+        assert stored.token_encrypted and created['token'] not in stored.token_encrypted
+
+
+@pytest.mark.asyncio
+async def test_owner_can_cancel_link_and_all_public_actions_reject_it(db_session, test_user):
+    async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
+        headers = await login(client)
+        created = (await client.post('/api/v1/temporary-issue-links', json={}, headers=headers)).json()
+        link = (await client.get('/api/v1/temporary-issue-links', headers=headers)).json()[0]
+        response = await client.post(f"/api/v1/temporary-issue-links/{link['id']}/cancel", headers=headers)
+        assert response.status_code == 204
+        listed = (await client.get('/api/v1/temporary-issue-links', headers=headers)).json()[0]
+        assert listed['revoked_at'] and not listed['active']
+        assert listed['url'] is None
+        path = f"/api/v1/public/issue-links/{created['token']}"
+        assert (await client.get(path)).status_code == 410
+        assert (await client.post(path + '/submit', json={'title': 'Cancelled'})).status_code == 410
+        assert (await client.post(path + '/attachments', files={'file': ('test.txt', b'test')})).status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_other_user_cannot_list_or_cancel_link(db_session, test_user, test_admin):
+    async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
+        headers = await login(client)
+        created = (await client.post('/api/v1/temporary-issue-links', json={}, headers=headers)).json()
+        link = (await client.get('/api/v1/temporary-issue-links', headers=headers)).json()[0]
+        admin_login = await client.post('/api/v1/auth/login', json={'username_or_email': 'admin', 'password': 'password123'})
+        admin_headers = {'Authorization': f"Bearer {admin_login.json()['access_token']}"}
+        assert (await client.get('/api/v1/temporary-issue-links', headers=admin_headers)).json() == []
+        assert (await client.post(f"/api/v1/temporary-issue-links/{link['id']}/cancel", headers=admin_headers)).status_code == 404
+        assert (await client.post(f"/api/v1/temporary-issue-links/{link['id']}/cancel")).status_code == 401
+        assert (await client.get(f"/api/v1/public/issue-links/{created['token']}")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_legacy_link_without_encrypted_token_can_still_be_cancelled(db_session, test_user):
+    from sqlalchemy import select
+
+    from app.models.temporary_issue_link import TemporaryIssueLink
+
+    async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
+        headers = await login(client)
+        created = (await client.post('/api/v1/temporary-issue-links', json={}, headers=headers)).json()
+        stored = await db_session.scalar(select(TemporaryIssueLink))
+        stored.token_encrypted = None
+        await db_session.commit()
+        link = (await client.get('/api/v1/temporary-issue-links', headers=headers)).json()[0]
+        assert link['active'] and link['url'] is None
+        assert (await client.get(f"/api/v1/public/issue-links/{created['token']}")).status_code == 200
+        path = f"/api/v1/temporary-issue-links/{link['id']}/cancel"
+        assert (await client.post(path, headers=headers)).status_code == 204
+        assert (await client.post(path, headers=headers)).status_code == 204
+        assert (await client.get(f"/api/v1/public/issue-links/{created['token']}")).status_code == 410

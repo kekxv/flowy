@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crypto import encrypt_token
 from app.models.issue import Issue, issue_assignees
 from app.models.temporary_issue_link import TemporaryIssueLink
 
@@ -23,19 +24,19 @@ class TemporaryIssueLinkService:
         if not MIN_EXPIRY_MINUTES <= expires_in_minutes <= MAX_EXPIRY_MINUTES:
             raise ValueError(f"Expiry must be between {MIN_EXPIRY_MINUTES} and {MAX_EXPIRY_MINUTES} minutes")
         now = _now()
-        count = await db.scalar(select(func.count(TemporaryIssueLink.id)).where(TemporaryIssueLink.creator_id == creator_id, TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.expires_at > now))
+        count = await db.scalar(select(func.count(TemporaryIssueLink.id)).where(TemporaryIssueLink.creator_id == creator_id, TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.revoked_at.is_(None), TemporaryIssueLink.expires_at > now))
         if (count or 0) >= MAX_ACTIVE_LINKS:
             raise ValueError("Too many active links")
         raw = create_raw_token()
-        link = TemporaryIssueLink(token_hash=hash_link_token(raw), creator_id=creator_id, expires_at=(datetime.now(UTC) + timedelta(minutes=expires_in_minutes)).isoformat())
+        link = TemporaryIssueLink(token_hash=hash_link_token(raw), token_encrypted=encrypt_token(raw), creator_id=creator_id, expires_at=(datetime.now(UTC) + timedelta(minutes=expires_in_minutes)).isoformat())
         db.add(link)
         await db.commit()
         await db.refresh(link)
         return link, raw
     async def get_active(self, db: AsyncSession, raw_token: str):
-        return await db.scalar(select(TemporaryIssueLink).where(TemporaryIssueLink.token_hash == hash_link_token(raw_token), TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.expires_at > _now()))
+        return await db.scalar(select(TemporaryIssueLink).where(TemporaryIssueLink.token_hash == hash_link_token(raw_token), TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.revoked_at.is_(None), TemporaryIssueLink.expires_at > _now()))
     async def reserve_attachment(self, db: AsyncSession, raw_token: str) -> TemporaryIssueLink | None:
-        result = await db.execute(update(TemporaryIssueLink).where(TemporaryIssueLink.token_hash == hash_link_token(raw_token), TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.expires_at > _now(), TemporaryIssueLink.attachment_count < 5).values(attachment_count=TemporaryIssueLink.attachment_count + 1))
+        result = await db.execute(update(TemporaryIssueLink).where(TemporaryIssueLink.token_hash == hash_link_token(raw_token), TemporaryIssueLink.used_at.is_(None), TemporaryIssueLink.revoked_at.is_(None), TemporaryIssueLink.expires_at > _now(), TemporaryIssueLink.attachment_count < 5).values(attachment_count=TemporaryIssueLink.attachment_count + 1))
         if result.rowcount != 1:
             return None
         await db.commit()
@@ -48,6 +49,7 @@ class TemporaryIssueLinkService:
             .where(
                 TemporaryIssueLink.token_hash == hash_link_token(raw_token),
                 TemporaryIssueLink.used_at.is_(None),
+                TemporaryIssueLink.revoked_at.is_(None),
                 TemporaryIssueLink.expires_at > now,
             )
             .values(used_at=now)

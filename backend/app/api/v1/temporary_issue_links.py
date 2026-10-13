@@ -1,13 +1,14 @@
 import mimetypes
 import os
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.wiki import _get_upload_limit
-from app.config import settings
+from app.core.crypto import decrypt_token
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.temporary_issue_link import TemporaryIssueLink
@@ -19,6 +20,7 @@ from app.services.wechat_work_bot.attachment_names import (
     encode_attachment_name,
     normalize_attachment_name,
 )
+from app.utils.settings import get_frontend_url
 
 router = APIRouter(prefix="/temporary-issue-links", tags=["temporary-issue-links"])
 public_router = APIRouter(prefix="/public/issue-links", tags=["public-issue-links"])
@@ -29,13 +31,46 @@ async def create_link(body: TemporaryIssueLinkCreate, response: Response, db: As
     try: link, raw = await service.create(db, user.id, body.expires_in_minutes)
     except ValueError as exc: raise HTTPException(400, str(exc)) from exc
     _no_store(response)
-    return {"token": raw, "url": f"{settings.frontend_url.rstrip('/')}/#/public/issue-links/{raw}", "expires_at": link.expires_at}
+    frontend_url = await get_frontend_url(db)
+    return {"token": raw, "url": f"{frontend_url.rstrip('/')}/#/public/issue-links/{raw}", "expires_at": link.expires_at}
 @router.get("")
 async def list_links(response: Response, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     _no_store(response)
     rows = (await db.execute(select(TemporaryIssueLink).where(TemporaryIssueLink.creator_id == user.id).order_by(TemporaryIssueLink.created_at.desc()).limit(100))).scalars().all()
     now = datetime.now(UTC).isoformat()
-    return [{"id": r.id, "expires_at": r.expires_at, "used_at": r.used_at, "issue_id": r.issue_id, "created_at": r.created_at, "active": r.used_at is None and r.expires_at > now} for r in rows]
+    frontend_url = (await get_frontend_url(db)).rstrip('/')
+    result = []
+    for row in rows:
+        active = row.used_at is None and row.revoked_at is None and row.expires_at > now
+        url = None
+        if active and row.token_encrypted:
+            try:
+                url = f"{frontend_url}/#/public/issue-links/{decrypt_token(row.token_encrypted)}"
+            except InvalidToken:
+                # A rotated key cannot recover the old token. The owner can still cancel it.
+                pass
+        result.append({"id": row.id, "expires_at": row.expires_at, "used_at": row.used_at, "revoked_at": row.revoked_at, "issue_id": row.issue_id, "created_at": row.created_at, "active": active, "url": url})
+    return result
+
+
+@router.post("/{link_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_link(link_id: str, response: Response, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    link = await db.scalar(select(TemporaryIssueLink).where(TemporaryIssueLink.id == link_id, TemporaryIssueLink.creator_id == user.id))
+    if not link:
+        raise HTTPException(404, "Link not found")
+    if link.revoked_at is None:
+        now = datetime.now(UTC).isoformat()
+        result = await db.execute(update(TemporaryIssueLink).where(
+            TemporaryIssueLink.id == link_id,
+            TemporaryIssueLink.creator_id == user.id,
+            TemporaryIssueLink.used_at.is_(None),
+            TemporaryIssueLink.revoked_at.is_(None),
+            TemporaryIssueLink.expires_at > now,
+        ).values(revoked_at=now, token_encrypted=None))
+        if result.rowcount != 1:
+            raise HTTPException(409, "Link is already closed")
+        await db.commit()
+    _no_store(response)
 @public_router.get("/{token}")
 async def get_public_link(token: str, response: Response, db: AsyncSession = Depends(get_db)):
     link = await service.get_active(db, token)
