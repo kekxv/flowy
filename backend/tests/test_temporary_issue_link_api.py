@@ -115,7 +115,9 @@ async def test_legacy_link_without_encrypted_token_can_still_be_cancelled(db_ses
 @pytest.mark.asyncio
 async def test_public_upload_requires_active_token_without_login(db_session, test_user):
     from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import select
+
     from app.models.temporary_issue_link import TemporaryIssueLink
 
     async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
