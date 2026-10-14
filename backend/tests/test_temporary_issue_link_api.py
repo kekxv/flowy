@@ -110,3 +110,32 @@ async def test_legacy_link_without_encrypted_token_can_still_be_cancelled(db_ses
         assert (await client.post(path, headers=headers)).status_code == 204
         assert (await client.post(path, headers=headers)).status_code == 204
         assert (await client.get(f"/api/v1/public/issue-links/{created['token']}")).status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_public_upload_requires_active_token_without_login(db_session, test_user):
+    from datetime import UTC, datetime, timedelta
+    from sqlalchemy import select
+    from app.models.temporary_issue_link import TemporaryIssueLink
+
+    async with AsyncClient(transport=transport(db_session), base_url='http://test') as client:
+        headers = await login(client)
+        created = (await client.post('/api/v1/temporary-issue-links', json={}, headers=headers)).json()
+        active = await client.post(
+            f"/api/v1/public/issue-links/{created['token']}/attachments",
+            files={'file': ('note.txt', b'public anonymous upload')},
+        )
+        assert active.status_code == 200
+        stored = await db_session.scalar(select(TemporaryIssueLink))
+        stored.expires_at = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+        await db_session.commit()
+        expired = await client.post(
+            f"/api/v1/public/issue-links/{created['token']}/attachments",
+            files={'file': ('expired.txt', b'blocked')},
+        )
+        assert expired.status_code == 410
+        unknown = await client.post(
+            '/api/v1/public/issue-links/not-a-real-token/attachments',
+            files={'file': ('unknown.txt', b'blocked')},
+        )
+        assert unknown.status_code == 410
