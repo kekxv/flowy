@@ -20,7 +20,7 @@ describe('TemporaryIssueLinksPage', () => {
     render(<TemporaryIssueLinksPage />)
     const open = await screen.findByRole('link', { name: 'Open link' })
     expect(open).toHaveAttribute('href', link.url)
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
     await screen.findByText('Copied')
     expect(clipboard.writeText).toHaveBeenCalledWith(link.url)
   })

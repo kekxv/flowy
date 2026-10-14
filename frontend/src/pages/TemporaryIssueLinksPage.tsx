@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check, Clipboard, Clock3, ExternalLink, Link2, Plus, ShieldCheck, XCircle } from 'lucide-react'
 import { cancelTemporaryIssueLink, createTemporaryIssueLink, listTemporaryIssueLinks } from '../api/temporaryIssueLinks'
 import type { TemporaryIssueLink } from '../api/temporaryIssueLinks'
 
@@ -59,36 +60,33 @@ export default function TemporaryIssueLinksPage() {
     }
   }
 
-  return <div className="page-container">
-    <div className="mb-6">
-      <h1 className="text-xl font-semibold">{t('temporary_links.title')}</h1>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">{t('temporary_links.description')}</p>
+  return <div className="page-container collection-links-page">
+    <div className="collection-links-hero">
+      <div className="collection-links-hero-icon"><Link2 size={22} /></div>
+      <div><h1>{t('temporary_links.title')}</h1><p>{t('temporary_links.description')}</p></div>
+      <div className="collection-links-trust"><ShieldCheck size={16} />{t('temporary_links.secure_hint')}</div>
     </div>
-    <div id="collection-generation" className="card mb-6 flex flex-col items-stretch gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-5">
-      <div>
-        <label htmlFor="link-duration" className="mb-1 block text-xs font-medium">{t('temporary_links.expires_in')}</label>
+    <div id="collection-generation" className="collection-link-generator">
+      <div className="collection-link-generator-copy"><span className="collection-link-kicker"><Plus size={14} />{t('temporary_links.create_title')}</span><strong>{t('temporary_links.create_hint')}</strong></div>
+      <div className="collection-link-generator-controls"><div>
+        <label htmlFor="link-duration">{t('temporary_links.expires_in')}</label>
         <select id="link-duration" value={minutes} disabled={busy} onChange={event => setMinutes(Number(event.target.value))} className="input">
           <option value={30}>{t('temporary_links.minutes', { count: 30 })}</option>
           <option value={360}>{t('temporary_links.hours', { count: 6 })}</option>
           <option value={1440}>{t('temporary_links.hours', { count: 24 })}</option>
           <option value={10080}>{t('temporary_links.days', { count: 7 })}</option>
         </select>
-      </div>
-      <button className="btn btn-primary w-full sm:w-auto" disabled={busy || loading} onClick={create}>{t('temporary_links.generate')}</button>
+      </div><button className="btn btn-primary" disabled={busy || loading} onClick={create}>{t('temporary_links.generate')}<Link2 size={17} /></button></div>
     </div>
     {error && <p role="alert" className="mb-4 text-sm text-red-600">{t(error)}</p>}
-    <div className="card divide-y divide-[var(--border-light)]">
-      {loading ? <p className="p-5 text-sm">{t('common.loading')}</p> : links.length === 0 ? <p className="p-5 text-sm text-[var(--text-muted)]">{t('temporary_links.empty')}</p> : links.map(link => <div key={link.id} className="flex min-w-0 flex-col gap-3 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="font-medium">{t(link.revoked_at ? 'temporary_links.cancelled' : link.active ? 'temporary_links.active' : 'temporary_links.closed')}</div>
-          <div className="mt-1 text-xs text-[var(--text-muted)]">{t('temporary_links.expires_at', { date: new Date(link.expires_at).toLocaleString(i18n.resolvedLanguage || i18n.language) })}</div>
-          {link.active && (link.url ? <a href={link.url} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all text-xs text-[var(--accent)]">{link.url}</a> : <p className="mt-2 text-xs text-[var(--text-muted)]">{t('temporary_links.legacy_link')} <button className="underline" onClick={() => { document.getElementById('collection-generation')?.scrollIntoView({ behavior: 'smooth' }); document.getElementById('link-duration')?.focus() }}>{t('temporary_links.regenerate')}</button></p>)}
-        </div>
-        {link.active && <div className="flex shrink-0 flex-wrap gap-2">
-          {link.url && <><a href={link.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">{t('temporary_links.open')}</a><button className="btn btn-ghost" onClick={() => void copy(link)}>{t(copied === link.id ? 'temporary_links.copied' : 'temporary_links.copy')}</button></>}
-          <button className="btn btn-ghost text-red-600" disabled={busy} onClick={() => void cancel(link.id)}>{t('temporary_links.cancel')}</button>
-        </div>}
-      </div>)}
-    </div>
+    <section className="collection-link-list">
+      <div className="collection-link-list-heading"><div><h2>{t('temporary_links.list_title')}</h2><p>{t('temporary_links.list_hint')}</p></div><span>{links.length}</span></div>
+      {loading ? <p className="collection-link-empty">{t('common.loading')}</p> : links.length === 0 ? <p className="collection-link-empty">{t('temporary_links.empty')}</p> : <div className="collection-link-grid">{links.map(link => <article key={link.id} className={`collection-link-item ${link.active ? 'is-active' : 'is-closed'}`}>
+        <div className="collection-link-item-top"><span className="collection-link-status">{link.active ? <Check size={14} /> : link.revoked_at ? <XCircle size={14} /> : <Clock3 size={14} />}{t(link.revoked_at ? 'temporary_links.cancelled' : link.active ? 'temporary_links.active' : 'temporary_links.closed')}</span><span className="collection-link-id">#{link.id.slice(0, 6)}</span></div>
+        <div className="collection-link-expiry"><Clock3 size={15} />{t('temporary_links.expires_at', { date: new Date(link.expires_at).toLocaleString(i18n.resolvedLanguage || i18n.language) })}</div>
+          {link.active && (link.url ? <a href={link.url} target="_blank" rel="noopener noreferrer" className="collection-link-url">{link.url}</a> : <p className="collection-link-legacy">{t('temporary_links.legacy_link')} <button onClick={() => { document.getElementById('collection-generation')?.scrollIntoView({ behavior: 'smooth' }); document.getElementById('link-duration')?.focus() }}>{t('temporary_links.regenerate')}</button></p>)}
+        {link.active && <div className="collection-link-actions">{link.url && <><a href={link.url} target="_blank" rel="noopener noreferrer" className="collection-link-open"><ExternalLink size={15} />{t('temporary_links.open')}</a><button className="collection-link-copy" onClick={() => void copy(link)}><span>{copied === link.id ? <Check size={15} /> : <Clipboard size={15} />}{t(copied === link.id ? 'temporary_links.copied' : 'temporary_links.copy')}</span></button></>}<button className="collection-link-cancel" disabled={busy} onClick={() => void cancel(link.id)}>{t('temporary_links.cancel')}</button></div>}
+      </article>)}</div>}
+    </section>
   </div>
 }
