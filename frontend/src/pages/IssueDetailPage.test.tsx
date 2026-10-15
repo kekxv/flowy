@@ -45,6 +45,39 @@ vi.mock("react-i18next", () => ({
 }))
 
 describe("IssueDetailPage", () => {
+  it.each([
+    [[{ id: "viewer", role: "member" }], true],
+    [[{ id: "other", role: "member" }], false],
+    [[{ id: "viewer", role: "member" }, { id: "other", role: "member" }], false],
+    [[{ id: "viewer", role: "member" }, { id: "other", role: "tester" }], false],
+    [[{ id: "viewer", role: "member" }, { id: "viewer", role: "tester" }], false],
+  ])("limits status editing to the sole member: %j", async (assignees, allowed) => {
+    apiMocks.get.mockImplementation((url: string) => Promise.resolve({ data:
+      url === "/issues/issue-0001" ? {
+        id: "issue-0001", title: "Sole member", issue_type: "bug", status: "open",
+        priority: "medium", created_at: "2026-10-15T00:00:00", description: "",
+        reporter: { id: "other", display_name: "Reporter" }, assignees,
+        labels: [], milestone_ids: [],
+      } : [],
+    }))
+    render(<MemoryRouter initialEntries={["/issues/issue-0001"]}>
+      <Routes><Route path="/issues/:id" element={<IssueDetailPage />} /></Routes>
+    </MemoryRouter>)
+    await screen.findByRole("heading", { name: "Sole member" })
+    const statusButton = screen.queryByRole("button", { name: "issues.status.open" })
+    if (allowed) {
+      expect(statusButton).toBeInTheDocument()
+      fireEvent.click(statusButton!)
+      for (const status of ["open", "in_progress", "proposed", "accepted", "resolved", "closed", "cancelled", "rejected"]) {
+        expect(screen.getAllByRole("button", { name: `issues.status.${status}` }).length).toBeGreaterThan(0)
+      }
+    } else {
+      expect(statusButton).not.toBeInTheDocument()
+    }
+    expect(screen.queryByRole("link", { name: "common.edit" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "issues.priority.medium" })).not.toBeInTheDocument()
+  })
+
   it("previews Markdown while composing a comment", async () => {
     apiMocks.get.mockImplementation((url: string) => {
       if (url === "/issues/issue-0001") {

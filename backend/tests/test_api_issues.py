@@ -31,6 +31,51 @@ async def _login(client, username="testuser", password="password123"):
 
 class TestIssueAPI:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "assignments,payload,expected",
+        [
+            ([("user-001", "member")], {"status": status}, 200)
+            for status in (
+                "open", "in_progress", "proposed", "accepted",
+                "resolved", "closed", "cancelled", "rejected",
+            )
+        ] + [
+            ([], {"status": "in_progress"}, 403),
+            ([("admin-001", "member")], {"status": "in_progress"}, 403),
+            ([("user-001", "member"), ("admin-001", "member")], {"status": "in_progress"}, 403),
+            ([("user-001", "member"), ("admin-001", "tester")], {"status": "in_progress"}, 403),
+            ([("user-001", "member"), ("user-001", "tester")], {"status": "in_progress"}, 403),
+            ([("user-001", "member")], {"title": "Not allowed"}, 403),
+            ([("user-001", "member")], {"status": "in_progress", "title": "Not allowed"}, 403),
+            ([("user-001", "project_lead")], {"status": "in_progress"}, 200),
+        ],
+    )
+    async def test_sole_member_status_permissions(
+        self, db_session, test_user, test_admin, assignments, payload, expected
+    ):
+        from app.models.issue import Issue, issue_assignees
+
+        db_session.add(Issue(
+            id="sole-member-issue", title="Original title", issue_type="bug",
+            reporter_id=test_admin.id,
+        ))
+        await db_session.flush()
+        for user_id, role in assignments:
+            await db_session.execute(issue_assignees.insert().values(
+                issue_id="sole-member-issue", user_id=user_id, role=role,
+            ))
+        await db_session.commit()
+        async with AsyncClient(transport=_build_transport(db_session), base_url="http://test") as client:
+            headers = await _login(client)
+            response = await client.put(
+                "/api/v1/issues/sole-member-issue", json=payload, headers=headers,
+            )
+            assert response.status_code == expected
+            detail = await client.get("/api/v1/issues/sole-member-issue", headers=headers)
+        assert detail.json()["title"] == "Original title"
+        assert detail.json()["status"] == (payload["status"] if expected == 200 else "open")
+
+    @pytest.mark.asyncio
     async def test_issue_schedule_dates_are_saved_and_returned(self, db_session, test_user):
         transport = _build_transport(db_session)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

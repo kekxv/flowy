@@ -195,12 +195,28 @@ async def update_issue(
     # Permission check
     is_admin = user.role == "admin"
     is_reporter = issue.reporter_id == user.id
-    assignee_roles = {a.role for a in (issue.assignees or []) if a.id == user.id}
+    assignments = (await db.execute(
+        select(issue_assignees.c.user_id, issue_assignees.c.role).where(
+            issue_assignees.c.issue_id == issue_id
+        )
+    )).all()
+    assignee_roles = {a.role for a in assignments if a.user_id == user.id}
     is_lead = "project_lead" in assignee_roles
     is_feature_owner = issue.issue_type == "feature" and len(assignee_roles) > 0
+    is_sole_member = (
+        len(assignments) == 1
+        and assignments[0].user_id == user.id
+        and assignments[0].role == "member"
+    )
 
     # Admin, project_lead, and feature owner can do anything
     if not is_admin and not is_lead and not is_feature_owner:
+        # The sole member may change any status, but no other issue fields.
+        if is_sole_member and data.status is not None and data.model_fields_set == {"status"}:
+            issue = await issue_service.update_issue(
+                db, issue, IssueUpdate(status=data.status), changed_by=user.id
+            )
+            return _issue_detail(issue, await _build_assignees(db, issue.id))
         # Reporter can change status to resolved/cancelled
         if is_reporter and data.status is not None and data.status in ("resolved", "cancelled"):
             safe_data = IssueUpdate(status=data.status)

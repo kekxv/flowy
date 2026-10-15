@@ -72,6 +72,10 @@ export default function IssueDetailPage() {
   const isLead = (issue?.assignees||[]).some((a:any)=>a.role==="project_lead" && a.id===curUser?.id);
   const isFeatureOwner = issue?.issue_type === "feature" && (issue?.assignees||[]).some((a:any)=>a.id===curUser?.id);
   const canFullEdit = isAdmin || isLead || isFeatureOwner;
+  const isSoleMember = issue?.assignees?.length === 1
+    && issue.assignees[0].id === curUser?.id
+    && issue.assignees[0].role === "member";
+  const canChangeStatus = canFullEdit || isSoleMember;
   const mls=issue?.milestone_ids||[];
 
   // External link handlers
@@ -176,14 +180,14 @@ export default function IssueDetailPage() {
             {/* Status */}
             <div className="relative px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{t("common.status")}</div>
-              {canFullEdit ? (
+              {canChangeStatus ? (
                 <button onClick={()=>setEs(!es)} className={`status-${issue.status} cursor-pointer transition-transform hover:scale-105`}>
-                  {t(`issues.status.${issue.status}`)} {canFullEdit && <ChevronDown size={10} className="ml-0.5 inline opacity-50"/>}
+                  {t(`issues.status.${issue.status}`)} <ChevronDown size={10} className="ml-0.5 inline opacity-50"/>
                 </button>
               ) : (
                 <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
               )}
-              {canFullEdit && es && <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-[8px] border border-[var(--border)] bg-white py-1.5 ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden shadow-[var(--shadow-md)]">{STAT.map(s=>
+              {canChangeStatus && es && <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-[8px] border border-[var(--border)] bg-white py-1.5 ring-1 ring-black/5 animate-[fadeInUp_.12s_ease-out] overflow-hidden shadow-[var(--shadow-md)]">{STAT.map(s=>
                 <button key={s} onClick={()=>{qu("status",s);setEs(false);}} className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)] ${s===issue.status?"font-semibold text-[var(--primary)] bg-[var(--primary-light)]":""}`}>
                   <span className={`status-${s}`} style={{fontSize:11}}>{t(`issues.status.${s}`)}</span>
                   {s===issue.status&&<span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--primary)]"/>}
