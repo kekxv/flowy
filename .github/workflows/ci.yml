@@ -72,7 +72,11 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Type check
-        run: npx tsc --noEmit
+        # `tsc --noEmit` compiles nothing here: the root tsconfig only holds
+        # project references (`"files": []`), so build mode is required.
+        run: npx tsc -b
+      - name: Unit tests
+        run: npm test
       - name: Build
         run: npm run build
 

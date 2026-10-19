@@ -1,11 +1,20 @@
-# Dependencies
-node_modules/
-.venv/
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-build/
+# Dependencies (patterns must be recursive: the venv/node_modules live in
+# backend/ and frontend/, so a bare `.venv/` would not match them)
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
+**/dist/
+**/build/
+
+# Local runtime data (never bake the dev database or uploads into an image)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/uploads/
+backend/data/
 
 # Git
 .git/
