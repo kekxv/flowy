@@ -7,6 +7,7 @@ export interface IssueData {
   description: string;
   status: string;
   priority: string;
+  issue_type: string;
   reporter: { id: string; username: string; display_name: string; avatar_url: string };
   assignees: Array<{ id: string; username: string; display_name: string }>;
   labels: Array<{ id: string; name: string; color: string }>;

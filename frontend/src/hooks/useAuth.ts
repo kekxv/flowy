@@ -3,14 +3,15 @@ import { useAuthStore } from "../store/authStore";
 
 export function useAuth() {
   const store = useAuthStore();
+  const { isLoading, fetchUser } = store;
   const fetchCalled = useRef(false);
 
   useEffect(() => {
-    if (store.isLoading && !fetchCalled.current) {
+    if (isLoading && !fetchCalled.current) {
       fetchCalled.current = true;
-      store.fetchUser();
+      void fetchUser();
     }
-  }, [store.isLoading]);
+  }, [isLoading, fetchUser]);
 
   return store;
 }

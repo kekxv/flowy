@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus, Package, Link2, FileArchive, GitBranch, Clock, History,
@@ -6,7 +6,10 @@ import {
   PlusCircle, Loader2, Pencil, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import Loader from "../components/Loader";
+import PageHeader from "../components/ui/PageHeader";
+import Segmented from "../components/ui/Segmented";
+import EmptyState from "../components/ui/EmptyState";
+import { ListSkeleton, Skeleton } from "../components/ui/Skeleton";
 import MarkdownContent from "../components/MarkdownContent";
 import MarkdownEditor from "../components/MarkdownEditor";
 import remarkBreaks from "remark-breaks";
@@ -47,7 +50,7 @@ function BadgeIcon({ c, size = 40 }: { c: ComponentData; size?: number }) {
   const meta = CATEGORY_META[categoryOf(c)];
   return (
     <div
-      className="flex items-center justify-center rounded-xl border border-[var(--border)]"
+      className="flex items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] px-1"
       style={{ width: size, height: size, background: meta.soft, color: meta.color }}
     >
       <span className="text-[13px] font-bold tracking-tight">
@@ -434,19 +437,19 @@ function HistoryModal({ component, onClose, onChanged, onEdit }: {
   onChanged: () => void;
   onEdit: (v: VersionData) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isAdmin = useAuthStore((s) => s.user?.role === "admin");
   const [versions, setVersions] = useState<VersionData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const c = await getComponent(component.id);
     setVersions(c.versions || []);
     setLoading(false);
-  };
+  }, [component.id]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const remove = async (id: string) => {
     await deleteVersion(id);
@@ -499,7 +502,7 @@ function HistoryModal({ component, onClose, onChanged, onEdit }: {
                     </div>
                   )}
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--text-faint)]">
-                    <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo(v.published_at || v.created_at)}</span>
+                    <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo(v.published_at || v.created_at, i18n?.language)}</span>
                     <span>{v.dependencies.length} {t("software.deps_short")}</span>
                   </div>
                 </div>
@@ -513,7 +516,7 @@ function HistoryModal({ component, onClose, onChanged, onEdit }: {
 
 // ─── Main page ─────────────────────────────────────────────
 export default function SoftwareVersionPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
 
@@ -529,9 +532,9 @@ export default function SoftwareVersionPage() {
   const [editComponent, setEditComponent] = useState<ComponentData | null>(null);
   const [componentEditFor, setComponentEditFor] = useState<ComponentData | null>(null);
   const [toast, setToast] = useState("");
-  const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3000); };
+  const showToast = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(""), 3000); }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [s, cs] = await Promise.all([getStats(), listComponents({ sort })]);
       setStats(s); setComponents(cs);
@@ -540,8 +543,8 @@ export default function SoftwareVersionPage() {
     } finally {
       setLoading(false);
     }
-  };
-  useEffect(() => { load(); }, [sort]);
+  }, [sort, showToast, t]);
+  useEffect(() => { void load(); }, [load]);
 
   const categories = useMemo(() => {
     const present = new Set(components.map((c) => categoryOf(c)));
@@ -560,64 +563,60 @@ export default function SoftwareVersionPage() {
     { label: t("software.stat.dependencies"), value: stats?.dependency_count ?? 0, icon: GitBranch, color: "#7c3aed" },
   ];
 
-  if (loading) return <Loader />;
+  if (loading) return (
+    <div className="page-enter space-y-3">
+      <Skeleton className="h-6 w-44" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({length:4}).map((_,i)=>(<div key={i} className="panel p-4"><Skeleton className="h-2.5 w-16" /><Skeleton className="mt-3 h-5 w-10" /></div>))}
+      </div>
+      <ListSkeleton rows={4} />
+    </div>
+  );
 
   return (
-    <div className="space-y-5 page-enter">
+    <div className="page-enter space-y-3">
       <Toaster msg={toast} />
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]">
-        <span>{t("software.breadcrumb_1")}</span>
-        <span className="text-[var(--text-faint)]">/</span>
-        <span className="text-[var(--text-muted)]">{t("software.breadcrumb_2")}</span>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">{t("software.title")}</h1>
-          <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{t("software.subtitle")}</p>
-        </div>
-        {isAdmin && (
+      <PageHeader
+        icon={Package}
+        title={t("software.title")}
+        subtitle={t("software.subtitle")}
+        actions={isAdmin ? (
           <button onClick={() => { setPublishFor(null); setShowPublish(true); }} className="btn btn-primary btn-sm">
             <Plus size={14} /> {t("software.publish")}
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map((s) => (
-          <div key={s.label} className="card rounded-xl p-4">
-            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
-              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-md" style={{ background: `${s.color}18`, color: s.color }}>
-                <s.icon size={13} />
+          <div key={s.label} className="panel px-4 py-3.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+              <span className="flex h-[20px] w-[20px] items-center justify-center rounded-[6px]" style={{ background: `${s.color}18`, color: s.color }}>
+                <s.icon size={12} />
               </span>
               <span>{s.label}</span>
             </div>
-            <div className="text-[26px] font-semibold leading-none tabular-nums text-[var(--text)]">{s.value}</div>
+            <div className="mt-2 text-[22px] font-semibold leading-none tabular-nums text-[var(--text)]">{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Tabs + sort */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <button onClick={() => setTab("all")}
-            className={`rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium transition-colors ${tab === "all" ? "bg-[#f3f4f6] text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-            {t("software.tab_all")} ({components.length})
-          </button>
-          {categories.map((c) => (
-            <button key={c} onClick={() => setTab(c)}
-              className={`rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium transition-colors ${tab === c ? "bg-[#f3f4f6] text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-              {t(`software.category.${c}`)} ({components.filter((x) => categoryOf(x) === c).length})
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          ariaLabel={t("software.category.all", "分类")}
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "all", label: t("software.tab_all"), count: components.length },
+            ...categories.map(c => ({ key: c, label: t(`software.category.${c}`), count: components.filter(x => categoryOf(x) === c).length })),
+          ]}
+        />
+        <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-[var(--text-muted)]">
           <span>{t("software.sort")}</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as "updated" | "name")} className="select h-[30px] text-[12px]">
+          <select value={sort} onChange={(e) => setSort(e.target.value as "updated" | "name")} className="select select-sm">
             <option value="updated">{t("software.sort_updated")}</option>
             <option value="name">{t("software.sort_name")}</option>
           </select>
@@ -626,10 +625,7 @@ export default function SoftwareVersionPage() {
 
       {/* Cards */}
       {shown.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
-          <Package size={26} className="mb-2 opacity-20" strokeWidth={1.5} />
-          <p className="text-[13px]">{t("software.empty")}</p>
-        </div>
+        <div className="panel"><EmptyState icon={Package} title={t("software.empty")} /></div>
       ) : (
         <div className="space-y-3">
           {shown.map((c) => {
@@ -637,13 +633,13 @@ export default function SoftwareVersionPage() {
             const internal = lv?.dependencies.filter((d) => d.kind === "internal") ?? [];
             const external = lv?.dependencies.filter((d) => d.kind !== "internal") ?? [];
             return (
-              <div key={c.id} className="card rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
+              <div key={c.id} className="panel p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   {/* Left */}
                   <div className="flex min-w-0 flex-1 gap-3">
                     <div className="mt-0.5 shrink-0"><BadgeIcon c={c} /></div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         <h3 className="text-[14px] font-semibold text-[var(--text)]">{c.name}</h3>
                         <span className="mono text-[11px] text-[var(--text-faint)]">{c.identifier}</span>
                       </div>
@@ -708,8 +704,8 @@ export default function SoftwareVersionPage() {
                   </div>
 
                   {/* Right actions */}
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {isAdmin && (
                         <button onClick={() => { setPublishFor(c); setShowPublish(true); }} className="btn btn-outline btn-sm">
                           {t("software.publish")}
@@ -731,7 +727,7 @@ export default function SoftwareVersionPage() {
                       )}
                     </div>
                     <span className="flex items-center gap-1 text-[11px] text-[var(--text-faint)]">
-                      <Clock size={11} /> {timeAgo(c.updated_at)}
+                      <Clock size={11} /> {timeAgo(c.updated_at, i18n?.language)}
                     </span>
                   </div>
                 </div>

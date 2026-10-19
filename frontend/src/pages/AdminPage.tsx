@@ -4,7 +4,9 @@ import { Users, Layers, AlertCircle, CheckCircle2, Link2, Shield, ShieldOff, Use
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { ALL_ROLES } from "../constants";
-import Loader from "../components/Loader";
+import PageHeader from "../components/ui/PageHeader";
+import EmptyState from "../components/ui/EmptyState";
+import { ListSkeleton, Skeleton } from "../components/ui/Skeleton";
 
 interface UserItem { id: string; username: string; email: string; display_name: string; nickname: string; role: string; is_active: boolean; created_at: string; }
 interface Stats { users: number; issues: number; open_issues: number; closed_issues: number; connections: number; }
@@ -85,21 +87,22 @@ export default function AdminPage() {
     fetch();
   };
 
-  if (loading) return <Loader />;
-  if (user?.role !== "admin") return (
-    <div className="flex flex-col items-center justify-center pt-24 text-[var(--text-muted)]">
-      <Lock size={40} className="mb-3 opacity-30"/>
-      <p className="text-sm font-medium">Access denied</p>
-      <p className="text-xs mt-1">Admin only</p>
+  if (loading) return (
+    <div className="page-enter space-y-3">
+      <Skeleton className="h-6 w-40" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {Array.from({length:5}).map((_,i)=>(<div key={i} className="panel p-4"><Skeleton className="h-2.5 w-12" /><Skeleton className="mt-2 h-4 w-10" /></div>))}
+      </div>
+      <ListSkeleton rows={5} />
     </div>
+  );
+  if (user?.role !== "admin") return (
+    <EmptyState icon={Lock} title={t("common.no_permission", "Access denied")} hint={t("common.admin_only", "仅管理员可用")} />
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 page-enter">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("admin.title")}</h1>
-        <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("admin.system_stats")}</p>
-      </div>
+    <div className="page-enter space-y-3">
+      <PageHeader icon={Settings2} title={t("admin.title")} subtitle={t("admin.system_stats")} />
 
       {/* Stats */}
       {stats && (
@@ -111,11 +114,11 @@ export default function AdminPage() {
             {k:"closed_issues",v:stats.closed_issues,icon:CheckCircle2,color:"text-emerald-600 bg-emerald-50",label:t("dashboard.closed_issues")},
             {k:"connections",v:stats.connections,icon:Link2,color:"text-purple-600 bg-purple-50",label:t("admin.connections","Connections")},
           ].map(s=>(
-            <div key={s.k} className="card rounded-xl p-4 flex items-center gap-3">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.color}`}><s.icon size={17}/></div>
-              <div>
-                <div className="text-lg font-bold">{s.v}</div>
-                <div className="text-[10px] text-[var(--text-muted)]">{s.label}</div>
+            <div key={s.k} className="panel flex items-center gap-2.5 p-3.5">
+              <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-[8px] ${s.color}`}><s.icon size={15}/></div>
+              <div className="min-w-0">
+                <div className="text-[17px] font-semibold tabular-nums leading-tight">{s.v}</div>
+                <div className="truncate text-[10.5px] text-[var(--text-muted)]">{s.label}</div>
               </div>
             </div>
           ))}
@@ -123,10 +126,10 @@ export default function AdminPage() {
       )}
 
       {/* Registration Settings */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="border-b border-[var(--border-light)] px-5 py-3.5 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            <Settings2 size={14}/>General {t("settings.config","Configuration")}
+          <h2 className="panel-title">
+            <Settings2 size={14}/>{t("admin.general_config","常规配置")}
           </h2>
         </div>
         <div className="px-5 py-4">
@@ -150,10 +153,10 @@ export default function AdminPage() {
       </div>
 
       {/* Wiki Settings */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            <Settings2 size={14}/>Wiki {t("settings.config","Configuration")}
+          <h2 className="panel-title">
+            <Settings2 size={14}/>{t("admin.wiki_config","Wiki 配置")}
           </h2>
         </div>
         <div className="px-5 py-4">
@@ -189,17 +192,17 @@ export default function AdminPage() {
       </div>
 
       {/* OAuth Configuration */}
-      <div className="card rounded-xl overflow-hidden">
-        <div className="border-b border-[var(--border-light)] px-5 py-3.5"><h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><Settings2 size={14}/>Brand theme</h2></div>
+      <div className="panel overflow-hidden">
+        <div className="border-b border-[var(--border-light)] px-5 py-3.5"><h2 className="panel-title"><Settings2 size={14}/>{t("admin.brand_theme","品牌主题")}</h2></div>
         <div className="flex items-center justify-between gap-4 px-5 py-4"><div><div className="text-[13px] font-medium">Global primary color</div><div className="mt-0.5 text-[11px] text-[var(--text-muted)]">Used as the default for new devices.</div></div><div className="flex items-center gap-2"><input aria-label="Global primary color" type="color" value={themeColor} onChange={e=>setThemeColor(e.target.value)} /><button onClick={()=>api.put("/system/settings",{theme_primary_color:themeColor})} className="btn btn-outline btn-sm">{t("common.save")}</button></div></div>
       </div>
 
       {/* OAuth Configuration */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <button onClick={() => setOauthExpanded(!oauthExpanded)}
           className="w-full border-b border-[var(--border-light)] px-5 py-3.5 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            <Settings2 size={14}/>OAuth {t("settings.config","Configuration")}
+          <h2 className="panel-title">
+            <Settings2 size={14}/>{t("admin.oauth_config","OAuth 配置")}
           </h2>
           {oauthExpanded ? <ChevronUp size={14} className="text-[var(--text-muted)]"/> : <ChevronDown size={14} className="text-[var(--text-muted)]"/>}
         </button>
@@ -262,10 +265,10 @@ export default function AdminPage() {
       </div>
 
       {/* Users table */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="border-b border-[var(--border-light)] px-5 py-3.5">
           <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <h2 className="panel-title">
               <UserCog size={14}/>{t("admin.users")}
               <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{users.length}</span>
             </h2>
@@ -342,7 +345,7 @@ export default function AdminPage() {
       {/* Project role edit — bottom sheet */}
       {roleEditUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setRoleEditUser(null)}>
-          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-[340px]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
               <button onClick={() => setRoleEditUser(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -367,7 +370,7 @@ export default function AdminPage() {
       {/* Add user modal */}
       {addUserOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setAddUserOpen(false)}>
-          <div className="card w-96 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-[400px]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">添加用户</h3>
               <button onClick={() => setAddUserOpen(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -410,7 +413,7 @@ export default function AdminPage() {
       {/* User edit modal */}
       {userEditUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setUserEditUser(null)}>
-          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-[340px]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">编辑用户</h3>
               <button onClick={() => setUserEditUser(null)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>
@@ -434,7 +437,7 @@ export default function AdminPage() {
       )}
       {passwordResetUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={closePasswordReset}>
-          <form onSubmit={resetPassword} className="card w-80 rounded-xl overflow-hidden animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <form onSubmit={resetPassword} className="modal-card w-[340px]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">{t("admin.reset_password")}</h3>
               <button type="button" onClick={closePasswordReset} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

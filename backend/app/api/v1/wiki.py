@@ -78,6 +78,8 @@ def _page_to_response(page) -> WikiPageResponse:
 async def list_wiki_pages(
     q: str | None = Query(default=None, description="Search query"),
     tab: str = Query(default="all", description="Tab filter: all|mine|collab|public"),
+    tag: str | None = Query(default=None, description="Only pages carrying this tag"),
+    sort: str = Query(default="updated", description="Order: updated|weight|title"),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -93,9 +95,28 @@ async def list_wiki_pages(
         tab=tab,
         limit=pagination.per_page,
         offset=pagination.offset,
+        tag=tag,
+        sort=sort,
     )
     data = [_page_to_response(p) for p in pages]
     return paginated_response(data, total, pagination)
+
+
+@router.get("/tags")
+async def list_wiki_tags(
+    tab: str = Query(default="all", description="Tab filter: all|mine|collab|public"),
+    limit: int = Query(default=30, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List the tags used by the pages visible to the current user."""
+    return await wiki_service.list_tags(
+        db,
+        user.id,
+        is_admin=user.role == "admin",
+        tab=tab,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=WikiPageResponse, status_code=status.HTTP_201_CREATED)

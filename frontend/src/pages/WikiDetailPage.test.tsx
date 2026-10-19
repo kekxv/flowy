@@ -90,7 +90,7 @@ describe("WikiDetailPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete page" }))
     await waitFor(() => expect(wikiMocks.deleteWikiPage).toHaveBeenCalledWith("private-page"))
-    expect(screen.getByText("Wiki list")).toBeInTheDocument()
+    expect(await screen.findByText("Wiki list")).toBeInTheDocument()
   })
 
   it("does not limit file extensions in either Wiki upload picker", async () => {
@@ -152,6 +152,6 @@ describe("WikiDetailPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Delete page" }))
 
     await waitFor(() => expect(wikiMocks.deleteWikiPage).toHaveBeenCalledWith("wiki-page"))
-    expect(screen.getByText("Wiki list")).toBeInTheDocument()
+    expect(await screen.findByText("Wiki list")).toBeInTheDocument()
   })
 })

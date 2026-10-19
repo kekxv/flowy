@@ -68,16 +68,8 @@ async def create_page(
     return page
 
 
-async def get_visible_pages(
-    db: AsyncSession,
-    user_id: str,
-    is_admin: bool = False,
-    q: str | None = None,
-    tab: str = "all",  # all | mine | collab | public
-    limit: int = 50,
-    offset: int = 0,
-) -> tuple[list[WikiPage], int]:
-    """Get wiki pages visible to the user, with optional search.
+def _visibility_filter(user_id: str, is_admin: bool = False, tab: str = "all"):
+    """Build the visibility predicate for a tab.
 
     Tab filters:
     - all: own + collaborated + public (all pages for administrators)
@@ -85,7 +77,6 @@ async def get_visible_pages(
     - collab: only collaborated pages (not own)
     - public: only public pages (not own)
     """
-    # Build base query: pages visible to user
     own_filter = WikiPage.owner_id == user_id
     collab_filter = WikiPage.id.in_(
         select(wiki_collaborators_table.c.wiki_id).where(
@@ -95,20 +86,64 @@ async def get_visible_pages(
     public_filter = WikiPage.is_public == True  # noqa: E712
 
     if is_admin and tab == "all":
-        visibility = True
-    elif tab == "mine":
-        visibility = own_filter
-    elif tab == "collab":
-        visibility = collab_filter
-    elif tab == "public":
-        visibility = public_filter & ~own_filter
-    else:  # all
-        visibility = or_(own_filter, collab_filter, public_filter)
+        return True
+    if tab == "mine":
+        return own_filter
+    if tab == "collab":
+        return collab_filter
+    if tab == "public":
+        return public_filter & ~own_filter
+    return or_(own_filter, collab_filter, public_filter)
+
+
+def _tag_filter(tag: str):
+    """Match a single tag inside the comma-separated `tags` column."""
+    normalized = tag.strip().lower()
+    if not normalized:
+        return None
+    compact = func.replace(func.lower(WikiPage.tags), " ", "")
+    return or_(
+        compact == normalized,
+        compact.like(f"{normalized},%"),
+        compact.like(f"%,{normalized}"),
+        compact.like(f"%,{normalized},%"),
+    )
+
+
+def _sort_key(value):
+    """Normalize datetimes/strings so mixed test fixtures still sort."""
+    if value is None:
+        return ""
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+async def get_visible_pages(
+    db: AsyncSession,
+    user_id: str,
+    is_admin: bool = False,
+    q: str | None = None,
+    tab: str = "all",  # all | mine | collab | public
+    limit: int = 50,
+    offset: int = 0,
+    tag: str | None = None,
+    sort: str = "updated",  # updated | weight | title
+) -> tuple[list[WikiPage], int]:
+    """Get wiki pages visible to the user, with optional search/tag/ordering.
+
+    Search hits are ordered by relevance; otherwise `sort` applies
+    (updated = newest first, weight = pinned first, title = alphabetical).
+    """
+    visibility = _visibility_filter(user_id, is_admin=is_admin, tab=tab)
 
     query = select(WikiPage).where(visibility).options(
         selectinload(WikiPage.owner),
     )
     count_query = select(func.count(WikiPage.id)).where(visibility)
+
+    tag_filter = _tag_filter(tag) if tag else None
+    if tag_filter is not None:
+        query = query.where(tag_filter)
+        count_query = count_query.where(tag_filter)
 
     if q and q.strip():
         tokens = tokenize(q)
@@ -125,11 +160,21 @@ async def get_visible_pages(
     pages = list(result.scalars().all())
     if q and q.strip():
         pages.sort(
-            key=lambda page: (_relevance_score(page, tokens, q), page.weight, page.updated_at),
+            key=lambda page: (_relevance_score(page, tokens, q), page.weight, _sort_key(page.updated_at)),
             reverse=True,
         )
-    else:
-        pages.sort(key=lambda page: page.id, reverse=True)
+    elif sort == "title":
+        pages.sort(key=lambda page: (page.title or "").lower())
+    elif sort == "weight":
+        pages.sort(
+            key=lambda page: (page.weight or 0, _sort_key(page.updated_at)),
+            reverse=True,
+        )
+    else:  # updated
+        pages.sort(
+            key=lambda page: (_sort_key(page.updated_at), page.weight or 0, page.id),
+            reverse=True,
+        )
     pages = pages[offset:offset + limit]
     return pages, total
 
@@ -559,3 +604,25 @@ async def get_recent_pages_for_bot(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def list_tags(
+    db: AsyncSession,
+    user_id: str,
+    is_admin: bool = False,
+    tab: str = "all",
+    limit: int = 30,
+) -> list[dict]:
+    """Aggregate the tags used by pages visible to the user."""
+    visibility = _visibility_filter(user_id, is_admin=is_admin, tab=tab)
+    result = await db.execute(select(WikiPage.tags).where(visibility))
+    counts: dict[str, int] = {}
+    for (raw,) in result.all():
+        if not raw:
+            continue
+        for part in raw.split(","):
+            tag = part.strip()
+            if tag:
+                counts[tag] = counts.get(tag, 0) + 1
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0].lower()))
+    return [{"tag": tag, "count": count} for tag, count in ordered[:limit]]

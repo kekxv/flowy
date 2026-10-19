@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { X, Plus, ChevronDown } from "lucide-react";
+import { X, Plus, ChevronDown, FilePlus2 } from "lucide-react";
 import { createIssue } from "../api/issues";
 import api from "../api/client";
 import { ALL_ROLES } from "../constants";
 import MarkdownEditor from "../components/MarkdownEditor";
+import PageHeader from "../components/ui/PageHeader";
+import Segmented from "../components/ui/Segmented";
 
 export default function IssueCreatePage() {
   const navigate = useNavigate(); const { t } = useTranslation();
   const [title, setTitle] = useState(""); const [desc, setDesc] = useState("");
-  const [issueType, setIssueType] = useState("bug");
+  const [searchParams] = useSearchParams();
+  const [issueType, setIssueType] = useState(searchParams.get("type") === "feature" ? "feature" : "bug");
   const [priority, setPriority] = useState("medium"); const [sub, setSub] = useState(false);
   const [startDate, setStartDate] = useState(""); const [dueDate, setDueDate] = useState("");
   const [users, setUsers] = useState<Array<{id:string;username:string;display_name:string}>>([]);
@@ -44,37 +47,37 @@ export default function IssueCreatePage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 page-enter">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("issues.new_issue")}</h1>
-        <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("issues.create_desc","Create a new issue in the project.")}</p>
-      </div>
+    <div className="page-enter mx-auto max-w-3xl space-y-3">
+      <PageHeader
+        icon={FilePlus2}
+        title={t("issues.new_issue")}
+        subtitle={t("issues.create_desc","Create a new issue in the project.")}
+        actions={
+          <Segmented
+            ariaLabel="Type"
+            value={issueType as "bug" | "feature"}
+            onChange={v => setIssueType(v)}
+            items={[
+              { key: "bug", label: t("issues.type.bug") },
+              { key: "feature", label: t("issues.type.feature") },
+            ]}
+          />
+        }
+      />
 
-      <form onSubmit={handle} className="card rounded-xl p-7 space-y-5">
-        {/* Type */}
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Type</label>
-          <div className="flex rounded-lg bg-[var(--bg-muted)] p-0.5 w-64">
-            {(["bug","feature"] as const).map(v => (
-              <button key={v} type="button" onClick={() => setIssueType(v)}
-                className={`flex-1 rounded-md py-1.5 text-[12px] font-medium transition-all ${issueType===v?"bg-white text-[var(--text)] shadow-sm":"text-[var(--text-muted)]"}`}>
-                {t(`issues.type.${v}`)}
-              </button>
-            ))}
-          </div>
-        </div>
+      <form onSubmit={handle} className="panel p-5 space-y-4">
 
         {/* Title */}
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.title")} *</label>
+          <label className="field-label">{t("common.title")} *</label>
           <input required value={title} onChange={e => setTitle(e.target.value)}
             className="input text-sm" placeholder={t("issues.title_placeholder","Brief summary")}/>
         </div>
 
         {/* Description */}
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
-            {t("common.description")} <span className="font-normal lowercase text-[var(--text-muted)]">(Markdown)</span>
+          <label className="field-label">
+            {t("common.description")} <span className="font-normal text-[var(--text-faint)]">(Markdown)</span>
           </label>
           <MarkdownEditor
             value={desc}
@@ -87,7 +90,7 @@ export default function IssueCreatePage() {
 
         {/* Assignees */}
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
+          <label className="field-label">
             {t("common.assignee","Assignee")} {issueType==="feature" && "*"}
           </label>
           <div className="flex flex-wrap gap-1.5 mb-2">
@@ -103,7 +106,7 @@ export default function IssueCreatePage() {
                 <Plus size={10}/> {t("roles.role")} <ChevronDown size={8}/>
               </button>
               {roleOpen && (
-                <div className="absolute left-0 top-full z-10 mt-1 w-48 card rounded-xl py-1.5  animate-[fadeInUp_.12s_ease-out]">
+                <div className="modal-card absolute left-0 top-full z-10 mt-1 w-48 py-1.5">
                   <div className="px-2 pb-1 mb-1 border-b border-[var(--border-light)]">
                     <div className="flex flex-wrap gap-1">
                       {ALL_ROLES.map(r => (
@@ -130,9 +133,9 @@ export default function IssueCreatePage() {
         </div>
 
         {/* Priority */}
-        <div className="grid gap-4 sm:grid-cols-2"><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">Start date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="input text-sm"/></div><div><label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.due_date", "Due date")}</label><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="input text-sm"/></div></div>
+        <div className="grid gap-4 sm:grid-cols-2"><div><label className="field-label">{t("milestones.start", "开始时间")}</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="input text-sm"/></div><div><label className="field-label">{t("common.due_date", "Due date")}</label><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="input text-sm"/></div></div>
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">{t("common.priority")}</label>
+          <label className="field-label">{t("common.priority")}</label>
           <select value={priority} onChange={e => setPriority(e.target.value)} className="input text-sm w-48">
             {["critical","high","medium","low","trivial"].map(p => (
               <option key={p} value={p}>{t(`issues.priority.${p}`)}</option>

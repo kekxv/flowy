@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import PageHeader from "../components/ui/PageHeader";
+import EmptyState from "../components/ui/EmptyState";
 import { Bell, Plus, Trash2, Zap, Radio, Webhook, MessageSquare, CheckCircle2, XCircle, X, Pencil } from "lucide-react";
 import api from "../api/client";
 
@@ -97,30 +99,24 @@ export default function NotificationsPage() {
   const getChannelName = (cid: string) => { const c = channels.find(x => x.id === cid); return c ? `${c.name} (${channelTypeNames[c.channel_type] || c.channel_type})` : cid; };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 page-enter">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{t("notifications.title")}</h1>
-        <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{t("notifications.desc","Manage notification channels and rules.")}</p>
-      </div>
+    <div className="page-enter mx-auto max-w-4xl space-y-3">
+      <PageHeader icon={Bell} title={t("notifications.title")} subtitle={t("notifications.desc","Manage notification channels and rules.")} />
 
-      {error && <div className="card rounded-xl px-5 py-3 text-[13px] text-red-700 bg-red-50">{error}</div>}
-      {success && <div className="card rounded-xl px-5 py-3 text-[13px] text-emerald-700 bg-emerald-50 flex items-center gap-2"><CheckCircle2 size={14}/>{success}</div>}
+      {error && <div className="rounded-[8px] border border-red-100 bg-red-50 px-3.5 py-2.5 text-[12.5px] text-red-700">{error}</div>}
+      {success && <div className="flex items-center gap-2 rounded-[8px] border border-emerald-100 bg-emerald-50 px-3.5 py-2.5 text-[12.5px] text-emerald-700"><CheckCircle2 size={13}/>{success}</div>}
 
       {/* Channels */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <h2 className="panel-title">
             <Radio size={14}/>{t("notifications.channels")}
-            <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{channels.length}</span>
+            <span className="ws-count">{channels.length}</span>
           </h2>
           <button onClick={() => { setChannelForm({ name: "", channel_type: "webhook", url: "", secret: "", webhook_url: "", mentioned_list: "" }); setModal("channel"); }}
             className="btn btn-outline btn-sm"><Plus size={12} className="mr-1"/>{t("notifications.add_channel")}</button>
         </div>
         {channels.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-[var(--text-muted)]">
-            <Radio size={28} className="mb-2 opacity-30"/>
-            <p className="text-[13px]">{t("common.no_data")}</p>
-          </div>
+          <EmptyState icon={Radio} title={t("common.no_data")} compact />
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {channels.map(c => {
@@ -153,20 +149,17 @@ export default function NotificationsPage() {
       </div>
 
       {/* Rules */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <h2 className="panel-title">
             <Bell size={14}/>{t("notifications.rules")}
-            <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{rules.length}</span>
+            <span className="ws-count">{rules.length}</span>
           </h2>
           <button onClick={() => { setEditRuleId(null); setRuleForm({ channel_id: channels[0]?.id || "", event_types: [], name: "" }); setModal("rule"); }}
             className="btn btn-outline btn-sm"><Plus size={12} className="mr-1"/>{t("notifications.add_rule")}</button>
         </div>
         {rules.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-[var(--text-muted)]">
-            <Bell size={28} className="mb-2 opacity-30"/>
-            <p className="text-[13px]">{t("common.no_data")}</p>
-          </div>
+          <EmptyState icon={Bell} title={t("common.no_data")} compact />
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {rules.map(r => {
@@ -201,7 +194,7 @@ export default function NotificationsPage() {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setModal(null); setEditRuleId(null); }}>
-          <div className="card w-[420px] max-h-[85vh] overflow-y-auto rounded-xl p-5  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-[420px] max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold">
                 {modal === "channel" ? t("notifications.add_channel") : editRuleId ? t("common.edit")+" "+t("notifications.rules") : t("notifications.add_rule")}
@@ -211,13 +204,13 @@ export default function NotificationsPage() {
             {modal === "channel" ? (
               <form onSubmit={handleCreateChannel} className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.name")}</label>
+                  <label className="field-label">{t("common.name")}</label>
                   <input type="text" required value={channelForm.name}
                     onChange={e => setChannelForm({ ...channelForm, name: e.target.value })}
                     className="input text-xs" placeholder={t("notifications.channel_name_placeholder","My Bot")}/>
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("notifications.channel_type","Type")}</label>
+                  <label className="field-label">{t("notifications.channel_type","Type")}</label>
                   <select value={channelForm.channel_type}
                     onChange={e => setChannelForm({ name: channelForm.name, channel_type: e.target.value, url: "", secret: "", webhook_url: "", mentioned_list: "" })}
                     className="input text-xs">
@@ -226,26 +219,26 @@ export default function NotificationsPage() {
                 </div>
                 {channelForm.channel_type === "webhook" ? <>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("notifications.webhook_url","Webhook URL")} *</label>
+                    <label className="field-label">{t("notifications.webhook_url","Webhook URL")} *</label>
                     <input type="url" required value={channelForm.url}
                       onChange={e => setChannelForm({ ...channelForm, url: e.target.value })}
                       className="input text-xs" placeholder="https://hooks.example.com/notify"/>
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("notifications.secret","Secret")} ({t("common.optional")})</label>
+                    <label className="field-label">{t("notifications.secret","Secret")} ({t("common.optional")})</label>
                     <input type="text" value={channelForm.secret}
                       onChange={e => setChannelForm({ ...channelForm, secret: e.target.value })}
                       className="input text-xs" placeholder={t("notifications.secret_placeholder","X-Signature header value")}/>
                   </div>
                 </> : <>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("notifications.webhook_url","Webhook URL")} *</label>
+                    <label className="field-label">{t("notifications.webhook_url","Webhook URL")} *</label>
                     <input type="url" required value={channelForm.webhook_url}
                       onChange={e => setChannelForm({ ...channelForm, webhook_url: e.target.value })}
                       className="input text-xs" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"/>
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">@ {t("notifications.mention_list","Mention List")} ({t("common.optional")})</label>
+                    <label className="field-label">@ {t("notifications.mention_list","Mention List")} ({t("common.optional")})</label>
                     <input type="text" value={channelForm.mentioned_list}
                       onChange={e => setChannelForm({ ...channelForm, mentioned_list: e.target.value })}
                       className="input text-xs" placeholder="user1, user2, @all"/>
@@ -259,13 +252,13 @@ export default function NotificationsPage() {
             ) : (
               <form onSubmit={handleSaveRule} className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.name")} ({t("common.optional")})</label>
+                  <label className="field-label">{t("common.name")} ({t("common.optional")})</label>
                   <input type="text" value={ruleForm.name}
                     onChange={e => setRuleForm({ ...ruleForm, name: e.target.value })}
                     className="input text-xs" placeholder={t("notifications.rule_name_placeholder","e.g. Issue alerts to Slack")}/>
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("notifications.channel","Channel")}</label>
+                  <label className="field-label">{t("notifications.channel","Channel")}</label>
                   <select required value={ruleForm.channel_id}
                     onChange={e => setRuleForm({ ...ruleForm, channel_id: e.target.value })}
                     className="input text-xs">
@@ -318,7 +311,7 @@ function EventSelector({ eventTypes, selected, onToggle, t }: {
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5 block">
+      <label className="field-label mb-1.5">
         {t("notifications.events","Events")}
         <span className="font-normal lowercase ml-1">({selected.length})</span>
       </label>

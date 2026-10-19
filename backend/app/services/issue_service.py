@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -49,6 +49,19 @@ async def list_issues(
     if filters.issue_type:
         query = query.where(Issue.issue_type == filters.issue_type)
         count_query = count_query.where(Issue.issue_type == filters.issue_type)
+    if filters.unassigned:
+        query = query.where(~Issue.assignees.any())
+        count_query = count_query.where(~Issue.assignees.any())
+    if filters.overdue:
+        today = datetime.now().date().isoformat()
+        overdue_cond = and_(
+            Issue.due_date.isnot(None),
+            Issue.due_date != "",
+            Issue.due_date < today,
+            Issue.status.in_(["open", "in_progress", "proposed", "accepted"]),
+        )
+        query = query.where(overdue_cond)
+        count_query = count_query.where(overdue_cond)
     if filters.q:
         search = f"%{filters.q}%"
         query = query.where(or_(Issue.title.ilike(search), Issue.description.ilike(search)))

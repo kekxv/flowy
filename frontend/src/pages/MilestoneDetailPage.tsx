@@ -1,22 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Calendar, Flag, CheckCircle2, AlertCircle, Edit3, Rocket } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, Flag, CheckCircle2, AlertCircle, Pencil, Rocket } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
-import Loader from "../components/Loader";
+import EmptyState from "../components/ui/EmptyState";
+import { Skeleton } from "../components/ui/Skeleton";
+import { formatDate } from "../utils/time";
 
 interface IssueItem { id: string; title: string; status: string; priority: string; issue_type?: string; created_at: string; start_date?: string|null; due_date?: string|null; }
 interface MilestoneData { id: string; name: string; description: string; start_date?: string|null; due_date: string|null; status: string; total_issues: number; closed_issues: number; progress: number; created_at: string; updated_at: string; owner_id?: string; }
 
 const daysLeft = (date: string|null) => { if (!date) return null; return Math.ceil((new Date(date).getTime()-Date.now())/86400000); };
 
+const STATUS_CHIP: Record<string, string> = { open: "chip-emerald", published: "chip-sky", closed: "chip-gray" };
+
 export default function MilestoneDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const returnTo = typeof location.state?.from === "string" && (location.state.from === "/milestones" || location.state.from.startsWith("/milestones?")) ? location.state.from : "/milestones";
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const user = useAuthStore(s => s.user);
   const [milestone, setMilestone] = useState<MilestoneData|null>(null);
   const [issues, setIssues] = useState<IssueItem[]>([]);
@@ -55,125 +59,140 @@ export default function MilestoneDetailPage() {
     catch (err: any) { showToast(err?.response?.status === 403 ? t("common.no_permission") : t("common.error","Failed")); }
   };
 
-  if (loading) return <Loader />;
-  if (!milestone) return <div className="text-center text-[var(--text-muted)] pt-16">{t("milestone.no_milestones")}</div>;
+  if (loading) return (
+    <div className="page-enter space-y-3">
+      <Skeleton className="h-7 w-24" />
+      <div className="panel p-4">
+        <Skeleton className="h-5 w-52" />
+        <Skeleton className="mt-3 h-3 w-72" />
+        <Skeleton className="mt-4 h-2.5 w-full rounded-full" />
+      </div>
+      <div className="panel p-4"><Skeleton className="h-3 w-24" /><Skeleton className="mt-4 h-3 w-full" /></div>
+    </div>
+  );
+
+  if (!milestone) return <EmptyState icon={Flag} title={t("milestone.no_milestones")} />;
 
   const left = daysLeft(milestone.due_date);
   const overdue = left !== null && left < 0;
   const soon = left !== null && left >= 0 && left <= 3;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 page-enter">
-      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-[8px] bg-red-50 border border-red-100 px-3 py-2 text-[12px] text-red-600 shadow-sm animate-[fadeInUp_.2s_ease-out]">{toast}</div>}
+    <div className="page-enter space-y-3">
+      {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-[8px] border border-red-100 bg-red-50 px-3 py-2 text-[12px] text-red-600 shadow-sm">{toast}</div>}
 
-      <Link to={returnTo} className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={returnTo} className="btn btn-ghost btn-sm"><ArrowLeft size={14}/>{t("common.back")}</Link>
+        <span className="mono text-[11px] text-[var(--text-faint)]">#{milestone.id.slice(0, 8)}</span>
+        <span className={`chip ${STATUS_CHIP[milestone.status] ?? "chip-gray"}`}>
+          {milestone.status === "published" && <Rocket size={11} />}
+          {t(`milestone.status.${milestone.status}`,milestone.status)}
+        </span>
+        {canEdit && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={()=>setEdit(true)} className="btn btn-outline btn-sm"><Pencil size={12}/>{t("common.edit")}</button>
+            {milestone.status!=="published" && <button onClick={()=>toggleStatus("published")} className="btn btn-outline btn-sm"><Rocket size={12}/>{t("milestone.publish","Publish")}</button>}
+            {milestone.status!=="closed" && <button onClick={()=>toggleStatus("closed")} className="btn btn-outline btn-sm"><CheckCircle2 size={12}/>{t("milestone.close")}</button>}
+            {milestone.status!=="open" && <button onClick={()=>toggleStatus("open")} className="btn btn-outline btn-sm"><Flag size={12}/>{t("milestone.reopen")}</button>}
+          </div>
+        )}
+      </div>
 
-      {/* Header card */}
-      <div className="card rounded-[8px] overflow-hidden">
-        <div className="px-6 py-5 border-b border-[var(--border-light)]">
+      <div className="panel overflow-hidden">
+        <div className="px-4 py-4">
           {edit ? (
             <div className="space-y-3">
-              <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.name")}</label><input value={ef.name} onChange={e=>setEf({...ef,name:e.target.value})} className="input font-bold text-lg"/></div>
-              <div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("milestone.description")} <span className="font-normal lowercase">(Markdown)</span></label><textarea rows={4} value={ef.description} onChange={e=>setEf({...ef,description:e.target.value})} className="input resize-none font-mono text-xs"/></div>
-              <div className="flex gap-3"><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">Start</label><input type="date" value={ef.start_date} onChange={e=>setEf({...ef,start_date:e.target.value})} className="input w-48"/></div><div><label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("common.due_date")}</label><input type="date" value={ef.due_date} onChange={e=>setEf({...ef,due_date:e.target.value})} className="input w-48"/></div></div>
+              <label className="field">
+                <span className="field-label">{t("milestone.name")}</span>
+                <input value={ef.name} onChange={e=>setEf({...ef,name:e.target.value})} className="input h-9 font-semibold"/>
+              </label>
+              <label className="field">
+                <span className="field-label">{t("milestone.description")} <span className="font-normal text-[var(--text-faint)]">(Markdown)</span></span>
+                <textarea rows={4} value={ef.description} onChange={e=>setEf({...ef,description:e.target.value})} className="input mono resize-none text-[12px]"/>
+              </label>
+              <div className="flex flex-wrap gap-3">
+                <label className="field"><span className="field-label">{t("milestones.start")}</span><input type="date" value={ef.start_date} onChange={e=>setEf({...ef,start_date:e.target.value})} className="input h-9 w-44"/></label>
+                <label className="field"><span className="field-label">{t("common.due_date")}</span><input type="date" value={ef.due_date} onChange={e=>setEf({...ef,due_date:e.target.value})} className="input h-9 w-44"/></label>
+              </div>
               <div className="flex gap-2">
                 <button onClick={save} className="btn btn-primary btn-sm">{t("common.save")}</button>
                 <button onClick={()=>setEdit(false)} className="btn btn-ghost btn-sm">{t("common.cancel")}</button>
               </div>
             </div>
           ) : (
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-[18px] font-bold tracking-tight">{milestone.name}</h1>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                    milestone.status==="open"?"bg-emerald-50 text-emerald-700":milestone.status==="published"?"bg-blue-50 text-blue-700":"bg-slate-100 text-slate-500"}`}>
-                    {milestone.status==="published"?"🚀 ":""}{t(`milestone.status.${milestone.status}`,milestone.status)}
+            <>
+              <h1 className="text-[19px] font-semibold tracking-[-.01em] text-[var(--text)]">{milestone.name}</h1>
+              <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11.5px] text-[var(--text-muted)]">
+                <span className="inline-flex items-center gap-1"><Calendar size={11.5}/>{t("common.created_at")}: {formatDate(milestone.created_at, i18n?.language)}</span>
+                {milestone.due_date && (
+                  <span className={`inline-flex items-center gap-1 ${overdue?"font-medium text-red-500":soon?"text-amber-500":""}`}>
+                    <Clock size={11.5}/>
+                    {milestone.due_date.slice(0,10)}
+                    <span className="opacity-60">·</span>
+                    {overdue?t("milestones.overdue",{n:Math.abs(left!)}):left===0?t("milestone.due_today"):t("milestones.left",{n:left})}
                   </span>
-                </div>
-                {milestone.description && <div className="mt-1.5 text-sm text-[var(--text-muted)] prose prose-sm max-w-none"><MarkdownContent>{milestone.description}</MarkdownContent></div>}
-                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[var(--text-muted)]">
-                  <span className="flex items-center gap-1"><Calendar size={12}/>{t("common.created_at")}: {new Date(milestone.created_at).toLocaleDateString()}</span>
-                  {milestone.due_date && (
-                    <span className={`flex items-center gap-1 font-medium ${overdue?"text-red-500":soon?"text-amber-500":""}`}>
-                      <Clock size={12}/>
-                      {overdue?`${Math.abs(left!)}d ${t("milestone.overdue","overdue")}`:left===0?t("milestone.due_today","Due today"):`${left}d ${t("milestone.due_in","left")}`}
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
-              {canEdit && <div className="flex items-center gap-2">
-                <button onClick={()=>setEdit(true)} className="btn btn-outline btn-sm"><Edit3 size={12}/>{t("common.edit")}</button>
-                {milestone.status!=="published"&&<button onClick={()=>toggleStatus("published")}
-                  className="btn btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100"><Rocket size={12}/>{t("milestone.publish","Publish")}</button>}
-                {milestone.status!=="closed"&&<button onClick={()=>toggleStatus("closed")}
-                  className="btn btn-sm bg-slate-100 text-slate-600 hover:bg-slate-200"><CheckCircle2 size={12}/>{t("milestone.close")}</button>}
-                {milestone.status!=="open"&&<button onClick={()=>toggleStatus("open")}
-                  className="btn btn-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100"><Flag size={12}/>{t("milestone.reopen")}</button>}
-              </div>}
-            </div>
+            </>
           )}
         </div>
 
-        {/* Progress bar */}
-        <div className="px-6 py-4 border-b border-[var(--border-light)]">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("milestone.progress")}</span>
-            <span className="text-lg font-bold text-[var(--text)]">{milestone.progress}%</span>
+        {!edit && milestone.description && (
+          <div className="border-t border-[var(--border-light)] px-4 py-3">
+            <div className="prose prose-sm max-w-none text-[var(--text-secondary)]"><MarkdownContent>{milestone.description}</MarkdownContent></div>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-[var(--bg-muted)]">
-            <div className={`h-full rounded-full transition-all duration-1000 ease-out ${milestone.progress>=100?"bg-emerald-500":milestone.progress>=50?"bg-[var(--primary)]":"bg-amber-400"}`}
+        )}
+
+        <div className="border-t border-[var(--border-light)] px-4 py-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-[var(--text-muted)]">{t("milestone.progress")}</span>
+            <span className="text-[15px] font-semibold tabular-nums text-[var(--text)]">{milestone.progress}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
+            <div className={`h-full rounded-full transition-all duration-700 ${milestone.progress>=100?"bg-emerald-500":milestone.progress>=50?"bg-[var(--primary)]":"bg-amber-400"}`}
               style={{width:`${milestone.progress}%`}}/>
           </div>
-          <div className="mt-2 flex items-center gap-4 text-[11px] text-[var(--text-muted)]">
-            <span className="flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-500"/>{milestone.closed_issues} closed</span>
-            <span className="flex items-center gap-1"><AlertCircle size={12} className="text-amber-500"/>{(milestone.total_issues-milestone.closed_issues)} open</span>
-            <span className="flex items-center gap-1"><Flag size={12} className="text-[var(--primary)]"/>{milestone.total_issues} total</span>
+          <div className="mt-2 flex flex-wrap items-center gap-3.5 text-[11px] text-[var(--text-muted)]">
+            <span className="inline-flex items-center gap-1"><CheckCircle2 size={11.5} className="text-emerald-500"/>{milestone.closed_issues} {t("milestones.closed", "closed")}</span>
+            <span className="inline-flex items-center gap-1"><AlertCircle size={11.5} className="text-amber-500"/>{milestone.total_issues-milestone.closed_issues} {t("milestones.open", "open")}</span>
+            <span className="inline-flex items-center gap-1"><Flag size={11.5} className="text-[var(--primary)]"/>{milestone.total_issues} {t("milestones.total", "total")}</span>
           </div>
         </div>
       </div>
 
-      {/* Issue list */}
-      <div className="card rounded-[8px] overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[var(--border-light)] px-4 py-3">
-          <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            {t("issues.title")}
-            <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-muted)]">{issues.length}</span>
-          </h2>
+      <div className="panel overflow-hidden">
+        <div className="panel-head">
+          <h2>{t("issues.title")}<span className="ws-count">{issues.length}</span></h2>
         </div>
         {issues.length===0 ? (
-          <div className="py-12 text-center text-[13px] text-[var(--text-muted)]">{t("issues.no_issues")}</div>
+          <EmptyState icon={Flag} title={t("issues.no_issues")} compact />
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {issues.map(issue => {
               const isFeature = (issue as any).issue_type === "feature";
-              const borderColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#d1d5db" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
+              const barColor = issue.status === "closed" || issue.status === "resolved" || issue.status === "cancelled" || issue.status === "rejected" ? "#cbd5e1" : issue.status === "in_progress" || issue.status === "accepted" ? "#f59e0b" : "#2563eb";
               return (
-              <Link key={issue.id} to={`/issues/${issue.id}`}
-                className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-muted)]">
-                {/* Left: status indicator + type initial */}
-                <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
-                  <div className="w-[3px] shrink-0 self-stretch rounded-full" style={{ backgroundColor: borderColor }} />
-                  <div className={`w-[26px] h-[26px] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] font-bold ${isFeature ? "bg-violet-50 text-violet-500" : "bg-amber-50 text-amber-500"}`}>
+                <Link key={issue.id} to={`/issues/${issue.id}`} className="group flex items-center gap-3 px-4 py-[11px] transition-colors hover:bg-[var(--bg-hover)]">
+                  <span className="h-6 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: barColor }} />
+                  <span className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[6px] text-[10px] font-bold ${isFeature ? "bg-violet-50 text-violet-500" : "bg-amber-50 text-amber-500"}`}>
                     {isFeature ? "需" : "问"}
-                  </div>
-                </div>
-                {/* Center: title + meta */}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-semibold text-[var(--text)] group-hover:text-[var(--primary)] transition-colors truncate">{issue.title}</span>
-                    <span className="mono shrink-0 text-[10px] text-[var(--text-faint)]">#{issue.id.slice(0, 8)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--text-faint)]">
-                    <span className={`status-${issue.status} text-[11px]`}>{t(`issues.status.${issue.status}`)}</span>
-                    <span className="text-[var(--border)]">·</span>
-                    <span className="priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium">{t(`issues.priority.${issue.priority}`)}</span>
-                    <span className="text-[var(--border)]">·</span>
-                    <span>{new Date(issue.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </Link>
-            )})}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-[13px] font-medium text-[var(--text)] transition-colors group-hover:text-[var(--primary)]">{issue.title}</span>
+                      <span className="mono shrink-0 text-[10px] text-[var(--text-faint)]">#{issue.id.slice(0,8)}</span>
+                    </span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-faint)]">
+                      <span className={`status-${issue.status}`}>{t(`issues.status.${issue.status}`)}</span>
+                      <span>·</span>
+                      <span className={`priority-${issue.priority} rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium`}>{t(`issues.priority.${issue.priority}`)}</span>
+                      <span>·</span>
+                      <span>{formatDate(issue.created_at, i18n?.language)}</span>
+                    </span>
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

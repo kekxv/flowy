@@ -536,3 +536,118 @@ class TestSplitForWecom:
         # Verify all chunks are within limit
         for chunk in result:
             assert len(chunk.encode("utf-8")) <= 100
+
+
+# ─── Wiki list filters (tag / sort / tags aggregation) ─────────
+
+
+class TestWikiListFilters:
+
+    async def _seed(self, db_session: AsyncSession, user: User) -> dict[str, WikiPage]:
+        from datetime import timedelta
+
+        older = datetime(2024, 1, 1, 9, 0, 0)
+        newer = datetime(2024, 6, 1, 9, 0, 0)
+        newest = datetime(2024, 7, 1, 9, 0, 0)
+        ops = await _create_wiki_page(
+            db_session, user.id, "Deploy runbook", tags="ops, docker", weight=0
+        )
+        ops.updated_at = older
+        guide = await _create_wiki_page(
+            db_session, user.id, "Docker guide", tags="docker, build", weight=5
+        )
+        guide.updated_at = newer
+        other = await _create_wiki_page(db_session, user.id, "Meeting notes", tags="team")
+        other.updated_at = newest
+        await db_session.flush()
+        return {"ops": ops, "guide": guide, "other": other}
+
+    @pytest.mark.asyncio
+    async def test_tag_filter_matches_whole_tag_only(self, db_session: AsyncSession, test_user: User):
+        """`tag=ops` must not match the unrelated `build` tag or partial words."""
+        await self._seed(db_session, test_user)
+
+        pages, total = await wiki_service.get_visible_pages(
+            db_session, test_user.id, tag="ops"
+        )
+
+        assert total == 1
+        assert [page.title for page in pages] == ["Deploy runbook"]
+
+        partial, partial_total = await wiki_service.get_visible_pages(
+            db_session, test_user.id, tag="op"
+        )
+        assert partial == []
+        assert partial_total == 0
+
+    @pytest.mark.asyncio
+    async def test_default_sort_is_newest_first(self, db_session: AsyncSession, test_user: User):
+        await self._seed(db_session, test_user)
+
+        pages, _ = await wiki_service.get_visible_pages(db_session, test_user.id)
+
+        assert [page.title for page in pages] == [
+            "Meeting notes",
+            "Docker guide",
+            "Deploy runbook",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_sort_by_weight_puts_pinned_pages_first(self, db_session: AsyncSession, test_user: User):
+        await self._seed(db_session, test_user)
+
+        pages, _ = await wiki_service.get_visible_pages(
+            db_session, test_user.id, sort="weight"
+        )
+
+        assert [page.title for page in pages] == [
+            "Docker guide",
+            "Meeting notes",
+            "Deploy runbook",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_sort_by_title_is_alphabetical(self, db_session: AsyncSession, test_user: User):
+        await self._seed(db_session, test_user)
+
+        pages, _ = await wiki_service.get_visible_pages(
+            db_session, test_user.id, sort="title"
+        )
+
+        assert [page.title for page in pages] == [
+            "Deploy runbook",
+            "Docker guide",
+            "Meeting notes",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_tags_endpoint_aggregates_visible_tags(self, db_session: AsyncSession, test_user: User):
+        await self._seed(db_session, test_user)
+        transport = _build_transport(db_session)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client, test_user.username)
+            response = await client.get("/api/v1/wiki/tags", headers=headers)
+
+        assert response.status_code == 200
+        payload = {item["tag"]: item["count"] for item in response.json()}
+        assert payload["docker"] == 2
+        assert payload["ops"] == 1
+        assert payload["team"] == 1
+
+    @pytest.mark.asyncio
+    async def test_list_endpoint_accepts_tag_and_sort(self, db_session: AsyncSession, test_user: User):
+        await self._seed(db_session, test_user)
+        transport = _build_transport(db_session)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client, test_user.username)
+            response = await client.get(
+                "/api/v1/wiki", params={"tag": "docker", "sort": "title"}, headers=headers
+            )
+
+        assert response.status_code == 200
+        assert [item["title"] for item in response.json()["data"]] == [
+            "Deploy runbook",
+            "Docker guide",
+        ]

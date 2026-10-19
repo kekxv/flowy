@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import api from "../api/client";
 import CommandTestResult from "../components/CommandTestResult";
+import PageHeader from "../components/ui/PageHeader";
+import EmptyState from "../components/ui/EmptyState";
 import {
   buildIntranetSourcePayload,
   buildIntranetSourceTestPayload,
@@ -403,22 +405,14 @@ export default function WeChatWorkBotPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 page-enter">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5">
-          <Bot size={26} className="text-[var(--primary)]" />
-          {t("wechat_work_bot.title", "企业微信机器人")}
-        </h1>
-        <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-          {t("wechat_work_bot.desc", "配置智能机器人，通过群聊管理问题和里程碑")}
-        </p>
-      </div>
+    <div className="page-enter mx-auto max-w-4xl space-y-3">
+      <PageHeader icon={Bot} title={t("wechat_work_bot.title", "企业微信机器人")} subtitle={t("wechat_work_bot.desc", "配置智能机器人，通过群聊管理问题和里程碑")} />
 
-      {error && <div className="card rounded-xl px-5 py-3 text-[13px] text-red-700 bg-red-50">{error}</div>}
-      {success && <div className="card rounded-xl px-5 py-3 text-[13px] text-emerald-700 bg-emerald-50 flex items-center gap-2"><CheckCircle2 size={14}/>{success}</div>}
+      {error && <div className="rounded-[8px] border border-red-100 bg-red-50 px-3.5 py-2.5 text-[12.5px] text-red-700">{error}</div>}
+      {success && <div className="flex items-center gap-2 rounded-[8px] border border-emerald-100 bg-emerald-50 px-3.5 py-2.5 text-[12.5px] text-emerald-700"><CheckCircle2 size={13}/>{success}</div>}
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl bg-[var(--bg-muted)] p-1">
+      <div className="seg w-full">
         {([
           { key: "config" as Tab, label: t("wechat_work_bot.config", "配置"), icon: Settings },
           { key: "users" as Tab, label: t("wechat_work_bot.users", "用户管理"), icon: Users },
@@ -426,8 +420,8 @@ export default function WeChatWorkBotPage() {
           { key: "files" as Tab, label: "内网文件", icon: FolderOpen },
         ]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${tab === key ? "bg-white shadow-sm text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
-            <Icon size={14} />{label}
+            className={`seg-item flex-1 justify-center ${tab === key ? "is-on" : ""}`}>
+            <Icon size={13} />{label}
           </button>
         ))}
       </div>
@@ -435,7 +429,7 @@ export default function WeChatWorkBotPage() {
       {/* Tab: Config */}
       {tab === "config" && (
         <>
-        <div className="card rounded-xl overflow-hidden">
+        <div className="panel overflow-hidden">
           <form onSubmit={handleSaveConfig} className="space-y-5 p-5">
             {/* Status bar */}
             <div className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${config.is_running ? "bg-emerald-50" : "bg-[var(--bg-muted)]"}`}>
@@ -488,17 +482,17 @@ export default function WeChatWorkBotPage() {
               <div className="rounded-lg bg-[var(--bg-hover)] p-4 space-y-3">
                 <h3 className="text-[12px] font-semibold text-[var(--text-secondary)]">AI 后端配置</h3>
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">API Base URL</label>
+                  <label className="field-label">API Base URL</label>
                   <input type="text" value={config.ai_base_url || ""} onChange={e => setConfig({ ...config, ai_base_url: e.target.value })}
                     className="input mt-1 text-[13px]" placeholder="https://api.openai.com/v1 或自定义地址" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">API Key</label>
+                  <label className="field-label">API Key</label>
                   <input type="password" value={formAiKey} onChange={e => setFormAiKey(e.target.value)}
                     className="input mt-1 text-[13px]" placeholder={config.ai_base_url ? "留空保持不变" : "sk-..."} />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">模型</label>
+                  <label className="field-label">模型</label>
                   <input type="text" value={config.ai_model || ""} onChange={e => setConfig({ ...config, ai_model: e.target.value })}
                     className="input mt-1 text-[13px]" placeholder="gpt-4o-mini / qwen-turbo / deepseek-chat" />
                 </div>
@@ -515,7 +509,7 @@ export default function WeChatWorkBotPage() {
         </div>
 
         {/* Command Test */}
-        <div className="card rounded-xl overflow-hidden mt-6">
+        <div className="panel overflow-hidden mt-6">
           <div className="flex items-center gap-2 border-b border-[var(--border-light)] px-5 py-3.5">
             <Terminal size={14} className="text-[var(--text-muted)]" />
             <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">指令测试</h2>
@@ -552,9 +546,9 @@ export default function WeChatWorkBotPage() {
 
       {/* Tab: Users */}
       {tab === "users" && (
-        <div className="card rounded-xl overflow-hidden">
+        <div className="panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <h2 className="panel-title">
               <Users size={14} />
               机器人用户
               <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{users.length}</span>
@@ -567,7 +561,7 @@ export default function WeChatWorkBotPage() {
 
           {showUserForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowUserForm(false); setEditingUserId(null); }}>
-              <div className="card w-full max-w-md rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="modal-card w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-[15px] font-semibold flex items-center gap-2">
                     <Users size={18} className="text-[var(--primary)]" />
@@ -578,14 +572,14 @@ export default function WeChatWorkBotPage() {
 
                 <form onSubmit={handleAddUser} className="space-y-3">
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">企业微信用户 ID</label>
+                    <label className="field-label">企业微信用户 ID</label>
                     <input type="text" value={userForm.wechat_user_id}
                       onChange={e => setUserForm({ ...userForm, wechat_user_id: e.target.value })}
                       className="input mt-1 text-[13px]" placeholder="woZpPdCQAA..." disabled={!!editingUserId} required />
                     <p className="text-[10px] text-[var(--text-muted)] mt-0.5">从企业微信后台或消息日志中获取</p>
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">关联 Flowy 用户 <span className="text-[var(--text-muted)]">(可选)</span></label>
+                    <label className="field-label">关联 Flowy 用户 <span className="text-[var(--text-muted)]">(可选)</span></label>
                     <select value={userForm.flowy_user_id}
                       onChange={e => setUserForm({ ...userForm, flowy_user_id: e.target.value })}
                       className="input mt-1 text-[13px]" disabled={!!editingUserId}>
@@ -596,7 +590,7 @@ export default function WeChatWorkBotPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">角色</label>
+                    <label className="field-label">角色</label>
                     <select value={userForm.role}
                       onChange={e => setUserForm({ ...userForm, role: e.target.value })}
                       className="input mt-1 text-[13px]">
@@ -618,10 +612,7 @@ export default function WeChatWorkBotPage() {
           )}
 
           {users.length === 0 ? (
-            <div className="flex flex-col items-center py-12 text-[var(--text-muted)]">
-              <Users size={28} className="mb-2 opacity-30" />
-              <p className="text-[13px]">{t("common.no_data")}</p>
-            </div>
+            <EmptyState icon={Users} title={t("common.no_data")} compact />
           ) : (
             <div className="divide-y divide-[var(--border-light)]">
               {users.map(u => {
@@ -658,7 +649,7 @@ export default function WeChatWorkBotPage() {
       {/* Bind Token Dialog */}
       {showBindDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowBindDialog(false)}>
-          <div className="card w-full max-w-md rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[15px] font-semibold flex items-center gap-2">
                 <Link size={18} className="text-[var(--primary)]" />
@@ -670,7 +661,7 @@ export default function WeChatWorkBotPage() {
             {!bindResult ? (
               <form onSubmit={handleGenerateBind} className="space-y-3">
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">Flowy 用户</label>
+                  <label className="field-label">Flowy 用户</label>
                   <select value={bindForm.flowy_user_id}
                     onChange={e => setBindForm({ ...bindForm, flowy_user_id: e.target.value })}
                     className="input mt-1 text-[13px]" required>
@@ -681,7 +672,7 @@ export default function WeChatWorkBotPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">角色</label>
+                  <label className="field-label">角色</label>
                   <select value={bindForm.role}
                     onChange={e => setBindForm({ ...bindForm, role: e.target.value })}
                     className="input mt-1 text-[13px]">
@@ -721,9 +712,9 @@ export default function WeChatWorkBotPage() {
 
       {/* Tab: Logs */}
       {tab === "logs" && (
-        <div className="card rounded-xl overflow-hidden">
+        <div className="panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <h2 className="panel-title">
               <ScrollText size={14} />
               指令日志
               <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{logs.length}</span>
@@ -770,9 +761,9 @@ export default function WeChatWorkBotPage() {
 
       {/* Tab: Files */}
       {tab === "files" && (
-        <div className="card rounded-xl overflow-hidden">
+        <div className="panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <h2 className="panel-title">
               <FolderOpen size={14} />
               内网文件源
               <span className="rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold">{intranetSources.length}</span>
@@ -788,7 +779,7 @@ export default function WeChatWorkBotPage() {
           {/* Add/Edit Source Dialog */}
           {showSourceForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowSourceForm(false); setEditingSourceId(null); }}>
-              <div className="card w-full max-w-md rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="modal-card w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-[15px] font-semibold flex items-center gap-2">
                     <Server size={18} className="text-[var(--primary)]" />
@@ -799,13 +790,13 @@ export default function WeChatWorkBotPage() {
 
                 <form onSubmit={handleSaveSource} className="space-y-3">
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">名称</label>
+                    <label className="field-label">名称</label>
                     <input type="text" value={sourceForm.name}
                       onChange={e => setSourceForm({ ...sourceForm, name: e.target.value })}
                       className="input mt-1 text-[13px]" placeholder="NAS 文件服务器" required />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">URL</label>
+                    <label className="field-label">URL</label>
                     <input type="url" value={sourceForm.url}
                       onChange={e => setSourceForm({ ...sourceForm, url: e.target.value })}
                       className="input mt-1 text-[13px] font-mono" placeholder="http://192.168.1.100/files/" required />
@@ -822,13 +813,13 @@ export default function WeChatWorkBotPage() {
                   {sourceForm.use_basic_auth && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-medium text-[var(--text-secondary)]">用户名</label>
+                        <label className="field-label">用户名</label>
                         <input type="text" value={sourceForm.auth_username}
                           onChange={e => setSourceForm({ ...sourceForm, auth_username: e.target.value })}
                           className="input mt-1 text-[13px]" autoComplete="username" required />
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-[var(--text-secondary)]">密码</label>
+                        <label className="field-label">密码</label>
                         <input type="password" value={sourceForm.auth_password}
                           onChange={e => setSourceForm({ ...sourceForm, auth_password: e.target.value })}
                           className="input mt-1 text-[13px]" autoComplete="new-password"
@@ -840,7 +831,7 @@ export default function WeChatWorkBotPage() {
                     </div>
                   )}
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">类型</label>
+                    <label className="field-label">类型</label>
                     <select value={sourceForm.source_type}
                       onChange={e => setSourceForm({ ...sourceForm, source_type: e.target.value as "json" | "nginx" })}
                       className="input mt-1 text-[13px]">
@@ -849,7 +840,7 @@ export default function WeChatWorkBotPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-[var(--text-secondary)]">下载有效期（小时）</label>
+                    <label className="field-label">下载有效期（小时）</label>
                     <input type="number" value={Math.round(sourceForm.file_ttl_seconds / 3600)}
                       onChange={e => setSourceForm({ ...sourceForm, file_ttl_seconds: Math.max(60, parseInt(e.target.value) * 3600) || 3600 })}
                       className="input mt-1 text-[13px]" min={1} max={24} step={1} />

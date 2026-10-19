@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Globe, Code2, Key, Trash2, CheckCircle2, XCircle, ExternalLink, RefreshCw, X } from "lucide-react";
 import { listConnections, connectViaPat, deleteConnection, testConnection, type ConnectionData } from "../api/connections";
 import { useAuthStore } from "../store/authStore";
 import api from "../api/client";
 import { ALL_ROLES } from "../constants";
-import Loader from "../components/Loader";
+import { ListSkeleton, Skeleton } from "../components/ui/Skeleton";
 
 export default function UserProfilePage() {
   const { t } = useTranslation();
@@ -27,14 +27,14 @@ export default function UserProfilePage() {
   const [pwdForm, setPwdForm] = useState({old_password:"", new_password:""});
   const [showPwd, setShowPwd] = useState(false);
 
-  const fetch = async () => {
+  const fetch = useCallback(async () => {
     const [c, oc] = await Promise.all([
       listConnections(),
       api.get("/system/settings").catch(()=>({data:{}})),
     ]);
     setConns(c); setOauthConfig(oc.data); setLoading(false);
-  };
-  useEffect(()=>{fetch();},[]);
+  }, []);
+  useEffect(()=>{fetch();},[fetch]);
 
   // Check which providers have OAuth configured
   const hasOAuth = (p:string) => !!(oauthConfig[`${p}_client_id`]);
@@ -65,7 +65,7 @@ export default function UserProfilePage() {
       setError(params.get("msg") || "OAuth failed");
       window.history.replaceState({}, "", "./#/profile");
     }
-  }, []);
+  }, [fetch, t]);
 
   const connectPAT = async (e:React.FormEvent) => { e.preventDefault(); setError(""); setSub(true);
     try { await connectViaPat({provider:patProvider,token,instance_url:instanceUrl||undefined}); setToken(""); setInstanceUrl(""); setShowPatForm(false); fetch(); }
@@ -76,29 +76,37 @@ export default function UserProfilePage() {
     alert(res.ok ? t("settings.test_ok","OK") : `${t("settings.test_fail","Failed")}: ${res.error || "unknown"}`);
   };
 
-  if (loading) return <Loader />;
+  if (loading) return (
+    <div className="page-enter space-y-3">
+      <div className="panel p-5"><div className="flex items-center gap-4"><Skeleton className="h-14 w-14 rounded-2xl" /><div className="flex-1"><Skeleton className="h-4 w-40" /><Skeleton className="mt-2 h-3 w-56" /></div></div></div>
+      <ListSkeleton rows={4} />
+    </div>
+  );
 
   const showProviderConnect = (p:string) => conns.every(c=>c.provider!==p);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 page-enter">
+    <div className="page-enter mx-auto max-w-2xl space-y-3">
       {/* User info */}
-      <div className="card rounded-xl p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--primary)] text-xl font-bold text-white ">
-            {(user?.display_name||user?.username||"?").slice(0,2).toUpperCase()}
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-[var(--text)]">{user?.display_name||user?.username}</h1>
-            <p className="text-[13px] text-[var(--text-muted)]">@{user?.username} · {user?.email} · <span className="rounded bg-[var(--bg-muted)] px-1.5 py-0.5 text-[11px] font-medium">{user?.role}</span></p>
-          </div>
+      <div className="panel flex items-center gap-4 p-4">
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[14px] bg-gradient-to-br from-[var(--primary)] to-violet-600 text-[17px] font-bold text-white shadow-sm">
+          {(user?.display_name||user?.username||"?").slice(0,2).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <h1 className="truncate text-[16px] font-semibold text-[var(--text)]">{user?.display_name||user?.username}</h1>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--text-muted)]">
+            <span>@{user?.username}</span>
+            <span className="opacity-40">·</span>
+            <span className="truncate">{user?.email}</span>
+            <span className="chip chip-gray capitalize">{user?.role}</span>
+          </p>
         </div>
       </div>
 
       {/* Profile Edit */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">个人信息</h2>
+          <h2 className="panel-title">个人信息</h2>
           <button onClick={()=>setShowEdit(!showEdit)} className="btn btn-outline btn-sm">{showEdit?"取消":"编辑"}</button>
         </div>
         {showEdit && (
@@ -117,9 +125,9 @@ export default function UserProfilePage() {
       </div>
 
       {/* Password Change */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">修改密码</h2>
+          <h2 className="panel-title">修改密码</h2>
           <button onClick={()=>setShowPwd(!showPwd)} className="btn btn-outline btn-sm">{showPwd?"取消":"修改"}</button>
         </div>
         {showPwd && (
@@ -141,13 +149,13 @@ export default function UserProfilePage() {
       <ProjectRolesSection t={t} />
 
       {/* Success / Error messages */}
-      {success && <div className="card rounded-xl px-5 py-3 text-[13px] text-emerald-700 bg-emerald-50 flex items-center gap-2"><CheckCircle2 size={16}/>{success}</div>}
-      {error && <div className="card rounded-xl px-5 py-3 text-[13px] text-red-700 bg-red-50">{error}</div>}
+      {success && <div className="panel px-5 py-3 text-[13px] text-emerald-700 bg-emerald-50 flex items-center gap-2"><CheckCircle2 size={16}/>{success}</div>}
+      {error && <div className="panel px-5 py-3 text-[13px] text-red-700 bg-red-50">{error}</div>}
 
       {/* Connected accounts */}
-      <div className="card rounded-xl overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="border-b border-[var(--border-light)] px-5 py-3.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("settings.integrations")}</h2>
+          <h2 className="panel-title">{t("settings.integrations")}</h2>
         </div>
 
         {/* Existing connections */}
@@ -219,7 +227,7 @@ export default function UserProfilePage() {
             <div className="grid gap-3 sm:grid-cols-2 mb-3">
               {patProvider==="gitea" && (
                 <div className="sm:col-span-2">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">{t("settings.instance_url","Instance URL")}</label>
+                  <label className="field-label">{t("settings.instance_url","Instance URL")}</label>
                   <input value={instanceUrl} onChange={e=>setInstanceUrl(e.target.value)} placeholder="https://gitea.example.com" className="input text-xs"/>
                 </div>
               )}
@@ -258,9 +266,9 @@ function ProjectRolesSection({ t }: { t: any }) {
 
   return (
     <>
-      <div className="card rounded-xl p-5">
+      <div className="panel p-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("roles.title","Project Roles")}</h2>
+          <h2 className="panel-title">{t("roles.title","Project Roles")}</h2>
           <button onClick={() => setEdit(true)} className="text-[11px] text-[var(--primary)] hover:underline font-medium">{t("common.edit")}</button>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -270,7 +278,7 @@ function ProjectRolesSection({ t }: { t: any }) {
 
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setEdit(false)}>
-          <div className="card w-80 rounded-xl overflow-hidden  animate-[fadeInUp_.2s_ease-out]" onClick={e => e.stopPropagation()}>
+          <div className="modal-card w-[340px]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-light)]">
               <h3 className="text-sm font-semibold">{t("roles.title","Project Roles")}</h3>
               <button onClick={() => setEdit(false)} className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={16}/></button>

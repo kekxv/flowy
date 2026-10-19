@@ -146,6 +146,50 @@ class TestIssueAPI:
         assert len(data["data"]) >= 1
 
     @pytest.mark.asyncio
+    async def test_list_issues_unassigned_filter(self, db_session, test_user):
+        """The unassigned saved view only returns issues without assignees."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            await client.post("/api/v1/issues", json={"title": "Nobody owns this"}, headers=headers)
+            await client.post(
+                "/api/v1/issues",
+                json={"title": "Owned", "assignees": [{"user_id": test_user.id, "role": "member"}]},
+                headers=headers,
+            )
+            resp = await client.get(
+                "/api/v1/issues", params={"unassigned": "true"}, headers=headers
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        titles = [item["title"] for item in body["data"]]
+        assert "Nobody owns this" in titles
+        assert "Owned" not in titles
+        assert all(item["assignees"] == [] for item in body["data"])
+
+    @pytest.mark.asyncio
+    async def test_list_issues_overdue_filter(self, db_session, test_user):
+        """The overdue saved view only returns active issues past their due date."""
+        transport = _build_transport(db_session)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = await _login(client)
+            await client.post(
+                "/api/v1/issues",
+                json={"title": "Late one", "due_date": "2020-01-01"},
+                headers=headers,
+            )
+            await client.post(
+                "/api/v1/issues",
+                json={"title": "Later one", "due_date": "2999-01-01"},
+                headers=headers,
+            )
+            resp = await client.get("/api/v1/issues", params={"overdue": "true"}, headers=headers)
+        assert resp.status_code == 200
+        titles = [item["title"] for item in resp.json()["data"]]
+        assert "Late one" in titles
+        assert "Later one" not in titles
+
+    @pytest.mark.asyncio
     async def test_get_issue_detail(self, db_session, test_user):
         """Get issue detail."""
         transport = _build_transport(db_session)

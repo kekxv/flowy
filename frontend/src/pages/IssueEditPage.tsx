@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getIssue, updateIssue } from "../api/issues";
 import { STAT, PRIS } from "../constants";
-import Loader from "../components/Loader";
+import { Skeleton } from "../components/ui/Skeleton";
 import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function IssueEditPage() {
@@ -19,7 +19,13 @@ export default function IssueEditPage() {
 
   const handle = async (e: React.FormEvent) => { e.preventDefault(); if(!id)return; await updateIssue(id,{title,description:desc,status,priority,start_date:startDate || null,due_date:dueDate || null}); navigate(`/issues/${id}`, { state: { from: returnTo } }); };
 
-  if (loading) return <Loader />;
+  if (loading) return (
+    <div className="panel mx-auto max-w-3xl space-y-3 p-5 page-enter">
+      <Skeleton className="h-5 w-1/2" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-40 w-full" />
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 page-enter">

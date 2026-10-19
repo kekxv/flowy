@@ -138,6 +138,8 @@ class IssueFilter:
         label_id: str | None = None,
         q: str | None = None,
         issue_type: str | None = None,
+        unassigned: bool = False,
+        overdue: bool = False,
     ):
         self.statuses = status.split(",") if status else None
         self.priorities = priority.split(",") if priority else None
@@ -146,6 +148,8 @@ class IssueFilter:
         self.label_id = label_id
         self.q = q
         self.issue_type = issue_type
+        self.unassigned = unassigned
+        self.overdue = overdue
 
 
 class CommentBodyCreate(BaseModel):

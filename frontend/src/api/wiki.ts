@@ -33,8 +33,22 @@ export interface WikiUploadResult {
   markdown: string;
 }
 
-export async function listWikiPages(params: { q?: string; tab?: string; page?: number; per_page?: number } = {}): Promise<PaginatedResponse<WikiPageData>> {
+export type WikiSort = "updated" | "weight" | "title";
+
+export interface WikiTagCount {
+  tag: string;
+  count: number;
+}
+
+export async function listWikiPages(
+  params: { q?: string; tab?: string; tag?: string; sort?: WikiSort; page?: number; per_page?: number } = {}
+): Promise<PaginatedResponse<WikiPageData>> {
   const res = await api.get("/wiki", { params });
+  return res.data;
+}
+
+export async function listWikiTags(params: { tab?: string; limit?: number } = {}): Promise<WikiTagCount[]> {
+  const res = await api.get("/wiki/tags", { params });
   return res.data;
 }
 

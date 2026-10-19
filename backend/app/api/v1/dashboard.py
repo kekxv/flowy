@@ -54,6 +54,8 @@ async def get_dashboard(
                 "priority": i.priority,
                 "issue_type": i.issue_type,
                 "created_at": i.created_at,
+                "updated_at": i.updated_at,
+                "due_date": i.due_date,
                 "roles": roles,
             }
         )
@@ -79,6 +81,7 @@ async def get_dashboard(
                 "priority": i.priority,
                 "issue_type": i.issue_type,
                 "created_at": i.created_at,
+                "due_date": i.due_date,
             }
         )
 

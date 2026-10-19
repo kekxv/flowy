@@ -40,35 +40,28 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/public/issue-links/:token" element={<PublicIssueLinkPage />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <Routes>
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/issues" element={<IssueListPage />} />
-                      <Route path="/temporary-issue-links" element={<TemporaryIssueLinksPage />} />
-                      <Route path="/issues/new" element={<IssueCreatePage />} />
-                      <Route path="/issues/:id" element={<IssueDetailPage />} />
-                      <Route path="/issues/:id/edit" element={<IssueEditPage />} />
-                      <Route path="/labels" element={<LabelsPage />} />
-                      <Route path="/milestones" element={<MilestonesPage />} />
-                      <Route path="/milestones/:id" element={<MilestoneDetailPage />} />
-                      <Route path="/wiki" element={<WikiListPage />} />
-                      <Route path="/wiki/new" element={<WikiCreatePage />} />
-                      <Route path="/wiki/:id" element={<WikiDetailPage />} />
-                      <Route path="/software" element={<SoftwareVersionPage />} />
-                      <Route path="/profile" element={<UserProfilePage />} />
-                      <Route path="/settings/notifications" element={<NotificationsPage />} />
-                      <Route path="/settings/wechat-work-bot" element={<WeChatWorkBotPage />} />
-                      <Route path="/admin" element={<AdminPage />} />
-                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
+            {/* Shell layout: the sidebar/topbar stay mounted while a route chunk loads. */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/issues" element={<IssueListPage />} />
+              <Route path="/temporary-issue-links" element={<TemporaryIssueLinksPage />} />
+              <Route path="/issues/new" element={<IssueCreatePage />} />
+              <Route path="/issues/:id" element={<IssueDetailPage />} />
+              <Route path="/issues/:id/edit" element={<IssueEditPage />} />
+              <Route path="/labels" element={<LabelsPage />} />
+              <Route path="/milestones" element={<MilestonesPage />} />
+              <Route path="/milestones/:id" element={<MilestoneDetailPage />} />
+              <Route path="/wiki" element={<WikiListPage />} />
+              <Route path="/wiki/new" element={<WikiCreatePage />} />
+              <Route path="/wiki/:id" element={<WikiDetailPage />} />
+              <Route path="/software" element={<SoftwareVersionPage />} />
+              <Route path="/profile" element={<UserProfilePage />} />
+              <Route path="/settings/notifications" element={<NotificationsPage />} />
+              <Route path="/settings/wechat-work-bot" element={<WeChatWorkBotPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
           </Routes>
         </Suspense>
       </HashRouter>

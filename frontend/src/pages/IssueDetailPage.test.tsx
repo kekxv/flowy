@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
@@ -111,6 +111,7 @@ describe("IssueDetailPage", () => {
       </MemoryRouter>,
     )
 
+    // 描述与评论同页展示，无需切换 tab
     const comment = await screen.findByPlaceholderText("issues.write_comment")
     fireEvent.change(comment, { target: { value: "# 评论标题" } })
     fireEvent.click(screen.getByRole("button", { name: "Markdown 预览" }))
@@ -166,14 +167,17 @@ describe("IssueDetailPage", () => {
       </MemoryRouter>,
     )
 
-    const attachmentLinks = await screen.findAllByRole("link", { name: "项目 报告.txt" })
+    fireEvent.click(await screen.findByRole("tab", { name: /附件/ }))
+    const filesTab = within(await screen.findByTestId("issue-files-tab"))
+    // Rendered by the comment body and by the attachment chip.
+    const attachmentLinks = filesTab.getAllByRole("link", { name: "项目 报告.txt" })
     expect(attachmentLinks).toHaveLength(2)
     expect(attachmentLinks[1]).toHaveAttribute(
       "href",
       "api/v1/bot-attachments/AbC123xyz",
     )
 
-    fireEvent.click(screen.getByTitle("Delete"))
+    fireEvent.click(filesTab.getByTitle("Delete"))
     await waitFor(() => {
       expect(apiMocks.delete).toHaveBeenCalledWith("/bot-attachments/AbC123xyz")
     })

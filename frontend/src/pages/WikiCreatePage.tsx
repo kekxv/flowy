@@ -1,11 +1,114 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Globe, Lock, Image, Paperclip, Eye, Edit3 } from "lucide-react";
+import { ArrowLeft, Save, Globe, Lock, Image, Paperclip, Eye, Edit3, FileText, Sparkles, X } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
+import Segmented from "../components/ui/Segmented";
 import { createWikiPage, uploadWikiFile, getWikiUploadLimit } from "../api/wiki";
 
 const DEFAULT_LIMIT_MB = 5;
+
+interface WikiTemplate {
+  key: string;
+  label: string;
+  hint: string;
+  summary: string;
+  content: string;
+}
+
+const TEMPLATES: WikiTemplate[] = [
+  {
+    key: "blank",
+    label: "空白页面",
+    hint: "从零开始写",
+    summary: "",
+    content: "",
+  },
+  {
+    key: "design",
+    label: "技术方案",
+    hint: "背景 · 方案 · 风险",
+    summary: "一句话说明要解决什么问题，以及最终采用的做法。",
+    content: `## 背景
+
+为什么现在要做这件事。
+
+## 目标
+
+- [ ] 目标一
+- [ ] 目标二
+
+## 方案
+
+关键设计、数据流、接口约定。
+
+| 项 | 说明 |
+| --- | --- |
+| 改动范围 | |
+| 兼容性 | |
+
+## 风险与回滚
+
+1. 风险点与应对
+2. 回滚步骤
+
+## 参考
+
+- 相关 issue / 里程碑
+`,
+  },
+  {
+    key: "runbook",
+    label: "排障手册",
+    hint: "现象 · 定位 · 处置",
+    summary: "出现什么现象时使用本手册，以及最快的恢复方式。",
+    content: `## 现象
+
+用户或监控侧看到的异常。
+
+## 快速定位
+
+\`\`\`bash
+# 常用排查命令
+journalctl -u flowy -n 200 --no-pager
+\`\`\`
+
+## 处置步骤
+
+1. 确认影响范围
+2. 执行恢复操作
+3. 验证结果
+
+## 复盘
+
+- 根因：
+- 后续改进：
+`,
+  },
+  {
+    key: "meeting",
+    label: "会议纪要",
+    hint: "结论 · 待办",
+    summary: "会议结论与后续待办，方便没参会的人快速对齐。",
+    content: `## 时间与参与人
+
+- 时间：
+- 参与人：
+
+## 议题
+
+1.
+
+## 结论
+
+-
+
+## 待办
+
+- [ ] 事项 — 负责人 — 截止时间
+`,
+  },
+];
 
 export default function WikiCreatePage() {
   const { t } = useTranslation();
@@ -22,6 +125,7 @@ export default function WikiCreatePage() {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(false);
   const [uploadLimitMb, setUploadLimitMb] = useState(DEFAULT_LIMIT_MB);
+  const [template, setTemplate] = useState("blank");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -29,6 +133,19 @@ export default function WikiCreatePage() {
   useEffect(() => {
     getWikiUploadLimit().then(d => setUploadLimitMb(d.limit_mb)).catch(() => {});
   }, []);
+
+  const applyTemplate = (next: WikiTemplate) => {
+    if (next.key === "blank") {
+      setTemplate("blank");
+      return;
+    }
+    const hasContent = content.trim().length > 0;
+    if (hasContent && !confirm(t("wiki.template_confirm", "用模板覆盖当前内容？"))) return;
+    setTemplate(next.key);
+    setContent(next.content);
+    setSummary(next.summary);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -82,29 +199,52 @@ export default function WikiCreatePage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 page-enter">
+    <div className="page-enter mx-auto max-w-4xl space-y-3">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate(returnTo)}
-          className="btn btn-ghost btn-sm"
-        >
-          <ArrowLeft size={16} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => navigate(returnTo)} className="btn btn-ghost btn-sm">
+          <ArrowLeft size={14} />
           {t("common.back", "Back")}
         </button>
-        <h1 className="text-xl font-bold tracking-tight flex-1 text-[var(--text)]">
+        <h1 className="flex-1 truncate text-[15px] font-semibold tracking-tight text-[var(--text)]">
           {t("wiki.new_page", "New Wiki Page")}
         </h1>
-        <button onClick={handleSave} disabled={saving || !title.trim()} className="btn btn-primary">
-          <Save size={14} />
+        <button onClick={handleSave} disabled={saving || !title.trim()} className="btn btn-primary btn-sm">
+          <Save size={13} />
           {saving ? t("common.saving", "Saving...") : t("common.save", "Save")}
         </button>
       </div>
 
       {/* Form */}
-      <div className="card rounded-xl p-5 space-y-4">
+      <div className="panel space-y-4 p-4 sm:p-5">
+        {/* Starter templates */}
+        <div className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg-muted)]/60 p-2.5">
+          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+            <Sparkles size={12} className="text-[var(--primary)]" />
+            {t("wiki.start_from_template", "从模板开始")}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {TEMPLATES.map(item => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => applyTemplate(item)}
+                className={`flex items-center gap-1.5 rounded-[7px] border px-2.5 py-1.5 text-left transition-colors ${template === item.key
+                  ? "border-[var(--primary)] bg-white shadow-[0_0_0_3px_rgba(37,99,235,.08)]"
+                  : "border-[var(--border)] bg-white/70 hover:border-[var(--border-strong)] hover:bg-white"}`}
+              >
+                <FileText size={12} className={template === item.key ? "text-[var(--primary)]" : "text-[var(--text-faint)]"} />
+                <span className="min-w-0">
+                  <span className="block text-[11.5px] font-medium text-[var(--text)]">{item.label}</span>
+                  <span className="block text-[10px] text-[var(--text-faint)]">{item.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+          <label className="field-label">
             {t("wiki.page_title", "Title")}
           </label>
           <input
@@ -117,7 +257,7 @@ export default function WikiCreatePage() {
         </div>
 
         <div>
-          <label htmlFor="wiki-summary" className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+          <label htmlFor="wiki-summary" className="field-label">
             {t("wiki.summary", "Summary")} ({t("wiki.markdown", "Markdown")})
           </label>
           <textarea
@@ -133,12 +273,12 @@ export default function WikiCreatePage() {
 
         {/* Content with toolbar */}
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+          <label className="field-label">
             {t("wiki.content", "Content")} (Markdown)
           </label>
-          <div className="rounded-lg border border-[var(--border)] overflow-hidden">
+          <div className="overflow-hidden rounded-[8px] border border-[var(--border)]">
             {/* Toolbar */}
-            <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--bg)] px-2 py-1.5">
+            <div className="flex items-center gap-1 border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-2 py-1.5">
               <input
                 ref={imageInputRef}
                 type="file"
@@ -178,33 +318,16 @@ export default function WikiCreatePage() {
               <span className="text-[10px] text-[var(--text-muted)]">
                 {t("wiki.max_size", `Max {{mb}}MB`, { mb: uploadLimitMb })}
               </span>
-              <div className="ml-2 flex rounded-md border border-[var(--border)] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setPreview(false)}
-                  className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-colors ${
-                    !preview
-                      ? "bg-[var(--primary)] text-white"
-                      : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-                  }`}
-                  title={t("wiki.edit_mode", "Edit")}
-                >
-                  <Edit3 size={12} />
-                  {t("wiki.edit_mode", "Edit")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreview(true)}
-                  className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-colors ${
-                    preview
-                      ? "bg-[var(--primary)] text-white"
-                      : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-                  }`}
-                  title={t("wiki.preview_mode", "Preview")}
-                >
-                  <Eye size={12} />
-                  {t("wiki.preview_mode", "Preview")}
-                </button>
+              <div className="ml-2">
+                <Segmented
+                  ariaLabel={t("wiki.preview_mode", "Preview")}
+                  value={preview ? "preview" : "edit"}
+                  onChange={v => setPreview(v === "preview")}
+                  items={[
+                    { key: "edit", label: <><Edit3 size={12} />{t("wiki.edit_mode", "Edit")}</> },
+                    { key: "preview", label: <><Eye size={12} />{t("wiki.preview_mode", "Preview")}</> },
+                  ]}
+                />
               </div>
             </div>
             {preview ? (
@@ -228,9 +351,9 @@ export default function WikiCreatePage() {
           </div>
         </div>
 
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[180px]">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+        <div className="flex flex-wrap gap-4">
+          <div className="min-w-[180px] flex-1">
+            <label className="field-label">
               {t("wiki.tags", "Tags")} ({t("wiki.tags_hint", "comma separated")})
             </label>
             <input
@@ -241,7 +364,7 @@ export default function WikiCreatePage() {
             />
           </div>
           <div className="w-28">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 block">
+            <label className="field-label">
               {t("wiki.weight", "Weight")}
             </label>
             <input
@@ -276,6 +399,21 @@ export default function WikiCreatePage() {
                 )}
               </span>
             </label>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-light)] pt-3">
+          <p className="text-[11px] text-[var(--text-faint)]">
+            {t("wiki.create_hint", "保存后可以继续补充协作人和相关内容。")}
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button type="button" onClick={() => navigate(returnTo)} className="btn btn-ghost btn-sm">
+              <X size={13} />{t("common.cancel", "Cancel")}
+            </button>
+            <button type="button" onClick={handleSave} disabled={saving || !title.trim()} className="btn btn-primary btn-sm">
+              <Save size={13} />
+              {saving ? t("common.saving", "Saving...") : t("wiki.create_page", "创建页面")}
+            </button>
           </div>
         </div>
       </div>

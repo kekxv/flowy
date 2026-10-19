@@ -13,4 +13,13 @@ i18n
     interpolation: { escapeValue: false },
   });
 
+// Keep <html lang> in sync: dates/times are formatted from it (see utils/time.ts).
+const syncLang = (language?: string) => {
+  if (typeof document !== "undefined" && language) {
+    document.documentElement.lang = language.startsWith("zh") ? "zh" : "en";
+  }
+};
+syncLang(i18n.language);
+i18n.on("languageChanged", syncLang);
+
 export default i18n;
