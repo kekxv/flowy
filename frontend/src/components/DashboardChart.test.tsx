@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import DashboardChart from "./DashboardChart"
 
-vi.mock("echarts-for-react", () => ({
+vi.mock("echarts-for-react/esm/core", () => ({
   default: ({ option, style }: { option: unknown; style?: Record<string, string | number> }) => <div data-testid="dashboard-echart" data-option={JSON.stringify(option)} style={style} />,
 }))
 
