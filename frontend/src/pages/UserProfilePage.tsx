@@ -233,10 +233,10 @@ export default function UserProfilePage() {
               )}
             </div>
 
-            <form onSubmit={connectPAT} className="flex gap-2">
+            <form onSubmit={connectPAT} className="flex gap-2 control-row">
               <div className="relative flex-1">
-                <Key size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
-                <input type="password" required value={token} onChange={e=>setToken(e.target.value)} placeholder="PAT" className="input pl-8 text-xs"/>
+                <Key size={13} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
+                <input type="password" required value={token} onChange={e=>setToken(e.target.value)} placeholder="PAT" className="input input-with-icon text-xs"/>
               </div>
               <button type="submit" disabled={sub} className="btn btn-primary btn-sm">{t("settings.connect")}</button>
               <button type="button" onClick={()=>{setShowPatForm(false);setError("");}} className="btn btn-ghost btn-sm">{t("common.cancel")}</button>

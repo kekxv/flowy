@@ -8,6 +8,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.issue import Issue, issue_assignees, issue_milestones_table
 from app.models.software import SoftwareComponent, SoftwareVersion
+from app.models.test import TestRequest
 from app.models.tracking import Milestone, TimeEntry
 from app.models.user import User
 from app.models.wiki import WikiPage, wiki_collaborators_table
@@ -163,6 +164,9 @@ async def get_dashboard(
     total_milestones = (await db.execute(select(func.count(Milestone.id)))).scalar() or 0
     software_components = (await db.execute(select(func.count(SoftwareComponent.id)))).scalar() or 0
     software_versions = (await db.execute(select(func.count(SoftwareVersion.id)))).scalar() or 0
+    test_status_rows = (await db.execute(select(TestRequest.status, func.count(TestRequest.id)).group_by(TestRequest.status))).all()
+    test_by_status = {s: c for s, c in test_status_rows}
+    test_total = sum(test_by_status.values())
     wiki_visibility = True if user.role == "admin" else or_(
         WikiPage.owner_id == user.id,
         WikiPage.is_public.is_(True),
@@ -257,6 +261,11 @@ async def get_dashboard(
             "by_priority": by_priority,
             "recent_activity": recent_activity,
             "completion_activity": completion_activity,
+            "tests_total": test_total,
+            "tests_active": sum(test_by_status.get(s, 0) for s in ("submitted", "queued", "testing")),
+            "tests_passed": test_by_status.get("passed", 0),
+            "tests_failed": test_by_status.get("failed", 0),
+            "tests_by_status": test_by_status,
         },
         "milestones": milestones_data,
     }

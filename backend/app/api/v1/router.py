@@ -15,6 +15,7 @@ from app.api.v1 import (
     software,
     sync,
     temporary_issue_links,
+    tests,
     users,
     wechat_work_bot,
     wiki,
@@ -41,3 +42,6 @@ api_router.include_router(software.router)
 
 api_router.include_router(temporary_issue_links.router)
 api_router.include_router(temporary_issue_links.public_router)
+api_router.include_router(tests.router)
+api_router.include_router(tests.collection_router)
+api_router.include_router(tests.public_router)

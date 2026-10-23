@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ListTodo, Flag, Tags, Shield, Bell, Globe, LogOut,
   Menu, X, Bot, BookOpen, Boxes, Link as LinkIcon, Search, Plus, PanelLeftClose,
-  PanelLeftOpen, Bug, Lightbulb, User as UserIcon,
+  PanelLeftOpen, Bug, Lightbulb, User as UserIcon, ClipboardCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import ThemePanel from "../theme/ThemePanel";
@@ -19,6 +19,7 @@ function useNavGroups() {
   const work: NavItem[] = [
     { to: "/dashboard", label: t("dashboard.title"), icon: LayoutDashboard },
     { to: "/issues", label: t("issues.list_title", "问题与需求"), icon: ListTodo },
+    { to: "/tests", label: t("tests.title", "测试管理"), icon: ClipboardCheck },
     { to: "/milestones", label: t("milestone.title"), icon: Flag },
   ];
   const knowledge: NavItem[] = [
@@ -142,6 +143,10 @@ function CreateMenu() {
             <Link to="/issues/new?type=feature" onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
               <Lightbulb size={14} className="text-violet-500" />{t("nav.new_feature", "新建需求")}
+            </Link>
+            <Link to="/tests/new" onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+              <ClipboardCheck size={14} className="text-emerald-600" />{t("tests.new_request", "新建测试申请")}
             </Link>
           </div>
         </>

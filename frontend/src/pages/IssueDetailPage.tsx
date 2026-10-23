@@ -582,7 +582,7 @@ export default function IssueDetailPage() {
               <div className="relative">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
                 <input value={linkQuery} onChange={e=>setLinkQuery(e.target.value)} placeholder={t("common.search")+"..."}
-                  className="input w-full text-xs" style={{paddingLeft:"34px"}} onKeyDown={e=>{if(e.key==="Enter")searchIssues();}}/>
+                  className="input input-with-icon w-full text-xs" onKeyDown={e=>{if(e.key==="Enter")searchIssues();}}/>
               </div>
               {linkSearching ? (
                 <div className="flex justify-center py-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent"/></div>

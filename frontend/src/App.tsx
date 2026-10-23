@@ -25,6 +25,10 @@ const WikiDetailPage = lazy(() => import("./pages/WikiDetailPage"))
 const SoftwareVersionPage = lazy(() => import("./pages/SoftwareVersionPage"))
 const TemporaryIssueLinksPage = lazy(() => import("./pages/TemporaryIssueLinksPage"))
 const PublicIssueLinkPage = lazy(() => import("./pages/PublicIssueLinkPage"))
+const TestListPage = lazy(() => import("./pages/TestListPage"))
+const TestCreatePage = lazy(() => import("./pages/TestCreatePage"))
+const TestDetailPage = lazy(() => import("./pages/TestDetailPage"))
+const PublicTestCollectionPage = lazy(() => import("./pages/PublicTestCollectionPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -40,6 +44,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/public/issue-links/:token" element={<PublicIssueLinkPage />} />
+            <Route path="/public/test-collections/:token" element={<PublicTestCollectionPage />} />
             {/* Shell layout: the sidebar/topbar stay mounted while a route chunk loads. */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -48,6 +53,9 @@ function App() {
               <Route path="/issues/new" element={<IssueCreatePage />} />
               <Route path="/issues/:id" element={<IssueDetailPage />} />
               <Route path="/issues/:id/edit" element={<IssueEditPage />} />
+              <Route path="/tests" element={<TestListPage />} />
+              <Route path="/tests/new" element={<TestCreatePage />} />
+              <Route path="/tests/:id" element={<TestDetailPage />} />
               <Route path="/labels" element={<LabelsPage />} />
               <Route path="/milestones" element={<MilestonesPage />} />
               <Route path="/milestones/:id" element={<MilestoneDetailPage />} />

@@ -12,7 +12,6 @@ import EmptyState from "../components/ui/EmptyState";
 import { ListSkeleton, Skeleton } from "../components/ui/Skeleton";
 import MarkdownContent from "../components/MarkdownContent";
 import MarkdownEditor from "../components/MarkdownEditor";
-import remarkBreaks from "remark-breaks";
 import { timeAgo } from "../utils/time";
 import {
   listComponents, getStats, createComponent, deleteComponent, updateComponent,
@@ -161,7 +160,7 @@ function NoteSummary({ note, label }: { note: string; label?: string }) {
     <div>
       {label && <div className="mt-1.5 text-[11px] font-medium text-[var(--text-secondary)]">{label}</div>}
       <div className={`prose prose-sm max-w-none text-[12px] text-[var(--text-muted)] ${expanded ? "" : "line-clamp-2"}`}>
-        <MarkdownContent remarkPlugins={[remarkBreaks]}>{note}</MarkdownContent>
+        <MarkdownContent>{note}</MarkdownContent>
       </div>
       {isLong && (
         <button
@@ -405,7 +404,7 @@ function ComponentEditModal({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.category")}</label>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t("software.category_label")}</label>
             <select value={category} onChange={(e) => setCategory(e.target.value as Category)} className="select">
               {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{t(`software.category.${c}`)}</option>)}
             </select>
@@ -498,7 +497,7 @@ function HistoryModal({ component, onClose, onChanged, onEdit }: {
                   </div>
                   {v.note && (
                     <div className="prose prose-sm max-w-none mt-1.5 text-[12px] text-[var(--text-muted)]">
-                      <MarkdownContent remarkPlugins={[remarkBreaks]}>{v.note}</MarkdownContent>
+                      <MarkdownContent>{v.note}</MarkdownContent>
                     </div>
                   )}
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--text-faint)]">

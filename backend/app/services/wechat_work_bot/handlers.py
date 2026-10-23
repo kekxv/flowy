@@ -204,6 +204,7 @@ class CommandHandlers:
 | --- | --- |
 | `/list` `/列表` [status] | 问题列表 |
 | `/stats` `/统计` | 问题统计 |
+| `/test` `/测试` <编号> | 查询测试申请状态和报告 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
 | `/file` `/文件` [关键词] | 搜索内网文件 |
 | `/soft` `/软件` [组件标识] [/all] | 软件版本说明与下载；`/all`（或 `--all`）查看全部历史版本 |
@@ -782,6 +783,7 @@ class CommandHandlers:
         2. Try matching by Flowy username/display_name
         3. Treat as external WeChat Work user
         """
+
         resolved = await self._resolve_issue(issue_id)
         if isinstance(resolved, str):
             return f" 找不到问题: {issue_id}" if resolved == "not_found" else resolved
@@ -861,6 +863,31 @@ class CommandHandlers:
             issue.updated_at = datetime.now().isoformat()
             await self.db.commit()
             return f" 已将 #{issue.id[:8]} 指派给外部人员 {assignee_name}"
+
+    async def handle_test(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        from app.models.test import TestRequest, TestRun
+        from app.utils.settings import get_frontend_url
+        if not args:
+            rows = (await self.db.execute(select(TestRequest).order_by(TestRequest.updated_at.desc()).limit(10))).scalars().all()
+            if not rows:
+                return "没有测试申请"
+            return "\n".join(f"| {r.id[:8]} | {r.title[:24]} | {r.status} | {r.tester.display_name if r.tester else '待分配'} |" for r in rows)
+        query = args[0].removeprefix("#")
+        if query.lower() == "report" and len(args) > 1:
+            query = args[1]
+        request = (await self.db.execute(select(TestRequest).where(TestRequest.id.startswith(query)))).scalars().first()
+        if not request:
+            request = (await self.db.execute(select(TestRequest).where(TestRequest.title.like(f"%{query}%")).order_by(TestRequest.updated_at.desc()).limit(1))).scalars().first()
+        if not request:
+            return "没有找到测试申请"
+        runs = (await self.db.execute(select(TestRun).where(TestRun.request_id == request.id).order_by(TestRun.created_at.desc()).limit(1))).scalars().all()
+        status_names = {"submitted": "测试申请（待审核）", "queued": "等待测试", "testing": "测试中", "passed": "测试成功", "failed": "测试失败", "cancelled": "取消测试", "rejected": "不予以测试"}
+        base = f"### 测试申请 #{request.id[:8]}\n- 标题：{request.title}\n- 状态：{status_names.get(request.status, request.status)}\n- 测试人员：{request.tester.display_name if request.tester else '待分配'}"
+        if runs:
+            run = runs[0]
+            base += f"\n- 版本：{run.version}\n- 结果：{run.result[:300]}"
+        url = (await get_frontend_url(self.db)).rstrip("/") + f"/#/tests/{request.id}"
+        return base + f"\n\n[查看测试报告]({url})"
     # ─── Comments ─────────────────────────────────────────────
 
     async def handle_comment(self, args: list[str], quote: dict, frame: dict = None) -> str:

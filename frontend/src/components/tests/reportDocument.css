@@ -1,0 +1,83 @@
+/* Shared by the paginated preview and the browser print fallback. */
+.test-print-root {
+  display:block!important;
+  width:100%;
+  color:#243247;
+  font:9.5pt/1.8 Inter,'Segoe UI','Microsoft YaHei',Arial,sans-serif;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+.test-print-root * { box-sizing:border-box; }
+.test-print-document { break-before:page; }
+.test-print-document:first-child { break-before:auto; }
+.test-print-header {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:0 0 14px; border-bottom:1px solid #dce5e9;
+  font-size:7pt; letter-spacing:.13em; color:#748294;
+}
+.test-print-header strong { color:#0f766e; font-size:8pt; font-weight:650; letter-spacing:.16em; }
+.test-print-title { margin:26px 0 22px; }
+.test-print-title > p { margin:0 0 10px; color:#0f766e; font-size:7.5pt; font-weight:600; letter-spacing:.1em; }
+.test-print-title h1 { margin:0 0 14px; color:#122438; font-size:25pt; font-weight:700; letter-spacing:-.035em; line-height:1.4; overflow-wrap:anywhere; }
+.test-print-verdict { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #dce5e9; border-radius:5px; color:#475569; font-size:8pt; font-weight:600; letter-spacing:.03em; }
+.test-print-verdict::before { content:''; width:5px; height:5px; border-radius:50%; background:currentColor; }
+.test-print-verdict.passed { color:#0f766e; background:#edf7f3; border-color:#d8ebe3; }
+.test-print-verdict.failed { color:#b54343; background:#fdf2f1; border-color:#f0dcda; }
+.test-print-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:15px 20px; margin:0 0 26px; padding:18px 20px; border:1px solid #e5ebef; border-radius:8px; background:#f8fafb; }
+.test-print-meta > div { min-width:0; }
+.test-print-meta .wide { grid-column:span 2; }
+.test-print-meta dt { margin-bottom:3px; color:#758293; font-size:7pt; line-height:1.5; }
+.test-print-meta dd { margin:0; color:#26384c; font-size:8.5pt; font-weight:500; line-height:1.65; overflow-wrap:anywhere; }
+.test-print-meta .test-print-meta-id dd { color:#748294; font:7.5pt/1.6 Consolas,monospace; }
+.test-print-section { margin:18px 0; }
+.test-print-section > h2 { display:flex; align-items:center; gap:9px; margin:0 0 10px; padding:0 0 7px; border-bottom:1px solid #e8edf0; color:#172d41; font-size:11.5pt; font-weight:650; line-height:1.5; break-after:avoid; }
+.test-print-section > h2 span { display:inline-flex; align-items:center; justify-content:center; min-width:23px; height:23px; padding:0 4px; border-radius:5px; background:#eef5f4; color:#337d76; font:600 7.5pt/1 Arial,sans-serif; }
+.test-print-root .prose { max-width:none; color:#344256; font-size:9.5pt; line-height:1.85; overflow-wrap:anywhere; }
+.test-print-root .prose > :first-child { margin-top:0; }
+.test-print-root .prose > :last-child { margin-bottom:0; }
+.test-print-root .prose h1,.test-print-root .prose h2,.test-print-root .prose h3,.test-print-root .prose h4 { margin:1.3em 0 .55em; color:#203549; font-weight:650; line-height:1.5; break-after:avoid; }
+.test-print-root .prose h1 { font-size:1.35em; }
+.test-print-root .prose h2 { font-size:1.18em; }
+.test-print-root .prose h3,.test-print-root .prose h4 { font-size:1.05em; }
+.test-print-root p { margin:.6em 0; orphans:3; widows:3; }
+.test-print-root ul,.test-print-root ol { padding-left:1.6em; margin:.6em 0; }
+.test-print-root ul { list-style:disc; }
+.test-print-root ol { list-style:decimal; }
+.test-print-root li { padding-left:3px; margin:.25em 0; orphans:3; widows:3; }
+.test-print-root li::marker { color:#708999; }
+.test-print-root blockquote { margin:14px 0; padding:8px 14px; border-left:2px solid #5f9b93; background:#f5f9f8; color:#536775; }
+.test-print-root blockquote p { margin:0; }
+.test-print-root img,.test-print-root video { display:block; max-width:100%; max-height:165mm; height:auto; margin:14px auto; border-radius:5px; object-fit:contain; break-inside:avoid; }
+.test-print-root pre { margin:14px 0; white-space:pre-wrap; overflow-wrap:anywhere; border:1px solid #e5ebef; border-radius:6px; background:#f8fafb; color:#344256; padding:12px 14px; font-size:8pt; line-height:1.65; }
+.test-print-root code { font-family:Consolas,'SFMono-Regular',monospace; font-size:.9em; }
+.test-print-root :not(pre) > code { padding:1px 4px; border-radius:3px; background:#f1f5f7; color:#3b6068; }
+.test-print-root table { width:100%; margin:14px 0; border-collapse:collapse; table-layout:fixed; font-size:8.5pt; line-height:1.65; }
+.test-print-root th,.test-print-root td { padding:8px 10px; border:0; border-bottom:1px solid #e5ebef; overflow-wrap:anywhere; text-align:left; vertical-align:top; }
+.test-print-root th { background:#f2f6f7; color:#395265; font-weight:600; }
+.test-print-root thead { display:table-header-group; }
+.test-print-root tr { break-inside:avoid; }
+.test-print-root a { color:#286e73; text-decoration:underline; text-decoration-color:#bccfd0; text-underline-offset:3px; overflow-wrap:anywhere; }
+.test-print-root hr { margin:20px 0; border:0; border-top:1px solid #e5ebef; }
+.test-print-footer { display:flex; justify-content:space-between; gap:12px; margin-top:30px; padding-top:12px; border-top:1px solid #dce5e9; font-size:6.5pt; color:#84909e; line-height:1.6; }
+.test-print-root .markdown-visual { margin:20px 0; border:0; border-radius:0; padding:0; background:white; }
+.test-print-root .markdown-visual > figcaption { margin:0 0 12px; padding-left:9px; border-left:2px solid #5f9b93; color:#344e61; font-size:9pt; font-weight:600; line-height:1.5; break-after:avoid; }
+.test-print-root .markdown-visual-svg { width:100%; overflow:visible; break-inside:avoid; }
+.test-print-root .markdown-visual-svg > svg { display:block; width:100%; max-width:100%; height:auto; max-height:150mm; }
+.test-print-root .markdown-visual-data { margin-top:12px; max-height:none; overflow:visible; }
+.test-print-root .markdown-visual-data table { font-size:7.5pt; }
+.test-print-root .markdown-visual-data th,.test-print-root .markdown-visual-data td { border:0; border-bottom:1px solid #e5ebef; padding:6px 9px!important; }
+.test-print-root .markdown-visual-data thead th { background:#f2f6f7; font-weight:600; }
+.test-print-root .markdown-visual-error > p { color:#92400e; }
+.report-a5.test-print-root { font-size:9pt; }
+.report-a5 .test-print-header { font-size:6pt; gap:8px; }
+.report-a5 .test-print-title { margin:20px 0 18px; }
+.report-a5 .test-print-title h1 { font-size:20pt; }
+.report-a5 .test-print-meta { grid-template-columns:1fr 1fr; padding:14px; gap:12px 16px; margin-bottom:22px; }
+.report-a5 .test-print-meta .wide { grid-column:1/-1; }
+.report-a5 .test-print-meta dd { font-size:8pt; }
+.report-a5 .test-print-section { margin:19px 0; }
+.report-a5 .test-print-section > h2 { font-size:10.5pt; }
+.report-a5 .prose { font-size:9pt; }
+.report-a5 img,.report-a5 video { max-height:115mm; }
+.report-a5 .markdown-visual-svg > svg { max-height:105mm; }
+.report-a5 .test-print-footer { font-size:6pt; }

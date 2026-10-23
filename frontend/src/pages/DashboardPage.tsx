@@ -30,6 +30,7 @@ interface DashboardData {
     by_status: Record<string, number>; by_priority: Record<string, number>;
     recent_activity: Array<{ date: string; count: number }>;
     completion_activity?: Array<{ date: string; count: number }>;
+    tests_total?: number; tests_active?: number; tests_passed?: number; tests_failed?: number;
   };
   milestones: Array<{ id: string; name: string; status: string; due_date: string | null; total: number; closed: number; progress: number }>;
 }
@@ -224,6 +225,14 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      <Link to="/tests" className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 hover:border-[var(--border-strong)]">
+        <span className="font-semibold">{t("tests.title", "测试管理")}</span>
+        <span className="text-sm text-[var(--text-muted)]">{t("tests.active", "处理中")} <b className="text-[var(--text)]">{stats.tests_active || 0}</b></span>
+        <span className="text-sm text-[var(--text-muted)]">{t("tests.passed", "测试成功")} <b className="text-emerald-600">{stats.tests_passed || 0}</b></span>
+        <span className="text-sm text-[var(--text-muted)]">{t("tests.failed", "测试失败")} <b className="text-red-600">{stats.tests_failed || 0}</b></span>
+        <span className="ml-auto text-sm text-[var(--text-muted)]">{t("tests.total", "申请总数")} {stats.tests_total || 0} →</span>
+      </Link>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Left: my work + trend */}

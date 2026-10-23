@@ -1,6 +1,21 @@
+import { isValidElement } from 'react';
+import ReportVisual from './markdown/ReportVisual';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import type { Components } from "react-markdown";
+
+const defaultComponents: Components = {
+  pre: ({ children, className }) => {
+    if (isValidElement<{ className?: string; children?: unknown }>(children)) {
+      const language = children.props.className?.match(/language-(chart|mermaid)(?:\s|$)/)?.[1];
+      if (language === 'chart' || language === 'mermaid') {
+        return <ReportVisual kind={language} source={String(children.props.children || '').trim()}/>;
+      }
+    }
+    return <pre className={className}>{children}</pre>;
+  },
+};
 
 interface MarkdownContentProps {
   children: string;
@@ -30,7 +45,7 @@ function defaultUrlTransform(url: string): string {
 }
 
 /**
- * Unified Markdown renderer with GFM support (tables, strikethrough, task lists, autolinks).
+ * Unified Markdown renderer with GFM support and single-newline line breaks.
  * URLs are automatically rewritten to relative paths for subdirectory deployment.
  */
 export default function MarkdownContent({
@@ -43,9 +58,12 @@ export default function MarkdownContent({
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, ...remarkPlugins]}
+        remarkPlugins={[remarkGfm, remarkBreaks, ...remarkPlugins]}
         urlTransform={urlTransform}
-        components={components}
+        components={{
+          ...defaultComponents,
+          ...components,
+        }}
       >
         {children}
       </ReactMarkdown>

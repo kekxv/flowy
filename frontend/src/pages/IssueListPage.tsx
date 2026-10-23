@@ -1,3 +1,4 @@
+import CollectionLinkGenerator from "../components/collections/CollectionLinkGenerator"
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -322,6 +323,8 @@ export default function IssueListPage() {
           <Link to="/issues/new" className="btn btn-primary btn-sm">{t("issues.new_issue")}</Link>
         </div>
       </div>
+
+      <CollectionLinkGenerator kind="issue" />
 
       <div className="grid gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
         {/* Saved views rail */}

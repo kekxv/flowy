@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileUp, ImageUp } from "lucide-react";
+import { ChartColumn, FileUp, ImageUp } from "lucide-react";
 
 import api from "../api/client";
 import { getWikiUploadLimit } from "../api/wiki";
+import ChartInsertDialog from "./markdown/ChartInsertDialog";
 import MarkdownContent from "./MarkdownContent";
 
 interface MarkdownEditorProps {
@@ -13,6 +14,10 @@ interface MarkdownEditorProps {
   rows?: number;
   id?: string;
   className?: string;
+  uploadFile?: (file: File) => Promise<string>;
+  uploadLimitMb?: number;
+  reportVisuals?: boolean;
+  onUploadStateChange?: (uploading: boolean) => void;
 }
 
 export default function MarkdownEditor({
@@ -22,19 +27,27 @@ export default function MarkdownEditor({
   rows = 6,
   id,
   className = "",
+  uploadFile,
+  uploadLimitMb: limitOverride,
+  onUploadStateChange,
+  reportVisuals = false,
 }: MarkdownEditorProps) {
   const { t } = useTranslation();
+  const [chartOpen, setChartOpen] = useState(false);
+  const chartSelection = useRef({ start: value.length, end: value.length });
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [uploadLimitMb, setUploadLimitMb] = useState(5);
+  const [defaultUploadLimitMb, setUploadLimitMb] = useState(5);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const uploadLimitMb = limitOverride ?? defaultUploadLimitMb;
   useEffect(() => {
+    if (limitOverride !== undefined) return;
     getWikiUploadLimit().then(({ limit_mb }) => setUploadLimitMb(limit_mb)).catch(() => {});
-  }, []);
+  }, [limitOverride]);
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -44,13 +57,18 @@ export default function MarkdownEditor({
     }
 
     setUploading(true);
+    onUploadStateChange?.(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await api.post("/bot-attachments/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const markdown = response.data.markdown as string;
+      let markdown: string;
+      if (uploadFile) markdown = await uploadFile(file);
+      else {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await api.post("/bot-attachments/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        markdown = response.data.markdown as string;
+      }
       const start = textareaRef.current?.selectionStart ?? value.length;
       const end = textareaRef.current?.selectionEnd ?? start;
       onChange(`${value.slice(0, start)}${markdown}${value.slice(end)}`);
@@ -59,6 +77,7 @@ export default function MarkdownEditor({
       alert(t("markdown_editor.upload_failed", "上传失败") + (message ? `: ${message}` : ""));
     } finally {
       setUploading(false);
+      onUploadStateChange?.(false);
     }
   };
 
@@ -86,7 +105,7 @@ export default function MarkdownEditor({
       onDrop={handleDrop}
       className={`overflow-hidden rounded-lg border ${dragging ? "border-[var(--primary)] bg-[var(--primary-light)]" : "border-[var(--border)]"} ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--border-light)] bg-[var(--bg-muted)] p-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-light)] bg-[var(--bg-muted)] p-1.5">
         <div className="flex items-center gap-1">
           <input ref={imageInputRef} aria-label={t("markdown_editor.upload_image", "上传图片")} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
           <input ref={fileInputRef} aria-label={t("markdown_editor.upload_file", "上传文件")} type="file" className="hidden" onChange={handleUpload} />
@@ -98,6 +117,10 @@ export default function MarkdownEditor({
             className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:bg-white hover:text-[var(--text)] disabled:opacity-50">
             <FileUp size={13} /> {uploading ? t("markdown_editor.uploading", "上传中...") : t("markdown_editor.upload_file", "上传文件")}
           </button>
+          {reportVisuals && <button type="button" className="markdown-visual-insert" aria-haspopup="dialog" disabled={uploading} onClick={() => {
+            chartSelection.current = { start: textareaRef.current?.selectionStart ?? value.length, end: textareaRef.current?.selectionEnd ?? value.length };
+            setChartOpen(true);
+          }}><ChartColumn size={13}/>{t('chart_editor.insert')}</button>}
           <span className="hidden text-[10px] text-[var(--text-muted)] sm:inline">{t("markdown_editor.max_size", "最大 {{mb}}MB", { mb: uploadLimitMb })}</span>
         </div>
         <div className="flex gap-1">
@@ -119,6 +142,15 @@ export default function MarkdownEditor({
           </button>
         </div>
       </div>
+      {reportVisuals && chartOpen && <ChartInsertDialog onClose={() => setChartOpen(false)} onInsert={markdown => {
+        const { start, end } = chartSelection.current;
+        onChange(`${value.slice(0, start)}${markdown}${value.slice(end)}`);
+        setMode('edit'); setChartOpen(false);
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+          textareaRef.current?.setSelectionRange(start + markdown.length, start + markdown.length);
+        });
+      }}/>}
       {mode === "edit" ? (
         <textarea
           ref={textareaRef}
