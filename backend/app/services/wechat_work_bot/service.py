@@ -214,11 +214,9 @@ class WeChatWorkBotService:
                                     f'({public_url}/api/v1/wiki/files/',
                                     content,
                                 )
-                            response = f"**{page.title}**\n\n{content}"
-                            # Split into chunks if too long
+                            response = await handlers._temporary_detail(page.title, content, page.summary or None)
                             if self._client:
-                                for chunk in split_for_wecom(response):
-                                    await self._client.reply_markdown(frame, chunk)
+                                await self._client.reply_markdown(frame, response)
                             await self._log_command(
                                 db, wechat_user_id, bot_user.id if bot_user else None,
                                 "wiki", [str(idx + 1)], response, "success", None

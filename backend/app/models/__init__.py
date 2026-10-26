@@ -3,6 +3,7 @@ from app.models.issue import Comment, Issue, Label
 from app.models.notification import NotificationChannel, NotificationLog, NotificationRule
 from app.models.settings import AppSetting
 from app.models.software import SoftwareComponent, SoftwareDependency, SoftwareVersion
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.models.temporary_issue_link import TemporaryIssueLink
 from app.models.test import (
     TestAttachment,

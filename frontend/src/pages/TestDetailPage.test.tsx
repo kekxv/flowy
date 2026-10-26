@@ -159,7 +159,7 @@ it('previews all reports from the detail toolbar before invoking a printer', asy
   const preview = screen.getByRole('dialog', { name: '打印预览' })
   await waitFor(() => expect(buildReportPreview).toHaveBeenCalled())
   const source = vi.mocked(buildReportPreview).mock.calls[0]![1]
-  expect(source.querySelectorAll('article')).toHaveLength(2)
+  expect(source.querySelectorAll('article')).toHaveLength(3)
   expect(print).not.toHaveBeenCalled()
   fireEvent.change(within(preview).getByLabelText('缩放比例'), { target: { value: '1.5' } })
   expect(within(preview).getByTitle('报告打印预览')).toHaveStyle({ transform: 'scale(1.5)' })
@@ -175,12 +175,12 @@ it('allows explicit single-report preview but the toolbar still previews all rep
   fireEvent.click(await screen.findByRole('button', { name: '查看报告 1.0' }))
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '预览并打印本份报告' }))
   await waitFor(() => expect(buildReportPreview).toHaveBeenCalled())
-  expect(vi.mocked(buildReportPreview).mock.calls[0]![1].querySelectorAll('article')).toHaveLength(1)
+  expect(vi.mocked(buildReportPreview).mock.calls[0]![1].querySelectorAll('article')).toHaveLength(2)
   fireEvent.click(screen.getByRole('button', { name: '关闭打印预览' }))
   fireEvent.click(screen.getByRole('button', { name: '关闭报告详情' }))
   fireEvent.click(screen.getByRole('button', { name: '打印全部报告' }))
   await waitFor(() => expect(buildReportPreview).toHaveBeenCalledTimes(2))
-  expect(vi.mocked(buildReportPreview).mock.calls[1]![1].querySelectorAll('article')).toHaveLength(2)
+  expect(vi.mocked(buildReportPreview).mock.calls[1]![1].querySelectorAll('article')).toHaveLength(3)
 })
 
 it('repaginates A5 preview and keeps print disabled until the preview is ready', async () => {

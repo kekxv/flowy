@@ -7,10 +7,12 @@ from urllib.parse import urljoin, urlsplit
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 from app.api.v1.software import router
 from app.database import get_db
 from app.models.software import SoftwareComponent, SoftwareVersion
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.services.wechat_work_bot.handlers import CommandHandlers
 
 
@@ -30,7 +32,9 @@ async def test_soft_download_link_works_without_login_and_expires(db_session, tm
 
     monkeypatch.setattr("app.services.wechat_work_bot.file_token.time.time", lambda: 2_000_000_000)
     result = await CommandHandlers(db_session).handle_soft(["web"], {})
-    link = re.search(r"\[release.zip\]\(([^)]+)\)", result).group(1)
+    detail = (await db_session.execute(select(TemporaryBotDetail))).scalars().one()
+    assert "/#/public/bot-details/" in result
+    link = re.search(r"\[release.zip\]\(([^)]+)\)", detail.content).group(1)
     parsed = urlsplit(link)
     url = parsed.path + "?" + parsed.query
     app = FastAPI()

@@ -29,6 +29,7 @@ const TestListPage = lazy(() => import("./pages/TestListPage"))
 const TestCreatePage = lazy(() => import("./pages/TestCreatePage"))
 const TestDetailPage = lazy(() => import("./pages/TestDetailPage"))
 const PublicTestCollectionPage = lazy(() => import("./pages/PublicTestCollectionPage"))
+const PublicBotDetailPage = lazy(() => import("./pages/PublicBotDetailPage"))
 
 function App() {
   const { isLoading } = useAuth()
@@ -45,6 +46,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/public/issue-links/:token" element={<PublicIssueLinkPage />} />
             <Route path="/public/test-collections/:token" element={<PublicTestCollectionPage />} />
+            <Route path="/public/bot-details/:token" element={<PublicBotDetailPage />} />
             {/* Shell layout: the sidebar/topbar stay mounted while a route chunk loads. */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />

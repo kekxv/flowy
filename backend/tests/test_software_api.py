@@ -4,8 +4,10 @@ import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.models.user import User
 
 
@@ -240,11 +242,13 @@ async def test_soft_bot_command(db_session):
         assert res.status_code == 200
         data = res.json()
         assert data["error"] is None, data["error"]
-        assert "Web Console" in data["response"]
-        assert "v3.2.0" in data["response"]
-        assert "mirrors.example.com" in data["response"]
-        # Release note stays as raw Markdown (not stripped to plain text)
-        assert "**修复登录问题**" in data["response"]
+        assert "/#/public/bot-details/" in data["response"]
+        detail = (await db_session.execute(select(TemporaryBotDetail).order_by(TemporaryBotDetail.created_at.desc()))).scalars().first()
+        assert detail is not None
+        assert "Web Console" in detail.content
+        assert "v3.2.0" in detail.content
+        assert "mirrors.example.com" in detail.content
+        assert "**修复登录问题**" in detail.content
 
         # /soft <identifier> shows the component detail (exact identifier match)
         res = await client.post(
@@ -254,9 +258,12 @@ async def test_soft_bot_command(db_session):
         )
         data = res.json()
         assert data["error"] is None, data["error"]
-        assert "Web Console" in data["response"]
-        assert "3.2.0" in data["response"]
-        assert "mirrors.example.com" in data["response"]
+        assert "/#/public/bot-details/" in data["response"]
+        detail = (await db_session.execute(select(TemporaryBotDetail).order_by(TemporaryBotDetail.created_at.desc()))).scalars().first()
+        assert detail is not None
+        assert "Web Console" in detail.content
+        assert "3.2.0" in detail.content
+        assert "mirrors.example.com" in detail.content
 
         # Duplicate names are NOT fuzzy-matched to a single hit:
         # querying by name disambiguates by identifier instead.

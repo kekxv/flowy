@@ -1,5 +1,7 @@
 import pytest
+from sqlalchemy import select
 
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.services.wechat_work_bot.command_parser import COMMANDS
 from app.services.wechat_work_bot.handlers import CommandHandlers
 
@@ -17,5 +19,7 @@ async def test_test_handler_returns_status_and_report_link(db_session, test_user
     handler = CommandHandlers(db_session)
     result = await handler.handle_test([request.id[:8]], {})
     assert "测试申请（待审核）" in result
-    assert request.id in result
-    assert "#/tests/" in result
+    assert "/#/public/bot-details/" in result
+    detail = (await db_session.execute(select(TemporaryBotDetail))).scalars().one()
+    assert request.id not in detail.content
+    assert "查询这个测试" in detail.content

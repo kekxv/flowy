@@ -98,6 +98,25 @@ class CommandHandlers:
         # Set by handlers to pass pending selection data back to service
         self.pending_wiki_results: list[str] | None = None
 
+    async def _temporary_detail(self, title: str, content: str, summary: str | None = None) -> str:
+        """Store long read-only output and return a compact WeChat markdown reply."""
+        from app.services.temporary_bot_detail_service import TemporaryBotDetailService
+        from app.utils.settings import get_frontend_url
+
+        clean = re.sub(r"[`*_>#|\[\]()]+", " ", content)
+        clean = re.sub(r"\s+", " ", clean).strip()
+        short = (summary or clean or "暂无概括").strip()
+        if len(short) > 140:
+            short = short[:137].rstrip() + "..."
+        creator_id = self.bot_user.flowy_user_id if self.bot_user else None
+        _, token = await TemporaryBotDetailService().create(self.db, creator_id, title[:500], short, content)
+        try:
+            base = (await get_frontend_url(self.db)).rstrip("/")
+        except Exception:
+            base = ""
+        url = f"{base}/#/public/bot-details/{token}" if base else f"/public/bot-details/{token}"
+        return f"**{title}**\n\n{short}\n\n[点击查看详情]({url})"
+
     # ─── General ──────────────────────────────────────────────
 
     @staticmethod
@@ -203,6 +222,7 @@ class CommandHandlers:
 | 指令 | 说明 |
 | --- | --- |
 | `/list` `/列表` [status] | 问题列表 |
+| `/view` `/查看` <编号或标题> | 查看问题/需求详情 |
 | `/stats` `/统计` | 问题统计 |
 | `/test` `/测试` <编号> | 查询测试申请状态和报告 |
 | `/wiki` `/知识库` [关键词] | 搜索知识库 |
@@ -354,7 +374,95 @@ class CommandHandlers:
         if len(all_issues) == 50:
             lines.append(f"> _仅显示最近 50 条 · {scope}_")
 
-        return "\n".join(lines).rstrip()
+        response = "\n".join(lines).rstrip()
+        status_labels = {
+            "open": "待处理", "in_progress": "进行中", "proposed": "待审核", "accepted": "已接受",
+            "resolved": "已解决", "closed": "已关闭", "cancelled": "已取消", "rejected": "已拒绝",
+        }
+        priority_labels = {"critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "无关紧要"}
+        type_labels = {"bug": "问题", "feature": "需求"}
+        status_counts: dict[str, int] = {}
+        priority_counts: dict[str, int] = {}
+        type_counts: dict[str, int] = {}
+        dashboard_issues: list[dict[str, object]] = []
+        activity_counts: dict[str, int] = {}
+        for issue in all_issues:
+            status_counts[issue.status] = status_counts.get(issue.status, 0) + 1
+            priority_counts[issue.priority] = priority_counts.get(issue.priority, 0) + 1
+            issue_type = issue.issue_type or "bug"
+            type_counts[issue_type] = type_counts.get(issue_type, 0) + 1
+            created = dt.fromisoformat(issue.created_at[:19])
+            end = _resolve_end(issue)
+            day = created.strftime("%Y-%m-%d")
+            activity_counts[day] = activity_counts.get(day, 0) + 1
+            dashboard_issues.append({
+                "title": issue.title,
+                "status": issue.status,
+                "priority": issue.priority,
+                "issue_type": issue_type,
+                "created_at": issue.created_at,
+                "updated_at": issue.updated_at,
+                "duration_seconds": max(0, int((end - created).total_seconds())),
+            })
+        activity = [
+            {"date": (dt.now() - timedelta(days=offset)).strftime("%Y-%m-%d"), "count": activity_counts.get((dt.now() - timedelta(days=offset)).strftime("%Y-%m-%d"), 0)}
+            for offset in range(29, -1, -1)
+        ]
+        dashboard = {
+            "kind": "issue-list",
+            "scope": scope,
+            "total": len(all_issues),
+            "shown": len(dashboard_issues),
+            "statuses": [{"key": key, "label": status_labels.get(key, key), "count": count} for key, count in status_counts.items()],
+            "priorities": [{"key": key, "label": priority_labels.get(key, key), "count": count} for key, count in priority_counts.items()],
+            "types": [{"key": key, "label": type_labels.get(key, key), "count": count} for key, count in type_counts.items()],
+            "activity": activity,
+            "issues": dashboard_issues,
+        }
+        marker = f"<!-- flowy-dashboard:{json.dumps(dashboard, ensure_ascii=False)} -->"
+        detail_content = f"{marker}\n\n{response}"
+        detail_reply = await self._temporary_detail("问题列表", detail_content, f"共 {len(all_issues)} 个问题，范围：{scope}")
+        overview = response
+        if len(overview) > 1800:
+            overview = overview[:1800].rsplit("\n", 1)[0].rstrip() + "\n\n> 其余问题和图表请点击详情查看"
+        return f"{overview}\n\n{detail_reply}"
+
+    async def handle_view(self, args: list[str], quote: dict, frame: dict = None) -> str:
+        """Show one bug/requirement through a temporary read-only detail link."""
+        if not args:
+            return "❌ 用法: `/view <编号或标题>`\n\n例：`/view #a1b2c3d4` 或 `/查看 登录报错`"
+        query = " ".join(args).removeprefix("#").strip()
+        resolved = await self._resolve_issue(query)
+        if isinstance(resolved, str):
+            return f"❌ 找不到问题: {query}" if resolved == "not_found" else resolved
+        issue = resolved
+        type_name = "需求" if issue.issue_type == "feature" else "Bug"
+        status_names = {
+            "open": "待处理", "proposed": "提议", "in_progress": "进行中",
+            "accepted": "已接受", "resolved": "已解决", "closed": "已关闭",
+            "cancelled": "已取消", "rejected": "已拒绝",
+        }
+        priority_names = {"critical": "紧急", "high": "高", "medium": "中", "low": "低", "trivial": "低"}
+        content = "\n".join([
+            f"## {type_name} #{issue.id[:8]}",
+            f"- 状态：{status_names.get(issue.status, issue.status)}",
+            f"- 优先级：{priority_names.get(issue.priority, issue.priority)}",
+            f"- 报告人：{issue.reporter.display_name if issue.reporter else '未知'}",
+            f"- 创建时间：{issue.created_at[:19]}",
+            "",
+            "## 描述",
+            issue.description or "暂无描述",
+        ])
+        comments_result = await self.db.execute(
+            select(Comment).where(Comment.issue_id == issue.id, Comment.status == "valid").order_by(Comment.created_at)
+        )
+        comments = comments_result.scalars().all()
+        if comments:
+            content += "\n\n## 评论\n\n" + "\n\n".join(
+                f"**{c.author.display_name if c.author else '未知'}** · {c.created_at[:19]}\n\n{c.body}"
+                for c in comments
+            )
+        return await self._temporary_detail(issue.title, content, f"{type_name} · {status_names.get(issue.status, issue.status)} · {issue.title}")
     async def handle_stats(self, args: list[str], quote: dict, frame: dict = None) -> str:
         from datetime import datetime as dt
         from datetime import timedelta
@@ -458,7 +566,10 @@ class CommandHandlers:
                 title = issue.title[:20] + ".." if len(issue.title) > 20 else issue.title
                 lines.append(f"- #{issue.id[:8]} {title} — {duration}")
 
-        return "\n".join(lines)
+        response = "\n".join(lines)
+        if len(response) > 1200:
+            return await self._temporary_detail("问题统计", response, f"{scope}共 {total} 个问题")
+        return response
 
     # ─── Issue Management ─────────────────────────────────────
 
@@ -866,7 +977,6 @@ class CommandHandlers:
 
     async def handle_test(self, args: list[str], quote: dict, frame: dict = None) -> str:
         from app.models.test import TestRequest, TestRun
-        from app.utils.settings import get_frontend_url
         if not args:
             rows = (await self.db.execute(select(TestRequest).order_by(TestRequest.updated_at.desc()).limit(10))).scalars().all()
             if not rows:
@@ -880,14 +990,34 @@ class CommandHandlers:
             request = (await self.db.execute(select(TestRequest).where(TestRequest.title.like(f"%{query}%")).order_by(TestRequest.updated_at.desc()).limit(1))).scalars().first()
         if not request:
             return "没有找到测试申请"
-        runs = (await self.db.execute(select(TestRun).where(TestRun.request_id == request.id).order_by(TestRun.created_at.desc()).limit(1))).scalars().all()
+        runs = (await self.db.execute(select(TestRun).where(TestRun.request_id == request.id).order_by(TestRun.created_at.desc()))).scalars().all()
         status_names = {"submitted": "测试申请（待审核）", "queued": "等待测试", "testing": "测试中", "passed": "测试成功", "failed": "测试失败", "cancelled": "取消测试", "rejected": "不予以测试"}
         base = f"### 测试申请 #{request.id[:8]}\n- 标题：{request.title}\n- 状态：{status_names.get(request.status, request.status)}\n- 测试人员：{request.tester.display_name if request.tester else '待分配'}"
+        application_detail = (
+            "## 测试申请\n\n"
+            + base.replace(f" #{request.id[:8]}", "")
+            + f"\n\n### 测试目标\n\n{request.objective or '暂无'}"
+            + f"\n\n### 预期效果\n\n{request.expected_effect or '暂无'}"
+            + f"\n\n### 当前行为\n\n{request.current_behavior or '暂无'}"
+        )
+        report_content = application_detail
         if runs:
-            run = runs[0]
-            base += f"\n- 版本：{run.version}\n- 结果：{run.result[:300]}"
-        url = (await get_frontend_url(self.db)).rstrip("/") + f"/#/tests/{request.id}"
-        return base + f"\n\n[查看测试报告]({url})"
+            report_content += "\n\n## 测试报告（按最新到最早）"
+            for index, run in enumerate(runs, 1):
+                report_content += (
+                    f"\n\n### 报告 {index} · {run.version or '未标记版本'} · "
+                    f"{'通过' if run.status == 'passed' else '失败'}"
+                    f"\n\n**测试方法**\n\n{run.method or '暂无'}"
+                    f"\n\n**测试步骤**\n\n{run.steps or '暂无'}"
+                    f"\n\n**测试结果**\n\n{run.result or '暂无'}"
+                    f"\n\n**完整报告**\n\n{run.report or run.result or '暂无'}"
+                )
+        else:
+            report_content += "\n\n## 测试报告\n\n暂无测试报告"
+        return await self._temporary_detail(
+            request.title, report_content,
+            f"{request.title} · {status_names.get(request.status, request.status)}",
+        )
     # ─── Comments ─────────────────────────────────────────────
 
     async def handle_comment(self, args: list[str], quote: dict, frame: dict = None) -> str:
@@ -1604,7 +1734,8 @@ class CommandHandlers:
                     if file_count:
                         parts.append(f"📎{file_count}文件")
                     lines.append(f"  _({'  '.join(parts)})_")
-            return "\n".join(lines)
+            response = "\n".join(lines)
+            return await self._temporary_detail("最近的知识库页面", response, f"共 {len(pages)} 个页面")
 
         # /wiki add 标题 | 内容
         if args[0] == "add":
@@ -1671,7 +1802,7 @@ class CommandHandlers:
         if len(pages) == 1:
             p = pages[0]
             content = _make_public_url(p.content or "_暂无内容_")
-            return f"**{p.title}**\n\n{content}"
+            return await self._temporary_detail(p.title, content, p.summary or None)
 
         # Multiple results: numbered list for user selection
         lines = ["## 📚 知识库搜索结果\n", f"找到 **{len(pages)}** 条与「{keyword}」相关的页面\n"]
@@ -1911,7 +2042,8 @@ class CommandHandlers:
                     for version in versions:
                         lines.extend(_version_block(version))
                 lines.append("")
-            return "\n".join(lines).rstrip()
+            response = "\n".join(lines).rstrip()
+            return await self._temporary_detail("软件版本总览", response, f"共 {len(components)} 个软件组件")
 
         # ── Args: exact match by identifier (unique), else exact name ──
         keyword = " ".join(args).strip()
@@ -1961,7 +2093,8 @@ class CommandHandlers:
                     out.append("")
                 if len(versions) > 5 and not all_versions:
                     out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个；使用 `/soft {c.identifier} /all` 查看全部_")
-            return "\n".join(out).rstrip()
+            response = "\n".join(out).rstrip()
+            return await self._temporary_detail(c.name, response, c.description or f"共 {len(versions)} 个版本")
 
         # Multiple matches → show each component's latest version
         lines = [f"🔍 找到 **{len(matches)}** 个匹配的软件组件：\n"]
@@ -1973,4 +2106,5 @@ class CommandHandlers:
             else:
                 lines.extend(_version_block(lv))
             lines.append("")
-        return "\n".join(lines).rstrip()
+        response = "\n".join(lines).rstrip()
+        return await self._temporary_detail("软件版本查询结果", response, f"找到 {len(matches)} 个匹配的软件组件")

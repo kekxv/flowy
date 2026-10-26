@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.issue import Comment, Issue, issue_assignees, issue_milestones_table
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.models.tracking import Milestone
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
@@ -138,8 +139,48 @@ class TestBotList:
 
         handlers = await _make_handlers(db_session, flowy_user_id=user.id)
         result = await handlers.handle_list(["all"], {})
+        assert "/#/public/bot-details/" in result
         assert "Bug 1" in result
         assert "Bug 2" in result
+        detail = (await db_session.execute(select(TemporaryBotDetail))).scalars().one()
+        assert "Bug 1" in detail.content
+        assert "Bug 2" in detail.content
+
+    @pytest.mark.asyncio
+    async def test_list_returns_dashboard_detail_without_assignment_data(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-list-dashboard", username="dashuser", email="dash@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        issue = await _create_issue(db_session, "Dashboard bug", user.id, "open")
+
+        result = await (await _make_handlers(db_session, flowy_user_id=user.id)).handle_list(["all"], {})
+
+        assert "/#/public/bot-details/" in result
+        detail = (await db_session.execute(select(TemporaryBotDetail))).scalars().one()
+        assert "flowy-dashboard:" in detail.content
+        assert '"kind": "issue-list"' in detail.content
+        assert '"total": 1' in detail.content
+        assert "Dashboard bug" in detail.content
+        assert issue.id not in detail.content
+        assert "我的工作" not in detail.content
+
+
+class TestBotView:
+    @pytest.mark.asyncio
+    async def test_view_issue_returns_temporary_detail_link(self, db_session: AsyncSession):
+        user = User(**_make_user_kwargs(id="user-view1", username="viewer1", email="view1@ex.com"))
+        db_session.add(user)
+        await db_session.flush()
+        await _create_issue(db_session, "登录报错", user.id, "open")
+        issue = (await db_session.scalar(select(Issue).where(Issue.title == "登录报错")))
+        db_session.add(Comment(issue_id=issue.id, author_id=user.id, body="已经确认是权限配置问题"))
+        await db_session.commit()
+        handlers = await _make_handlers(db_session, flowy_user_id=user.id)
+        result = await handlers.handle_view(["登录报错"], {})
+        assert "点击查看详情" in result
+        assert "/#/public/bot-details/" in result
+        detail = (await db_session.execute(select(TemporaryBotDetail))).scalar_one()
+        assert "已经确认是权限配置问题" in detail.content
 
 
 # ── TestBotCreate ────────────────────────────────────────────────────────────

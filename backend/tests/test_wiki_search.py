@@ -5,8 +5,10 @@ from datetime import datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.temporary_bot_detail import TemporaryBotDetail
 from app.models.user import User
 from app.models.wechat_work_bot import WeChatWorkBotUser
 from app.models.wiki import WikiPage
@@ -455,8 +457,10 @@ class TestHandleWiki:
         handlers = CommandHandlers(db=db_session, bot_user=bot_user, wechat_user_id="wx-wiki-5")
         result = await handlers.handle_wiki([], {})
         assert "最近的知识库页面" in result
-        assert "Page 1" in result
-        assert "Page 2" in result
+        assert "/#/public/bot-details/" in result
+        detail = (await db_session.execute(select(TemporaryBotDetail))).scalars().one()
+        assert "Page 1" in detail.content
+        assert "Page 2" in detail.content
 
     @pytest.mark.asyncio
     async def test_add_wiki_page(self, db_session: AsyncSession):

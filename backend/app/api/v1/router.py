@@ -14,6 +14,7 @@ from app.api.v1 import (
     settings_api,
     software,
     sync,
+    temporary_bot_details,
     temporary_issue_links,
     tests,
     users,
@@ -42,6 +43,7 @@ api_router.include_router(software.router)
 
 api_router.include_router(temporary_issue_links.router)
 api_router.include_router(temporary_issue_links.public_router)
+api_router.include_router(temporary_bot_details.public_router)
 api_router.include_router(tests.router)
 api_router.include_router(tests.collection_router)
 api_router.include_router(tests.public_router)
