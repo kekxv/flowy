@@ -454,7 +454,7 @@ async def fuzzy_search(
 ) -> list[WikiPage]:
     """Fuzzy search wiki pages, ranked by relevance.
 
-    Searches both related users' wiki and public wiki by title, tags, and
+    Searches visible wiki pages by title, tags, and
     overview summary — the page body is never searched. A page whose title
     matches the keyword exactly is returned directly; other pages are ranked
     by relevance (title > tags > overview).
@@ -467,9 +467,8 @@ async def fuzzy_search(
     if not tokens:
         return []
 
-    # Build visibility filter: related users' pages + public pages
+    # Issue co-assignment does not grant access to another user's private wiki.
     own_filter = WikiPage.owner_id == user_id
-    related_filter = WikiPage.owner_id.in_(related_user_ids) if related_user_ids else None
     public_filter = WikiPage.is_public == True  # noqa: E712
     collab_filter = WikiPage.id.in_(
         select(wiki_collaborators_table.c.wiki_id).where(
@@ -478,8 +477,6 @@ async def fuzzy_search(
     )
 
     visibility_conditions = [own_filter, public_filter, collab_filter]
-    if related_filter is not None:
-        visibility_conditions.append(related_filter)
     visibility = or_(*visibility_conditions)
 
     # Exact/complete title match is the highest priority — return it directly,
@@ -548,13 +545,20 @@ async def search_for_bot(
     related_pages: list[WikiPage] = []
     public_pages: list[WikiPage] = []
 
-    # 1. Search related users' wiki (both public and private)
+    # 1. Related pages must still satisfy the normal wiki visibility rules.
     if related_user_ids:
         result = await db.execute(
             select(WikiPage)
             .where(
                 search_filter,
                 WikiPage.owner_id.in_(related_user_ids),
+                or_(
+                    WikiPage.is_public.is_(True),
+                    WikiPage.owner_id == bot_user_id,
+                    WikiPage.id.in_(select(wiki_collaborators_table.c.wiki_id).where(
+                        wiki_collaborators_table.c.user_id == bot_user_id,
+                    )),
+                ),
             )
             .options(selectinload(WikiPage.owner))
             .order_by(WikiPage.updated_at.desc())

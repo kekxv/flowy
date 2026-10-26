@@ -57,7 +57,11 @@ def split_for_wecom(text: str, max_bytes: int = WECOM_MSG_MAX_BYTES) -> list[str
                 pos = 0
                 while pos < len(encoded):
                     end = min(pos + max_bytes, len(encoded))
-                    chunk = encoded[pos:end].decode("utf-8", errors="ignore")
+                    while end < len(encoded) and encoded[end] & 0xC0 == 0x80:
+                        end -= 1
+                    if end <= pos:
+                        raise ValueError("max_bytes is too small for a UTF-8 character")
+                    chunk = encoded[pos:end].decode("utf-8")
                     if chunk:
                         chunks.append(chunk)
                     pos = end
@@ -157,12 +161,25 @@ class WeChatWorkBotService:
         async with async_session() as db:
             bot_user = await self._get_bot_user(db, wechat_user_id)
 
+            # Continuations must pass the same current permissions as commands.
+            if msg_ctx.text.strip().isdigit():
+                pending_command = (
+                    "assign" if wechat_user_id in self._pending_assignments else
+                    "wiki" if wechat_user_id in self._pending_wiki else None
+                )
+                if pending_command and (not bot_user or not check_permission(bot_user.role, pending_command)):
+                    self._pending_assignments.pop(wechat_user_id, None)
+                    self._pending_wiki.pop(wechat_user_id, None)
+                    if self._client:
+                        await self._client.reply_text(frame, "⚠️ 当前没有权限继续此操作，请重新查询或联系管理员。")
+                    return
+
             # 2.5. Check for pending assignment numeric reply
             if wechat_user_id in self._pending_assignments:
                 pending = self._pending_assignments[wechat_user_id]
                 text = msg_ctx.text.strip()
                 if text.isdigit():
-                    idx = int(text) - 1
+                    idx = int(text) - 1 if text.isascii() and len(text) <= 3 else -1
                     issues = pending.get("issues", [])
                     if 0 <= idx < len(issues):
                         issue_id = issues[idx][0]
@@ -174,13 +191,13 @@ class WeChatWorkBotService:
                             if self._client:
                                 await self._client.reply_markdown(frame, response)
                             await self._log_command(
-                                db, wechat_user_id, bot_user.id if bot_user else None,
+                                db, wechat_user_id, bot_user.flowy_user_id if bot_user else None,
                                 "assign", [str(idx + 1)], response, "success", None
                             )
-                        except Exception as e:
+                        except Exception:
                             logger.exception("Failed to complete assignment")
                             if self._client:
-                                await self._client.reply_text(frame, f"❌ 指派失败: {e}")
+                                await self._client.reply_text(frame, "❌ 指派失败，请稍后重试或联系管理员。")
                         finally:
                             del self._pending_assignments[wechat_user_id]
                         return
@@ -194,10 +211,12 @@ class WeChatWorkBotService:
                 text = msg_ctx.text.strip()
                 if text.isdigit():
                     page_ids = self._pending_wiki[wechat_user_id]
-                    idx = int(text) - 1
+                    idx = int(text) - 1 if text.isascii() and len(text) <= 3 else -1
                     if 0 <= idx < len(page_ids):
                         from app.services import wiki_service
-                        page = await wiki_service.get_page_by_id(db, page_ids[idx])
+                        page = await wiki_service.get_page_for_user(
+                            db, page_ids[idx], bot_user.flowy_user_id
+                        ) if bot_user.flowy_user_id else None
                         if page:
                             # Convert local file paths to public URLs
                             import re as _re
@@ -214,16 +233,17 @@ class WeChatWorkBotService:
                                     f'({public_url}/api/v1/wiki/files/',
                                     content,
                                 )
+                            handlers = CommandHandlers(db, bot_user, wechat_user_id, client=self._client, frame=frame)
                             response = await handlers._temporary_detail(page.title, content, page.summary or None)
                             if self._client:
                                 await self._client.reply_markdown(frame, response)
                             await self._log_command(
-                                db, wechat_user_id, bot_user.id if bot_user else None,
+                                db, wechat_user_id, bot_user.flowy_user_id if bot_user else None,
                                 "wiki", [str(idx + 1)], response, "success", None
                             )
                         else:
                             if self._client:
-                                await self._client.reply_text(frame, "❌ 该页面不存在或已被删除")
+                                await self._client.reply_text(frame, "❌ 该页面不存在或没有访问权限")
                         del self._pending_wiki[wechat_user_id]
                         return
                     else:
@@ -275,12 +295,15 @@ class WeChatWorkBotService:
                         frame, f"⚠️ 您的角色 ({bot_user.role}) 没有权限执行 /{command_name}"
                     )
                 await self._log_command(
-                    db, wechat_user_id, bot_user.id, command_name, parsed.args,
+                    db, wechat_user_id, bot_user.flowy_user_id, command_name, parsed.args,
                     "⚠️ 权限不足", "failed", "Insufficient permissions"
                 )
                 return
 
             # 6. Execute handler
+            # A new command supersedes the previous numbered prompt.
+            self._pending_assignments.pop(wechat_user_id, None)
+            self._pending_wiki.pop(wechat_user_id, None)
             handlers = CommandHandlers(db, bot_user, wechat_user_id, client=self._client, frame=frame)
             handler_name = cmd_def.get("handler", "")
             handler_func = getattr(handlers, handler_name, None)
@@ -308,16 +331,16 @@ class WeChatWorkBotService:
                     for chunk in split_for_wecom(response):
                         await self._client.reply_markdown(frame, chunk, mentioned)
                 await self._log_command(
-                    db, wechat_user_id, bot_user.id if bot_user else None, command_name,
+                    db, wechat_user_id, bot_user.flowy_user_id if bot_user else None, command_name,
                     parsed.args, response, "success", None
                 )
             except Exception as e:
                 logger.exception(f"Handler error for /{command_name}")
-                error_msg = f"❌ 执行出错: {e}"
+                error_msg = "❌ 执行出错，请稍后重试或联系管理员。"
                 if self._client:
                     await self._client.reply_text(frame, error_msg, mentioned)
                 await self._log_command(
-                    db, wechat_user_id, bot_user.id if bot_user else None, command_name,
+                    db, wechat_user_id, bot_user.flowy_user_id if bot_user else None, command_name,
                     parsed.args, error_msg, "failed", str(e)
                 )
 
@@ -360,7 +383,14 @@ class WeChatWorkBotService:
             WeChatWorkBotUser.wechat_user_id == wechat_user_id
         )
         result = await db.execute(query)
-        return result.scalar_one_or_none()
+        bot_user = result.scalar_one_or_none()
+        if bot_user and bot_user.flowy_user_id:
+            from app.models.user import User
+
+            user = await db.get(User, bot_user.flowy_user_id)
+            if not user or not user.is_active:
+                return None
+        return bot_user
 
     async def _log_command(
         self,

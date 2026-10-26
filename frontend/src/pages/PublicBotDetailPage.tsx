@@ -8,6 +8,10 @@ import { parseIssueListDashboard } from '../components/IssueListDashboardData'
 
 export default function PublicBotDetailPage() {
   const { token = '' } = useParams()
+  return <BotDetailContent key={token} token={token} />
+}
+
+function BotDetailContent({ token }: { token: string }) {
   const [detail, setDetail] = useState<PublicBotDetail | null>(null)
   const [unavailable, setUnavailable] = useState(false)
   const [selectedReport, setSelectedReport] = useState<number | null>(null)
@@ -21,10 +25,12 @@ export default function PublicBotDetailPage() {
 
   const date = detail ? new Date(detail.expires_at).toLocaleString() : ''
   const displayTitle = detail?.title.replace(/\s*#[0-9a-f]{8}\b/i, '') || '详情查看'
-  const pages = detail ? detail.content.split(/\n(?=## 测试报告)/) : []
+  const content = detail?.content || ''
+  const isTestDetail = content.startsWith('<!-- flowy-test-detail -->\n') || content.startsWith('## 测试申请\n\n### 测试申请')
+  const pages = isTestDetail ? content.replace(/^<!-- flowy-test-detail -->\n/, '').split(/\n(?=## 测试报告)/) : [content]
   const reports = pages.length > 1 ? pages.slice(1).join('\n').split(/\n(?=### 报告 )/).filter(report => /^### 报告 /.test(report.trim())) : []
   const parsedDashboard = detail ? parseIssueListDashboard(detail.content) : { dashboard: null, markdown: '' }
-  const application = (parsedDashboard.markdown || pages[0] || detail?.content || '').replace(/(测试申请)\s*#[0-9a-f]{8}\b/ig, '$1')
+  const application = (pages.length > 1 ? pages[0] ?? '' : parsedDashboard.markdown).replace(/(测试申请)\s*#[0-9a-f]{8}\b/ig, '$1')
   const reportData = reports.map((report, index) => {
     const heading = report.match(/^###\s+([^\n]+)/)?.[1] || `报告 ${index + 1}`
     const body = report.replace(/^###\s+[^\n]+\n?/, '')
@@ -50,6 +56,7 @@ export default function PublicBotDetailPage() {
           <header className="bot-detail-hero"><p className="bot-detail-kicker">DETAIL</p><h1>{displayTitle}</h1><div className="bot-detail-summary">{detail.summary}</div></header>
           <div className="bot-detail-pages">
             <article className="bot-detail-card">{parsedDashboard.dashboard ? <IssueListDashboard data={parsedDashboard.dashboard} /> : <MarkdownContent className="bot-detail-prose" children={application || '暂无内容'} />}</article>
+            {pages.length > 1 && reportData.length === 0 && <section className="bot-detail-reports"><MarkdownContent className="bot-detail-prose" children={pages.slice(1).join('\n')} /></section>}
             {reportData.length > 0 && <section className="bot-detail-reports"><div className="bot-detail-reports-heading"><div><p className="bot-detail-kicker">REPORTS</p><h2>报告档案 <span>{reportData.length}</span></h2><p>每次验证独立留档，点击卡片查看完整测试过程与报告。</p></div><span>按最新提交在前</span></div><div className="test-report-grid bot-detail-report-grid">{reportData.map((report, index) => <article key={index} className={`test-report-card ${report.failed ? 'failed' : 'passed'}`}><div className="test-report-card-top"><span className={`test-report-card-icon ${report.failed ? 'failed' : ''}`}>{report.failed ? <XCircle size={20} /> : <CheckCircle2 size={20} />}</span><span className={`chip ${report.failed ? 'chip-red' : 'chip-green'}`}>{report.failed ? '测试失败' : '测试成功'}</span></div><div className="test-report-card-title"><h3>{report.heading.replace(/\s*#[0-9a-f]{8}\b/ig, '')}</h3>{index === 0 && <span>最新报告</span>}</div><p className="test-report-card-sequence">第 {reportData.length - index} 份测试报告</p><div className="test-report-card-excerpt"><span>结果摘要</span><p>{report.excerpt || '暂无结果摘要'}</p></div><footer><span>报告 {String(index + 1).padStart(2, '0')}</span><button type="button" onClick={() => setSelectedReport(index)}>查看报告 <ChevronRight size={14} /></button></footer></article>)}</div></section>}
           </div>
           <footer className="bot-detail-footer">此页面由 Flowy 机器人生成 · 链接到期后自动失效</footer>

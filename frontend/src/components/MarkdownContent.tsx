@@ -1,6 +1,6 @@
 import { isValidElement } from 'react';
 import ReportVisual from './markdown/ReportVisual';
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform as sanitizeUrl } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import type { Components } from "react-markdown";
@@ -59,7 +59,7 @@ export default function MarkdownContent({
     <div className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, ...remarkPlugins]}
-        urlTransform={urlTransform}
+        urlTransform={(url) => sanitizeUrl(urlTransform(url))}
         components={{
           ...defaultComponents,
           ...components,

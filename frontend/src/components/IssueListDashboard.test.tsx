@@ -31,3 +31,15 @@ describe("IssueListDashboard", () => {
     expect(screen.queryByText(/2155f2af/)).not.toBeInTheDocument()
   })
 })
+
+it.each([
+  { kind: 'issue-list', issues: [] },
+  { ...data, statuses: null },
+  { ...data, activity: [{ date: 1, count: 2 }] },
+  { ...data, total: '2' },
+  { ...data, priorities: [{ key: 'high', label: '高', count: -1 }] },
+  { ...data, issues: [{ title: {} }] },
+])('falls back to readable Markdown for malformed dashboard data: %j', (malformed) => {
+  const content = `<!-- flowy-dashboard:${JSON.stringify(malformed)} -->\n\n可读正文`
+  expect(parseIssueListDashboard(content)).toEqual({ dashboard: null, markdown: content })
+})

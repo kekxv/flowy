@@ -184,22 +184,23 @@ class CommandHandlers:
         - "not_found": no match at all
         - A formatted string when multiple title matches exist
         """
+        if not query_text.strip():
+            return "not_found"
         # Try ID prefix match first
         result = await self.db.execute(
-            select(Issue).where(Issue.id.startswith(query_text))
-        )
-        issue = result.scalar_one_or_none()
-        if issue:
-            return issue
-
-        # Try title fuzzy match
-        result = await self.db.execute(
-            select(Issue)
-            .where(Issue.title.like(f"%{query_text}%"))
-            .order_by(Issue.updated_at.desc())
-            .limit(10)
+            select(Issue).where(Issue.id.startswith(query_text, autoescape=True)).limit(10)
         )
         issues = result.scalars().all()
+
+        # Try title fuzzy match
+        if not issues:
+            result = await self.db.execute(
+                select(Issue)
+                .where(Issue.title.like(f"%{query_text}%"))
+                .order_by(Issue.updated_at.desc())
+                .limit(10)
+            )
+            issues = result.scalars().all()
         if len(issues) == 1:
             return issues[0]
         elif len(issues) > 1:
@@ -385,16 +386,30 @@ class CommandHandlers:
         priority_counts: dict[str, int] = {}
         type_counts: dict[str, int] = {}
         dashboard_issues: list[dict[str, object]] = []
-        activity_counts: dict[str, int] = {}
+        # Charts cover every match; only the message and detail rows are capped.
+        totals = await self.db.execute(
+            select(Issue.status, Issue.priority, Issue.issue_type, func.count(Issue.id))
+            .where(base_filter).group_by(Issue.status, Issue.priority, Issue.issue_type)
+        )
+        for status, priority, issue_type, count in totals.all():
+            status_counts[status] = status_counts.get(status, 0) + count
+            priority_counts[priority] = priority_counts.get(priority, 0) + count
+            issue_type = issue_type or "bug"
+            type_counts[issue_type] = type_counts.get(issue_type, 0) + count
+        total = sum(status_counts.values())
+        today = dt.now().date()
+        activity_start = (today - timedelta(days=29)).isoformat()
+        created_day = func.substr(Issue.created_at, 1, 10)
+        activity_rows = await self.db.execute(
+            select(created_day, func.count(Issue.id))
+            .where(base_filter, created_day >= activity_start, created_day <= today.isoformat())
+            .group_by(created_day)
+        )
+        activity_counts = dict(activity_rows.all())
         for issue in all_issues:
-            status_counts[issue.status] = status_counts.get(issue.status, 0) + 1
-            priority_counts[issue.priority] = priority_counts.get(issue.priority, 0) + 1
             issue_type = issue.issue_type or "bug"
-            type_counts[issue_type] = type_counts.get(issue_type, 0) + 1
             created = dt.fromisoformat(issue.created_at[:19])
             end = _resolve_end(issue)
-            day = created.strftime("%Y-%m-%d")
-            activity_counts[day] = activity_counts.get(day, 0) + 1
             dashboard_issues.append({
                 "title": issue.title,
                 "status": issue.status,
@@ -405,13 +420,13 @@ class CommandHandlers:
                 "duration_seconds": max(0, int((end - created).total_seconds())),
             })
         activity = [
-            {"date": (dt.now() - timedelta(days=offset)).strftime("%Y-%m-%d"), "count": activity_counts.get((dt.now() - timedelta(days=offset)).strftime("%Y-%m-%d"), 0)}
+            {"date": (today - timedelta(days=offset)).isoformat(), "count": activity_counts.get((today - timedelta(days=offset)).isoformat(), 0)}
             for offset in range(29, -1, -1)
         ]
         dashboard = {
             "kind": "issue-list",
             "scope": scope,
-            "total": len(all_issues),
+            "total": total,
             "shown": len(dashboard_issues),
             "statuses": [{"key": key, "label": status_labels.get(key, key), "count": count} for key, count in status_counts.items()],
             "priorities": [{"key": key, "label": priority_labels.get(key, key), "count": count} for key, count in priority_counts.items()],
@@ -421,7 +436,7 @@ class CommandHandlers:
         }
         marker = f"<!-- flowy-dashboard:{json.dumps(dashboard, ensure_ascii=False)} -->"
         detail_content = f"{marker}\n\n{response}"
-        detail_reply = await self._temporary_detail("问题列表", detail_content, f"共 {len(all_issues)} 个问题，范围：{scope}")
+        detail_reply = await self._temporary_detail("问题列表", detail_content, f"共 {total} 个问题，范围：{scope}")
         overview = response
         if len(overview) > 1800:
             overview = overview[:1800].rsplit("\n", 1)[0].rstrip() + "\n\n> 其余问题和图表请点击详情查看"
@@ -982,9 +997,10 @@ class CommandHandlers:
             if not rows:
                 return "没有测试申请"
             return "\n".join(f"| {r.id[:8]} | {r.title[:24]} | {r.status} | {r.tester.display_name if r.tester else '待分配'} |" for r in rows)
-        query = args[0].removeprefix("#")
-        if query.lower() == "report" and len(args) > 1:
-            query = args[1]
+        query_args = args[1:] if args[0].lower() == "report" else args
+        query = " ".join(query_args).removeprefix("#").strip()
+        if not query:
+            return "用法：`/test <编号或标题>` 或 `/test report <编号或标题>`"
         request = (await self.db.execute(select(TestRequest).where(TestRequest.id.startswith(query)))).scalars().first()
         if not request:
             request = (await self.db.execute(select(TestRequest).where(TestRequest.title.like(f"%{query}%")).order_by(TestRequest.updated_at.desc()).limit(1))).scalars().first()
@@ -1000,7 +1016,7 @@ class CommandHandlers:
             + f"\n\n### 预期效果\n\n{request.expected_effect or '暂无'}"
             + f"\n\n### 当前行为\n\n{request.current_behavior or '暂无'}"
         )
-        report_content = application_detail
+        report_content = "<!-- flowy-test-detail -->\n" + application_detail
         if runs:
             report_content += "\n\n## 测试报告（按最新到最早）"
             for index, run in enumerate(runs, 1):
@@ -1999,6 +2015,21 @@ class CommandHandlers:
                 return f"[下载]({v.download_url})"
             return None
 
+        async def _reply_with_latest_downloads(title: str, content: str, summary: str, selected: list) -> str:
+            reply = await self._temporary_detail(title, content, summary)
+            overview, detail_link = reply.rsplit("\n\n", 1)
+            downloads = []
+            for component in selected[:10]:
+                latest = component.versions[0] if component.versions else None
+                label = f"**{component.name}** · " if len(selected) > 1 else ""
+                if latest:
+                    downloads.append(f"{label}最新版本：v{latest.version}\n下载：{_download(latest) or '暂无下载地址'}")
+                else:
+                    downloads.append(f"{label}暂无版本")
+            if len(selected) > 10:
+                downloads.append("其余组件的最新下载地址请点击详情查看。")
+            return "\n\n".join([overview, *downloads, detail_link])
+
         def _note_md(v, limit: int | None = 140) -> str | None:
             """Raw Markdown release note (optionally truncated for a preview).
 
@@ -2043,7 +2074,7 @@ class CommandHandlers:
                         lines.extend(_version_block(version))
                 lines.append("")
             response = "\n".join(lines).rstrip()
-            return await self._temporary_detail("软件版本总览", response, f"共 {len(components)} 个软件组件")
+            return await _reply_with_latest_downloads("软件版本总览", response, f"共 {len(components)} 个软件组件", components)
 
         # ── Args: exact match by identifier (unique), else exact name ──
         keyword = " ".join(args).strip()
@@ -2094,7 +2125,7 @@ class CommandHandlers:
                 if len(versions) > 5 and not all_versions:
                     out.append(f"\n> _仅显示最新 5 个版本，共 {len(versions)} 个；使用 `/soft {c.identifier} /all` 查看全部_")
             response = "\n".join(out).rstrip()
-            return await self._temporary_detail(c.name, response, c.description or f"共 {len(versions)} 个版本")
+            return await _reply_with_latest_downloads(c.name, response, c.description or f"共 {len(versions)} 个版本", [c])
 
         # Multiple matches → show each component's latest version
         lines = [f"🔍 找到 **{len(matches)}** 个匹配的软件组件：\n"]
@@ -2107,4 +2138,4 @@ class CommandHandlers:
                 lines.extend(_version_block(lv))
             lines.append("")
         response = "\n".join(lines).rstrip()
-        return await self._temporary_detail("软件版本查询结果", response, f"找到 {len(matches)} 个匹配的软件组件")
+        return await _reply_with_latest_downloads("软件版本查询结果", response, f"找到 {len(matches)} 个匹配的软件组件", matches)

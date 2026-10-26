@@ -34,3 +34,18 @@ it('shows invalid chart source with a readable error instead of losing report co
   expect(await screen.findByRole('alert')).toHaveTextContent('图表')
   expect(screen.getByText('{broken}')).toBeInTheDocument()
 })
+
+it.each(['javascript:alert%281%29', 'vbscript:msgbox%281%29', 'data:text/html;base64,PHNjcmlwdD4='])('blocks unsafe Markdown URL %s', (url) => {
+  const { container } = render(<MarkdownContent>{`[unsafe](${url})\n\n![unsafe image](${url})`}</MarkdownContent>)
+  expect(container.querySelector('a')?.getAttribute('href')).toBeFalsy()
+  expect(container.querySelector('img')?.getAttribute('src')).toBeFalsy()
+})
+it('keeps attachment rewrites and safe links while filtering custom URL transforms', () => {
+  const { container } = render(<MarkdownContent>{'[file](attachment:example.png)\n\n[safe](https://example.com)'}</MarkdownContent>)
+  expect(screen.getByText('file')).toHaveAttribute('href', 'api/v1/bot-attachments/example.png')
+  expect(screen.getByText('safe')).toHaveAttribute('href', 'https://example.com')
+  cleanup()
+  render(<MarkdownContent urlTransform={() => 'javascript:alert(1)'}>{'[unsafe](https://example.com)'}</MarkdownContent>)
+  expect(screen.getByText('unsafe').getAttribute('href')).toBeFalsy()
+  expect(container.querySelector('script')).toBeNull()
+})

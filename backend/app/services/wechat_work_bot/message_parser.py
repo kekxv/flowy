@@ -19,7 +19,7 @@ class MessageContext:
     # Raw quote data (for image/media handling)
     raw_quote: dict = field(default_factory=dict)
     # Structured data extracted from quoted content
-    extracted_issue_ids: list[int] = field(default_factory=list)
+    extracted_issue_ids: list[str | int] = field(default_factory=list)
     extracted_usernames: list[str] = field(default_factory=list)
     extracted_numbers: list[int] = field(default_factory=list)
 
@@ -64,7 +64,7 @@ class MessageParser:
             quoted_msgid = body.get("quoted_msgid", "")
 
         # Extract structured info from quoted content
-        extracted_issue_ids: list[int] = []
+        extracted_issue_ids: list[str | int] = []
         extracted_usernames: list[str] = []
         extracted_numbers: list[int] = []
 
@@ -127,15 +127,19 @@ class MessageParser:
             return match.group(1).strip()
         return text
 
-    def _extract_issue_ids(self, text: str) -> list[int]:
-        """Extract issue IDs from text. Matches #123 or ISSUE-123 patterns."""
-        ids: list[int] = []
-        # #123 pattern
-        for match in re.finditer(r"#(\d+)", text):
-            ids.append(int(match.group(1)))
+    def _extract_issue_ids(self, text: str) -> list[str | int]:
+        """Accept actual UUIDs/prefixes while preserving legacy numeric references."""
+        ids: list[str | int] = []
+        for match in re.finditer(r"#([0-9a-f]{8}(?:-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?|\d+)\b", text, re.IGNORECASE):
+            value = match.group(1)
+            if len(value) == 36 or len(value) == 8:
+                ids.append(value.lower())
+            elif len(value) <= 18:
+                ids.append(int(value))
         # ISSUE-123 pattern
         for match in re.finditer(r"ISSUE-(\d+)", text, re.IGNORECASE):
-            ids.append(int(match.group(1)))
+            if len(match.group(1)) <= 18:
+                ids.append(int(match.group(1)))
         return list(dict.fromkeys(ids))  # deduplicate preserving order
 
     def _extract_usernames(self, text: str) -> list[str]:
@@ -149,5 +153,6 @@ class MessageParser:
         """Extract standalone numbers from text (potential IDs)."""
         nums: list[int] = []
         for match in re.finditer(r"\b(\d+)\b", text):
-            nums.append(int(match.group(1)))
+            if len(match.group(1)) <= 18:
+                nums.append(int(match.group(1)))
         return nums

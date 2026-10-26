@@ -306,8 +306,8 @@ class TestFuzzySearch:
         assert result[0].title == "Public Docker"
 
     @pytest.mark.asyncio
-    async def test_related_priority(self, db_session: AsyncSession):
-        """Related users' private pages should be searchable."""
+    async def test_related_users_still_need_explicit_wiki_access(self, db_session: AsyncSession):
+        """Issue relations must not bypass private wiki permissions."""
         owner = await _create_user(db_session, id="u10", username="u10", email="u10@ex.com")
         viewer = await _create_user(db_session, id="u11", username="u11", email="u11@ex.com")
         # Private page from related user
@@ -317,10 +317,9 @@ class TestFuzzySearch:
         result = await wiki_service.fuzzy_search(db_session, "Docker", viewer.id, related_user_ids=[])
         assert len(result) == 0
 
-        # With related_user_ids: should see it
+        # Related issue participants cannot read private wiki pages.
         result = await wiki_service.fuzzy_search(db_session, "Docker", viewer.id, related_user_ids=[owner.id])
-        assert len(result) == 1
-        assert result[0].title == "Team Docker"
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_no_results(self, db_session: AsyncSession):

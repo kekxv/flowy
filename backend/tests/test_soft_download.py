@@ -2,7 +2,7 @@
 
 import re
 from html import unescape
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 
 import pytest
 from fastapi import FastAPI
@@ -13,6 +13,7 @@ from app.api.v1.software import router
 from app.database import get_db
 from app.models.software import SoftwareComponent, SoftwareVersion
 from app.models.temporary_bot_detail import TemporaryBotDetail
+from app.services.wechat_work_bot.file_token import verify_file_token
 from app.services.wechat_work_bot.handlers import CommandHandlers
 
 
@@ -95,3 +96,38 @@ async def test_intranet_token_cannot_authorize_software_download(tmp_path, monke
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(f"/api/v1/software/download/release.zip?token={token}")
         assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('args', [[], ['web'], ['web', '/all']])
+@pytest.mark.parametrize('artifact_type', ['url', 'file', 'none'])
+async def test_soft_reply_exposes_only_latest_download(db_session, args, artifact_type):
+    db_session.add(SoftwareComponent(id='web', name='Web', identifier='web'))
+    db_session.add_all([
+        SoftwareVersion(
+            id='old', component_id='web', version='1.0', published_at='2026-01-01',
+            artifact_type='url', download_url='https://example.com/old.zip',
+        ),
+        SoftwareVersion(
+            id='latest', component_id='web', version='2.0', published_at='2026-02-01',
+            artifact_type=artifact_type, download_url='https://example.com/latest.zip',
+            stored_filename='latest.zip', file_name='latest.zip',
+        ),
+    ])
+    await db_session.flush()
+    response = await CommandHandlers(db_session).handle_soft(args, {})
+    assert '最新版本' in response
+    assert 'v2.0' in response
+    assert 'https://example.com/old.zip' not in response
+    if artifact_type == 'url':
+        assert '[下载](https://example.com/latest.zip)' in response
+    elif artifact_type == 'file':
+        assert '/api/v1/software/download/latest.zip/confirm?token=' in response
+        link = re.search(r'\[latest.zip\]\(([^)]+)\)', response).group(1)
+        payload = verify_file_token(parse_qs(urlsplit(link).query)['token'][0])
+        assert payload['sid'] == 'software'
+        assert payload['url'] == 'latest.zip'
+    else:
+        assert '暂无下载地址' in response
+        assert 'https://example.com/latest.zip' not in response
+    assert '点击查看详情' in response
